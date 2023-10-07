@@ -92,7 +92,7 @@ void insert_indent()
 //      guessedIndentAmount = guess_space_indent_amount(prevIndentAmount, MIN(currentCharOffset, curIndentAmount));
       }
     }
-    else if (curIndentAmount > 0)
+    else if (curIndentAmount > 0 && prev)
     {
       guessedIndentChar = currentLine->text[curIndentAmount-1];
       if (is_space(guessedIndentChar))

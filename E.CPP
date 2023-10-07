@@ -442,16 +442,16 @@ void move_cursor_horizontally(int chars)
     {
       if (currentLine->prevLine)
       {
-  move_cursor_vertically(-1);
-  cursorX = virtualX = currentLine->length;
-  left = MAX(0, cursorX - (SCREEN_WIDTH-1));
-  cursorX -= left;
-  viewportXOffset += left;
+        move_cursor_vertically(-1);
+        cursorX = virtualX = currentLine->length;
+        left = MAX(0, cursorX - (SCREEN_WIDTH-1));
+        cursorX -= left;
+        viewportXOffset += left;
 
-  move_cursor_horizontally(chars+1);
+        move_cursor_horizontally(chars+1);
       }
       else
-  ERROR_BEEP();
+        ERROR_BEEP();
     }
   }
   else if (chars > 0)
@@ -582,7 +582,7 @@ void move_cursor_to_next_word()
 
   for(; currentCharOffset < line->length; ++currentCharOffset)
     if (isalnum((unsigned char)line->text[currentCharOffset])
-  && !isalnum((unsigned char)line->text[currentCharOffset-1]))
+      && !isalnum((unsigned char)line->text[currentCharOffset-1]))
     break;
 
   if (currentCharOffset >= line->length)
@@ -829,8 +829,6 @@ void erase_current_line()
   }
   repaint_screen();
 }
-
-//extern unsigned short pendingScanCode; // TODO REMOVE
 
 void print_textsel_info()
 {
