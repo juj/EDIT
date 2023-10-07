@@ -13,6 +13,7 @@
 
 void run_open_file_menu()
 {
+#if defined(__TURBOC__) && defined(__MSDOS__)
   struct find_t ffblk;
   int x = 0;
   int y = 1;
@@ -66,4 +67,5 @@ void run_open_file_menu()
       set_chars_color(selectionX*FILE_WIDTH, selectionY, FILE_WIDTH-1, WHITE | BGCOLOR(LTGRAY));
     }
   }
+#endif
 }

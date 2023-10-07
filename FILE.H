@@ -1,13 +1,13 @@
 #ifndef _FILE_H
 #define _FILE_H
 
+#include "memory.h"
 #include <stdio.h>
 
 struct Line;
 
-class File
+struct File
 {
-public:
   char *filename;
   char huge *fileData;
   long size;

@@ -2,26 +2,26 @@
 #include "memory.h"
 #include "audio.h"
 #include "screen.h"
+#include "input.h"
 #include <dos.h>
-#include <alloc.h>
 #include <stdio.h>
 #include <string.h>
 
-unsigned long allocatedNearMemory = 0;
-unsigned long allocatedFarMemory = 0;
+size_t allocatedNearMemory = 0;
+size_t allocatedFarMemory = 0;
 
-void out_of_memory(int isFarMemory, unsigned long bytes)
+void out_of_memory(int isFarMemory, size_t bytes)
 {
   char str[64];
-  sprintf(str, "Unable to allocate %lu bytes of %s memory!",
+  sprintf(str, "Unable to allocate %zu bytes of %s memory!",
     bytes, isFarMemory ? "far" : "near");
-  put_string_on_screen(str, (SCREEN_WIDTH - strlen(str))/2, SCREEN_HEIGHT-1,
+  put_string_on_screen(str, (SCREEN_WIDTH - (int)strlen(str))/2, SCREEN_HEIGHT-1,
     YELLOW | BGCOLOR(RED));
   ERROR_BEEP();
-  getch();
+  get_key();
 }
 
-void far *Farmalloc(unsigned long bytes)
+void far *Farmalloc(size_t bytes)
 {
   void far *ptr = farmalloc(bytes);
   if (ptr)
@@ -41,7 +41,7 @@ void *Malloc(size_t bytes)
   return ptr;
 }
 
-void Farfree(void far *ptr, unsigned long bytes)
+void Farfree(void far *ptr, size_t bytes)
 {
   if (ptr)
   {

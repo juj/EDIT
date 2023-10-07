@@ -1,18 +1,20 @@
 #ifndef _LINE_H
 #define _LINE_H
 
+#include "memory.h"
+
 // Line::colorsFlags bitfield
 #define LINE_STARTS_IN_COMMENT 0x01
 #define LINE_ENDS_IN_COMMENT 0x02
 
 struct Line
 {
-  int ownsPtr;
-  char huge *text;
+  unsigned ownsPtr : 1;
+  unsigned char colorFlags;
   long length;
   long capacity;
-  char far *colors;
-  unsigned char colorFlags;
+  char huge *text;
+  unsigned char huge *colors;
   Line far *prevLine;
   Line far *nextLine;
 };

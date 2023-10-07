@@ -1,6 +1,8 @@
 #ifndef _SCREEN_H
 #define _SCREEN_H
 
+#include "memory.h"
+
 #define ATTR_BLINK 0x80
 #define BLACK      0
 #define BLUE       1
@@ -28,7 +30,7 @@ extern unsigned char SCREEN_HEIGHT;
 #define CHAR_RIGHT_ARROW 0x1A
 #define CHAR_MIDDLE_DOT ((char)0xFA)
 
-extern char far *screen;
+//extern char far *screen;
 
 void clear_line(char far *screenPtr, unsigned char ch);
 void show_line(char far *screenPtr, char huge *text, int textLen);
@@ -36,7 +38,6 @@ void show_line_with_colors(char far *screenPtr, char huge *text, int textLen, un
 
 void show_line_with_sel(char far *screenPtr, char huge *text, int textLen, int selStart, int selEnd);
 void show_line_with_colors_with_sel(char far *screenPtr, char huge *text, int textLen, unsigned char far *colors, int selStart, int selEnd);
-
 
 void put_string_on_screen(const char *str, int x, int y);
 void put_string_on_screen(const char *str, int x, int y, unsigned char color);

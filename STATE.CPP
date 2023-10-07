@@ -27,17 +27,17 @@ char tabChar = showWhitespace ? (tabMode == ' ' ? CHAR_MIDDLE_DOT : CHAR_RIGHT_A
 
 unsigned char editorTextColor = LTGREEN | BGCOLOR(BLUE);
 
-unsigned long selectionStartLineNum = 0, selectionEndLineNum = 0;
+long selectionStartLineNum = 0, selectionEndLineNum = 0;
 Line far *selectionStartLine = 0;
 Line far *selectionEndLine = 0;
-unsigned long selectionStartColumn = 0, selectionEndColumn = 0;
+long selectionStartColumn = 0, selectionEndColumn = 0;
 
-unsigned long current_column()
+long current_column()
 {
   return viewportXOffset + cursorX;
 }
 
-unsigned long current_line_number()
+long current_line_number()
 {
   return firstDisplayedLineNumber + cursorY;
 }

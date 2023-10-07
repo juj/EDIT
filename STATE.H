@@ -1,7 +1,9 @@
 #ifndef _STATE_H
 #define _STATE_H
 
-class File;
+#include "memory.h"
+
+struct File;
 struct Line;
 
 extern long allocatedMemory;
@@ -38,12 +40,12 @@ extern unsigned char editorTextColor;
 
 void clear_selection();
 
-extern unsigned long selectionStartLineNum, selectionEndLineNum;
+extern long selectionStartLineNum, selectionEndLineNum;
 extern Line far *selectionStartLine; // if 0, no active selection
 extern Line far *selectionEndLine;
-extern unsigned long selectionStartColumn, selectionEndColumn;
+extern long selectionStartColumn, selectionEndColumn;
 
-unsigned long current_line_number();
-unsigned long current_column();
+long current_line_number();
+long current_column();
 
 #endif

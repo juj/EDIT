@@ -14,7 +14,7 @@ enum extern float for friend goto if inline int long new operator private
 protected public register return short signed sizeof static struct switch
 template this throw try typedef union unsigned virtual void volatile while */
 
-static int strneq(const char huge *s, char *s2, int n)
+static int strneq(const char huge *s, const char *s2, int n)
 {
   for(int i = 0; i < n; ++i)
     if (s[i] != s2[i])
@@ -37,8 +37,8 @@ int is_cpp_reserved_word(const char huge *s, const char huge *end)
 {
   assert(s);
   assert(end);
-  const size_t len = end-s;
-  const size_t len1 = len-1;
+  const int len = (int)(end-s);
+  const int len1 = len-1;
   const char huge * const s1 = s+1;
   switch(len)
   {

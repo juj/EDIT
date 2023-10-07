@@ -2,6 +2,8 @@
 #include <conio.h>
 #include <dos.h>
 
+#if defined(__TURBOC__) && defined(__MSDOS__)
+
 #define SCANCODE_LEFT_ALT 0x38
 #define SCANCODE_RIGHT_ALT 0x138
 #define SCANCODE_LEFT_SHIFT 0x2A
@@ -60,11 +62,17 @@ void unregister_keyboard_interrupt()
     oldKbHandler = 0;
   }
 }
+#endif
+
+#if defined(__TURBOC__) && defined(__MSDOS__)
+// 'getch': The POSIX name for this item is deprecated. Instead, use the ISO C and C++ conformant name: _getch.
+#define getch _getch
+#endif
 
 int get_key()
 {
-  int key = getch();
+  int key = _getch();
   if (!key)
-    key = 0x100 | getch();
+    key = 0x100 | _getch();
   return key;
 }

@@ -8,19 +8,17 @@
 #include "audio.h"
 #include <stdlib.h>
 #include <string.h>
-#include <alloc.h>
 #include <assert.h>
 
 long huge_fread(char huge *dst, long numBytes, FILE *handle)
 {
-  char data[1024];
   long numSuccessfullyRead = 0;
   while(numBytes > 0)
   {
     long blockSize = MIN(numBytes, 1024);
     size_t numRead = fread(dst, 1, blockSize, handle);
     dst = &dst[blockSize];
-    numSuccessfullyRead += numRead;
+    numSuccessfullyRead += (long)numRead;
     if (numRead != blockSize)
       break;
     numBytes -= blockSize;
@@ -30,14 +28,13 @@ long huge_fread(char huge *dst, long numBytes, FILE *handle)
 
 long huge_fwrite(char huge *src, long numBytes, FILE *handle)
 {
-  char data[1024];
   long numWritten = 0;
   while(numBytes > 0)
   {
     long blockSize = MIN(numBytes, 1024);
     size_t nW = fwrite(src, 1, blockSize, handle);
     src = &src[blockSize];
-    numWritten += nW;
+    numWritten += (long)nW;
     if (numWritten != blockSize)
       break;
     numBytes -= blockSize;
@@ -112,7 +109,7 @@ File *open_new_file()
 
   f->nextFile = f->prevFile = 0;
   f->hasUnsavedChanges = 0;
-  char *filename = "<unsaved>";
+  const char *filename = "<unsaved>";
   f->filename = (char*)Malloc(strlen(filename)+1);
   if (!f->filename)
   {
@@ -134,7 +131,8 @@ File *open_new_file()
 
   firstLine->ownsPtr = 1;
   firstLine->prevLine = firstLine->nextLine = 0;
-  firstLine->text = firstLine->colors = 0;
+  firstLine->text = 0;
+  firstLine->colors = 0;
   firstLine->colorFlags = 0;
   f->firstLine = f->lastLine = firstLine;
   firstLine->length = firstLine->capacity = 0;
@@ -248,9 +246,9 @@ void save_file(File *file)
     }
     if (line->nextLine)
     {
-      int written = fwrite("\r\n", 1, 2, handle);
+      size_t written = fwrite("\r\n", 1, 2, handle);
       if (written != 2)
-	goto error;
+        goto error;
       line = line->nextLine;
     }
     else break;

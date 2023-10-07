@@ -11,8 +11,8 @@
 #include <string.h>
 
 char huge *copyBuffer = 0;
-unsigned long copyBufferLength = 0;
-unsigned long copyBufferCapacity = 0;
+long copyBufferLength = 0;
+long copyBufferCapacity = 0;
 
 void repaint_screen_lines(int yStart, int yEnd); // TODO proper declaration location
 
@@ -48,7 +48,7 @@ void calculate_num_lines_and_chars_selected(unsigned long *lines, unsigned long 
   *chars = numCharsSelected;
 }
 
-static void copy_buffer_reserve(unsigned long newCap)
+static void copy_buffer_reserve(long newCap)
 {
   if (copyBufferCapacity < newCap)
   {
@@ -73,18 +73,18 @@ void copy_selection()
     return;
 
   // Copy text to copy buffer
-  unsigned long offset = selectionStartColumn;
-  unsigned long dstOfs = 0;
+  long offset = selectionStartColumn;
+  long dstOfs = 0;
   Line far *l = selectionStartLine;
-  for(unsigned long lineNum = selectionStartLineNum; lineNum <= selectionEndLineNum;
+  for(long lineNum = selectionStartLineNum; lineNum <= selectionEndLineNum;
     ++lineNum, l = l->nextLine)
   {
     if (!l)
       break;
 
-    unsigned long end = (lineNum == selectionEndLineNum) ? selectionEndColumn : l->length;
+    long end = (lineNum == selectionEndLineNum) ? selectionEndColumn : l->length;
     assert(offset <= end);
-    unsigned long len = end - offset;
+    long len = end - offset;
 //    printf("dstOfs: %lu, len: %lu, copybufferCapacity: %lu, lineNum: %lu, selectionEndLineNum: %lu\n",
  //     dstOfs, len, copyBufferCapacity, lineNum, selectionEndLineNum);
     assert(dstOfs + len <= copyBufferCapacity);
@@ -137,7 +137,7 @@ void erase_selected_text()
   Line far *l = selectionStartLine->nextLine;
   assert(l);
   Line far *endLine = selectionEndLine->nextLine;
-  for(unsigned long j = selectionStartLineNum+1; j <= selectionEndLineNum && l; ++j)
+  for(long j = selectionStartLineNum+1; j <= selectionEndLineNum && l; ++j)
   {
     Line far *next = l->nextLine;
     if (l == firstDisplayedLine)
@@ -176,7 +176,7 @@ void paste_selection()
 
   // Find the first line of content, and paste it on the
   // current cursor line
-  size_t i = 0;
+  long i = 0;
   for(; i < copyBufferLength; ++i)
     if (copyBuffer[i] == '\n')
       break;
@@ -184,7 +184,7 @@ void paste_selection()
   if (!increase_capacity(currentLine, currentLine->length + i))
     return;
 
-  unsigned long pastePosition = current_column();
+  long pastePosition = current_column();
   if (i < copyBufferLength)// && pastePosition < currentLine->length) // if true, we will be pasting multiple lines
   {
     insert_new_line(0); // TODO: Disable indent generation here?
@@ -220,21 +220,21 @@ void paste_selection()
   unsigned long numPastedLines = 1;
   while (i < copyBufferLength) // multi-line pasting:
   {
-    size_t j;
+    long j;
     for(j = i; j < copyBufferLength; ++j)
       if (copyBuffer[j] == '\n')
-	break;
+    break;
 
     if (j == copyBufferLength)// && j-i > 0) // last line?
     {
       // prepend the last block at the beginning of the last line
-      unsigned long pasteAmount = j-i;
+      long pasteAmount = j-i;
       if (!increase_capacity(endLine, endLine->length + pasteAmount))
-	return;
+        return;
       for(long k = endLine->length + pasteAmount-1; k >= pasteAmount; --k)
-	endLine->text[k] = endLine->text[k - pasteAmount];
+        endLine->text[k] = endLine->text[k - pasteAmount];
       for(size_t l = 0; l < pasteAmount; ++l)
-	endLine->text[l] = copyBuffer[i+l];
+        endLine->text[l] = copyBuffer[i+l];
       endLine->length += pasteAmount;
       clear_highlight(endLine);
       cursorX = virtualX = pasteAmount;

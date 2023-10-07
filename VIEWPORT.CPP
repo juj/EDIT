@@ -49,6 +49,7 @@ void open_file_in_viewport(File *file, unsigned char bringToMruFront)
 
 void run_alt_tab_menu()
 {
+#if defined(__TURBOC__) && defined(__MSDOS__)
   File *f = currentFile;
   if (f->nextFile) f = f->nextFile;
   else if (f->prevFile) f = f->prevFile;
@@ -63,21 +64,22 @@ void run_alt_tab_menu()
       int key = get_key();
       if (key == KEY_TAB || key == KEY_ALT_TAB || key == KEY_SHIFT_TAB || key == KEY_CTRL_TAB)
       {
-	if (leftShiftDown || rightShiftDown)
-	{
-	  if (f->prevFile) f = f->prevFile;
-	  else while(f->nextFile) f = f->nextFile;
-	}
-	else
-	{
-	  if (f->nextFile) f = f->nextFile;
-	  else while(f->prevFile) f = f->prevFile;
-	}
+	      if (leftShiftDown || rightShiftDown)
+	      {
+	        if (f->prevFile) f = f->prevFile;
+	        else while(f->nextFile) f = f->nextFile;
+	      }
+	      else
+	      {
+	        if (f->nextFile) f = f->nextFile;
+	        else while(f->prevFile) f = f->prevFile;
+	      }
 
-	open_file_in_viewport(f, /*bringToMruFront:*/0);
-	repaint_open_files_list(f);
+	      open_file_in_viewport(f, /*bringToMruFront:*/0);
+	      repaint_open_files_list(f);
       }
     }
   }
   bring_to_front_in_mru_order(f);
+#endif
 }
