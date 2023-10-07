@@ -7,7 +7,7 @@
 #include "screen.h"
 #include "audio.h"
 #include "file.h"
-#include <assert.h>
+#include "iassert.h"
 
 int is_tab(char ch)
 {

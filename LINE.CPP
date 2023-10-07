@@ -4,7 +4,7 @@
 #include "state.h"
 #include "file.h"
 #include "memory.h"
-#include <assert.h>
+#include "iassert.h"
 
 int find_line_indent_position(Line far *line)
 {

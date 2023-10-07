@@ -8,11 +8,12 @@
 #include "audio.h"
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
+#include "iassert.h"
 
 long huge_fread(char huge *dst, long numBytes, FILE *handle)
 {
   long numSuccessfullyRead = 0;
+#if defined(_MSC_VER) || defined(__TURBOC__)
   while(numBytes > 0)
   {
     long blockSize = MIN(numBytes, 1024);
@@ -23,12 +24,14 @@ long huge_fread(char huge *dst, long numBytes, FILE *handle)
       break;
     numBytes -= blockSize;
   }
+#endif
   return numSuccessfullyRead;
 }
 
 long huge_fwrite(char huge *src, long numBytes, FILE *handle)
 {
   long numWritten = 0;
+#if defined(_MSC_VER) || defined(__TURBOC__)
   while(numBytes > 0)
   {
     long blockSize = MIN(numBytes, 1024);
@@ -39,6 +42,7 @@ long huge_fwrite(char huge *src, long numBytes, FILE *handle)
       break;
     numBytes -= blockSize;
   }
+#endif
   return numWritten;
 }
 
@@ -113,7 +117,11 @@ File *open_new_file()
 
   f->nextFile = f->prevFile = 0;
   f->hasUnsavedChanges = 0;
-  const char *filename = "<unsaved>";
+#if defined(__C64__) || defined(__MSDOS__) // files are all uppercase, and on C64 chars too
+  const char *filename = "<UNTITLED>";
+#else
+  const char *filename = "<untitled>";
+#endif
   f->filename = (char*)Malloc(strlen(filename)+1);
   if (!f->filename)
   {
@@ -179,6 +187,7 @@ void close_file(File *file)
 
 File *load_file(const char *filename)
 {
+#if defined(_MSC_VER) || defined(__TURBOC__)
   FILE *handle = fopen(filename, "rb");
   if (!handle)
   {
@@ -228,10 +237,14 @@ File *load_file(const char *filename)
     return 0;
   }
   return f;
+#else
+  return 0;
+#endif
 }
 
 void save_file(File *file)
 {
+#if defined(_MSC_VER) || defined(__TURBOC__)
   assert(file);
   if (!strcmp(file->filename, "<unsaved>"))
   {
@@ -271,4 +284,5 @@ error:
   sprintf(str, "Unable to save file \"%s\"!", file->filename);
   log_error(str);
   return;
+#endif
 }

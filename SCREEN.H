@@ -3,6 +3,34 @@
 
 #include "memory.h"
 
+#ifdef __C64__
+// C64 colors: https://www.c64-wiki.com/wiki/Color
+#define BLACK      0
+#define WHITE      1
+#define RED        2
+#define CYAN       3
+#define MAGENTA    4
+#define GREEN      5
+#define BLUE       6
+#define YELLOW     7
+#define BROWN      9
+
+#define LTRED     10
+#define DKGRAY    12
+#define LTGREEN   13
+#define LTBLUE    14
+#define LTGRAY    15
+
+// Don't exist on DOS/PC
+//#define BLACK_GRAY 11
+//#define ORANGE      8
+
+// Don't exist on C64:
+//#define LTCYAN   
+//#define LTMAGENTA
+
+
+#else
 #define ATTR_BLINK 0x80
 #define BLACK      0
 #define BLUE       1
@@ -15,11 +43,12 @@
 #define DKGRAY     8
 #define LTBLUE     9
 #define LTGREEN   10
-#define LTCYAN    11
+//#define LTCYAN    11   // No C64 counterpart
 #define LTRED     12
-#define LTMAGENTA 13
+//#define LTMAGENTA 13   // No C64 counterpart
 #define YELLOW    14
 #define WHITE     15
+#endif
 
 #define BGCOLOR(x) ((x) << 4)
 
@@ -49,7 +78,7 @@ void show_line(int screenPos, char huge *text, int textLen);
 void show_line_with_colors(int screenPos, char huge *text, int textLen, unsigned char far *colors);
 
 void show_line_with_sel(int screenPos, char huge *text, int textLen, int selStart, int selEnd, int drawStartX, int drawEndX);
-void show_line_with_colors_with_sel(int screenPos, char huge *text, int textLen, unsigned char far *colors, int selStart, int selEnd);
+void show_line_with_colors_with_sel(int screenPos, char huge *text, int textLen, unsigned char far *colors, int selStart, int selEnd, int drawStartX, int drawEndX);
 
 void put_string_on_screen(const char *str, int x, int y);
 void put_string_on_screen(const char *str, int x, int y, unsigned char color);

@@ -1,8 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
+#include "iassert.h"
+#if defined(_MSC_VER) || defined(__TURBOC__)
 #include <conio.h>
 #include <dos.h>
+#endif
 #include <string.h>
 #include <ctype.h>
 #include "util.h"
@@ -33,7 +35,7 @@ void repaint_open_files_list(File *highlightFilename)
     sprintf(fname, f->hasUnsavedChanges ? "%s*" : "%s", f->filename);
     x -= (int)strlen(fname);
     unsigned char foreColor = (f->hasUnsavedChanges ? LTRED :
-       (f == currentFile ? LTCYAN : LTGRAY));
+       (f == currentFile ? LTBLUE : LTGRAY));
     unsigned char bgColor = (f == highlightFilename) ? BGCOLOR(LTGRAY) : BGCOLOR(BLACK);
 
     put_string_on_screen(fname, x, 0, foreColor | bgColor);
@@ -55,7 +57,7 @@ void repaint_line(int screenY, Line *line, int startX, int endX)
     int selStart = (lineNumber == selectionStartLineNum) ? selectionStartColumn : (lineNumber <= selectionEndLineNum ? 0 : 0x7FFF);
     int selEnd = (lineNumber == selectionEndLineNum) ? selectionEndColumn : (lineNumber >= selectionStartLineNum ? 0x7FFF : 0);
 #ifdef ENABLE_SYNTAX_HIGHLIGHTING
-    if (curLine->colors) show_line_with_colors_with_sel(y * SCREEN_WIDTH, curLine->text, curLine->length, curLine->colors, selStart, selEnd);
+    if (line->colors) show_line_with_colors_with_sel(screenY * SCREEN_WIDTH, line->text, line->length, line->colors, selStart, selEnd, startX, endX);
     else
 #endif
       show_line_with_sel(screenY * SCREEN_WIDTH, line->text, line->length, selStart, selEnd, startX, endX);
@@ -812,6 +814,7 @@ void run_goto_line_menu()
       }
       // TODO: Goto line
     }
+#ifndef __C64__ // TODO
     else if (key == KEY_ESC)
     {
       currentLine = originalCurrentLine;
@@ -820,6 +823,7 @@ void run_goto_line_menu()
       cursorY = originalCursorY;
       break;
     }
+#endif
     else if (key == KEY_ENTER)
     {
       cursorX = virtualX = find_line_indent_position(currentLine);
@@ -863,7 +867,7 @@ void print_textsel_info()
     sprintf(str, "%ld chars selected.", numCharsSelected);
   else
     sprintf(str, "%ld lines, %ld chars selected.", numLinesSelected, numCharsSelected);
-  put_string_on_screen(str, (SCREEN_WIDTH-(int)strlen(str))>>1, SCREEN_HEIGHT-1, LTMAGENTA);
+  put_string_on_screen(str, (SCREEN_WIDTH-(int)strlen(str))>>1, SCREEN_HEIGHT-1, LTBLUE);
 }
 
 void select_all()
@@ -898,6 +902,7 @@ void main_loop()
     assert(get_line_number(firstDisplayedLine) == firstDisplayedLineNumber);
     assert(currentLine);
     assert(get_line_number(currentLine) == current_line_number());
+    repaint_screen();
     int key = get_key();
 
     // Doing text selection?
@@ -935,6 +940,7 @@ void main_loop()
       case KEY_RIGHT: move_cursor_horizontally(1); break;
       case KEY_UP: move_cursor_vertically(-1); break;
       case KEY_DOWN: move_cursor_vertically(1); break;
+#ifndef __C64__ // TODO
       case KEY_PGUP: move_viewport_vertically(-SCREEN_HEIGHT, 1); break;
       case KEY_PGDN: move_viewport_vertically(SCREEN_HEIGHT, 1); break;
       case KEY_HOME: toggle_cursor_home(); break;
@@ -950,6 +956,7 @@ void main_loop()
       case KEY_CTRL_Q:
         running = 0;
         break;
+#endif
       case KEY_CTRL_A: select_all(); break;
       case KEY_BACKSPACE:
         if (selectionStartLine)
@@ -1017,7 +1024,9 @@ void main_loop()
         repaint_screen();
         break;
       case KEY_CTRL_W:
+#ifndef __C64__ // TODO
       case KEY_CTRL_F4:
+#endif
         close_file(currentFile);
         repaint_screen();
         break;
@@ -1044,7 +1053,7 @@ void main_loop()
         }
         break;
       case KEY_F10:
-        clear_screen(0, LTGRAY);
+        clear_screen(' ', LTGRAY);
         clrscr();
         system("command.com");
         repaint_screen();
@@ -1136,9 +1145,10 @@ int main(int argc, char **argv)
   assert(currentLine);
 
   init_keyboard();
+  set_cursor_style(CURSOR_NORMAL);
   main_loop();
   deinit_keyboard();
-  clear_screen(0, LTGRAY);
+  clear_screen(' ', LTGRAY);
 #if defined(__TURBOC__) && defined(__MSDOS__)
   clrscr();
 #endif

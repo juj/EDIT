@@ -1,6 +1,8 @@
 #include "input.h"
+#if defined(_MSC_VER) || defined(__TURBOC__)
 #include <conio.h>
 #include <dos.h>
+#endif
 
 #ifdef _MSC_VER
 #include <Windows.h>
@@ -92,16 +94,20 @@ int is_navigation_action_key(int key)
   case KEY_RIGHT:
   case KEY_UP:
   case KEY_DOWN:
+#ifndef __C64__ // TODO
   case KEY_PGUP:
+#endif
   case KEY_PGDN:
   case KEY_HOME:
   case KEY_END:
+#ifndef __C64__ // TODO
   case KEY_CTRL_LEFT:
   case KEY_CTRL_RIGHT:
   case KEY_CTRL_UP:
   case KEY_CTRL_DOWN:
   case KEY_CTRL_HOME:
   case KEY_CTRL_END:
+#endif
     return 1;
   default:
     return 0;
@@ -118,7 +124,9 @@ int is_shift_aware_key(int key)
   case KEY_RIGHT:
   case KEY_UP:
   case KEY_DOWN:
+#ifndef __C64__ // TODO
   case KEY_PGUP:
+#endif
   case KEY_PGDN:
   case KEY_HOME:
   case KEY_END:
@@ -128,6 +136,7 @@ int is_shift_aware_key(int key)
   }
 }
 
+#if defined(_MSC_VER) || defined(__TURBOC__)
 int get_key()
 {
   int key = _getch();
@@ -136,6 +145,7 @@ int get_key()
   if (is_shift_key_currently_down() && is_shift_aware_key(key)) key |= KEY_SHIFT_MODIFIER;
   return key;
 }
+#endif
 
 bool is_shift_key_held(int key)
 {

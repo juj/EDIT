@@ -1,7 +1,7 @@
 #ifndef _HIGHLITE_H
 #define _HIGHLITE_H
 
-//#define ENABLE_SYNTAX_HIGHLIGHTING 1
+#define ENABLE_SYNTAX_HIGHLIGHTING 1
 
 struct Line;
 

@@ -1,7 +1,9 @@
+#if defined(_MSC_VER) || defined(__TURBOC__)
 #include <conio.h>
-#include <stdio.h>
 #include <dos.h>
-#include <assert.h>
+#endif
+#include <stdio.h>
+#include "iassert.h"
 #include "openfile.h"
 #include "input.h"
 #include "screen.h"

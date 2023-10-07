@@ -1,4 +1,4 @@
-#include <assert.h>
+#include "iassert.h"
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
@@ -164,10 +164,10 @@ void syntax_highlight(Line far *line)
       line->colors[i] =	CYAN | bg;
       if (line->text[i] == '*' && i+1 < line->length && line->text[i+1] == '/')
       {
-	line->colors[i+1] = CYAN | bg;
-	i += 2;
-	commentTerminated = 1;
-	break;
+	      line->colors[i+1] = CYAN | bg;
+	      i += 2;
+	      commentTerminated = 1;
+	      break;
       }
     }
     if (!commentTerminated)
@@ -184,7 +184,7 @@ void syntax_highlight(Line far *line)
     else if (isalnum(line->text[i]) || line->text[i] == '_')
     {
       size_t j = i+1;
-      while(j < line->length && (isalnum(line->text[j]) || line->text[j] == '_'))
+      while(j < line->length && (isalnum((unsigned char)line->text[j]) || line->text[j] == '_'))
 	++j;
       unsigned char color = LTGREEN | bg;
       if (line->text[i] == '0' && j-i>1)
@@ -231,16 +231,16 @@ void syntax_highlight(Line far *line)
 	}
       }
       else
-	line->colors[i] = YELLOW | bg;
+	       line->colors[i] = YELLOW | bg;
     }
     else if (line->text[i] == '\'')
     {
       line->colors[i++] = MAGENTA | bg;
       for(; i < line->length; ++i)
       {
-	line->colors[i] = MAGENTA | bg;
-	if (line->text[i] == '\'')
-	  break;
+	       line->colors[i] = MAGENTA | bg;
+	       if (line->text[i] == '\'')
+	         break;
       }
     }
     else if (line->text[i] == '"')
@@ -259,9 +259,14 @@ void syntax_highlight(Line far *line)
       line->colors[i] = YELLOW | bg;
     else if (line->text[i] == '#')
     {
-      unsigned char color = (i == indentLength) ? BLUE | BGCOLOR(CYAN) : BLACK | BGCOLOR(RED);
+#ifdef __C64__
+#define COMMENT_COLOR (LTBLUE | BGCOLOR(CYAN))
+#else
+#define COMMENT_COLOR (BLUE | BGCOLOR(CYAN))
+#endif
+      unsigned char color = (i == indentLength) ? COMMENT_COLOR : (BLACK | BGCOLOR(RED));
       for(size_t j = i; j < line->length; ++j)
-	line->colors[j] = color;
+	       line->colors[j] = color;
       return;
     }
     else line->colors[i] = LTGREEN | bg;

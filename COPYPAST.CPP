@@ -7,7 +7,7 @@
 #include "file.h"
 #include "screen.h"
 #include "audio.h" // TODO REMOVE THIS
-#include <assert.h>
+#include "iassert.h"
 #include <string.h>
 
 char huge *copyBuffer = 0;

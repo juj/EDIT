@@ -1,9 +1,11 @@
+#if defined(_MSC_VER) || defined(__TURBOC__)
 #include <conio.h>
+#include <dos.h>
+#endif
 #include "memory.h"
 #include "audio.h"
 #include "screen.h"
 #include "input.h"
-#include <dos.h>
 #include <stdio.h>
 #include <string.h>
 

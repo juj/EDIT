@@ -5,10 +5,12 @@
 #include <wchar.h>
 #include <stdlib.h>
 #include <stdio.h>
-
-#include <assert.h>
-
+#include "../iassert.h"
 #include "../screen.h"
+
+void set_cursor_style(int style)
+{
+}
 
 int get_text_width()
 {

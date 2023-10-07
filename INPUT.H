@@ -14,26 +14,49 @@
 #define KEY_CTRL_V 0x16
 #define KEY_CTRL_W 0x17
 #define KEY_CTRL_X 0x18
-#define KEY_ESC    0x1B
-//#define KEY_SHIFT_INSERT 0x30
-#define KEY_F2    0x13C
-#define KEY_F3    0x13D
-#define KEY_F10   0x144
-#define KEY_LEFT  0x14B
-#define KEY_RIGHT 0x14D
-#define KEY_UP    0x148
-#define KEY_DOWN  0x150
-#define KEY_HOME  0x147
-#define KEY_END   0x14f
-#define KEY_PGUP  0x149
-#define KEY_PGDN  0x151
+
+#ifdef __C64__
+//#define KEY_ESC    0x03 On C64, ESC and Ctrl-C give the same PETSCII key code
+#define KEY_F1         0x85
+#define KEY_F3         0x86
+#define KEY_F5         0x87
+#define KEY_F7         0x88
+#define KEY_F2         0x89
+#define KEY_F4         0x8A
+#define KEY_F6         0x8B
+#define KEY_F8         0x8C
+#define KEY_BACKSPACE  0x14
+#define KEY_LEFT       0x9D
+#define KEY_UP         0x91
+#define KEY_DOWN       0x11
+#define KEY_RIGHT      0x1D
+#define KEY_HOME       0x13
+#define KEY_END        0x5F
+#define KEY_PGDN       0x5E
+#else
+
+#define KEY_F2         0x13C
+#define KEY_F3         0x13D
+#define KEY_F10        0x144
+#define KEY_ESC        0x1B
+#define KEY_BACKSPACE  0x08
+#define KEY_LEFT       0x14B
+#define KEY_UP         0x148
+#define KEY_DOWN       0x150
+#define KEY_RIGHT      0x14D
+#define KEY_HOME       0x147
+#define KEY_END        0x14f
+#define KEY_PGUP       0x149
+#define KEY_PGDN       0x151
 #define KEY_CTRL_HOME  0x177
 #define KEY_CTRL_END   0x175
 #define KEY_CTRL_LEFT  0x173
 #define KEY_CTRL_RIGHT 0x174
 #define KEY_CTRL_F4    0x161
 #define KEY_ALT_F4     0x16B
-#define KEY_BACKSPACE  0x08
+
+#endif
+
 #define KEY_INSERT     0x152
 #define KEY_SHIFT_INSERT (KEY_SHIFT_MODIFIER | KEY_INSERT)
 #define KEY_DELETE     0x153
@@ -52,6 +75,7 @@
 
 int get_key();
 bool is_shift_key_held(int key);
+int is_shift_aware_key(int key);
 int is_navigation_action_key(int key);
 
 void init_keyboard();

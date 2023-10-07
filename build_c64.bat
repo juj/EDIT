@@ -1,0 +1,1 @@
+C:\code\llvm-mos-sdk\build\install\bin\mos-c64-clang.bat AUDIO.CPP COPYPAST.CPP CURSOR.CPP E.CPP FILE.CPP HIGHLITE.CPP INPUT.CPP LINE.CPP SMINDENT.CPP MEMORY.CPP OPENFILE.CPP SCREEN.CPP STATE.CPP UTIL.CPP VGA.CPP VIEWPORT.CPP -o test.prg -Os -Wno-nonportable-include-path c64/c64.cpp c64/c64key.cpp

@@ -3,8 +3,10 @@
 #include "file.h"
 #include "input.h"
 #include "audio.h"
-#include <assert.h>
+#include "iassert.h"
+#if defined(_MSC_VER) || defined(__TURBOC__)
 #include <conio.h>
+#endif
 
 void repaint_open_files_list(File *highlightFilename);
 void repaint_screen();

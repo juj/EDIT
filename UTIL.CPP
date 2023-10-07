@@ -1,4 +1,6 @@
+#if defined(_MSC_VER) || defined(__TURBOC__)
 #include <conio.h>
+#endif
 #include "util.h"
 #include "audio.h"
 #include "screen.h"

@@ -1,11 +1,13 @@
+#if defined(_MSC_VER) || defined(__TURBOC__)
 #include <conio.h>
+#include <dos.h>
+#endif
 #include "screen.h"
 #include "util.h"
 #include "state.h"
 #include "audio.h"
 #include "memory.h"
-#include <dos.h>
-#include <assert.h>
+#include "iassert.h"
 #include <string.h>
 
 #include <stdio.h> // todo remove
@@ -59,30 +61,30 @@ void log_x(const char *str)
     put_screen(pos, str[i], WHITE | BGCOLOR(MAGENTA));
 }
 
-void show_line_with_colors(int screenPos, char huge *text, int textLen, unsigned char *colors)
+void show_line_with_colors(int screenPos, char huge *text, int textLen, unsigned char *colors, int drawStartX, int drawEndX)
 {
-  textLen = MIN(textLen - viewportXOffset, SCREEN_WIDTH);
+  textLen = MIN(textLen - viewportXOffset, drawEndX);
   int x;
-  for(x = 0; x < textLen; ++x)
+  for(x = drawStartX; x < textLen; ++x)
     put_screen(screenPos+x, text[x + viewportXOffset], colors[x + viewportXOffset]);
-  for(; x < SCREEN_WIDTH; ++x)
+  for(; x < drawEndX; ++x)
     put_screen(screenPos+x, 0, editorTextColor);
 }
 
-void show_line_with_colors_with_sel(int screenPos, char huge *text, int textLen, unsigned char *colors, int selStart, int selEnd)
+void show_line_with_colors_with_sel(int screenPos, char huge *text, int textLen, unsigned char *colors, int selStart, int selEnd, int drawStartX, int drawEndX)
 {
   selStart -= viewportXOffset;
   selEnd -= viewportXOffset;
   const unsigned char selectionColor = BLUE | BGCOLOR(LTGRAY);
-  textLen = MIN(textLen - viewportXOffset, SCREEN_WIDTH);
+  textLen = MIN(textLen - viewportXOffset, drawEndX);
   int x;
-  for(x = 0; x < textLen; ++x)
+  for(x = drawStartX; x < textLen; ++x)
   {
     put_screen(screenPos + x, text[x + viewportXOffset], x < selStart || x >= selEnd ? colors[x + viewportXOffset] : selectionColor);
 //    screenPtr[x<<1] = ;
 //    screenPtr[(x<<1)+1] = ;
   }
-  for(; x < SCREEN_WIDTH; ++x)
+  for(; x < drawEndX; ++x)
   {
     put_screen(screenPos + x, 0, editorTextColor);
   }

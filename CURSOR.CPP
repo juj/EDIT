@@ -4,14 +4,25 @@
 void toggle_insert()
 {
   insertMode = !insertMode;
-#if defined(__TURBOC__) && defined(__MSDOS__)
-  _setcursortype(insertMode ? _SOLIDCURSOR : _NORMALCURSOR);
-#else
-  // xxx todo
-#endif
+  if (insertMode) set_cursor_style(CURSOR_INSERT);
+  else set_cursor_style(CURSOR_NORMAL);
 }
 
 #if defined(__TURBOC__) && defined(__MSDOS__)
+
+void set_cursor_style(int style)
+{
+#if defined(__TURBOC__) && defined(__MSDOS__)
+  switch(style)
+  {
+  case CURSOR_NONE: _setcursortype(_NOCURSOR); break;
+  case CURSOR_INSERT: _setcursortype(_SOLIDCURSOR); break;
+  default: _setcursortype(_NORMALCURSOR); break;
+  }
+#else
+  // todo
+#endif
+}
 
 void set_vga_cursor_position(int x, int y)
 {
@@ -30,4 +41,5 @@ void set_cursor_pos(int x, int y)
   gotoxy(x+1, y+1);
   set_vga_cursor_position(cursorX, cursorY);
 }
+
 #endif
