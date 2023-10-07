@@ -116,7 +116,11 @@ int saved_screen_matches_current_screen()
     for(int x = 0; x < screen_buffer_width; ++x)
     {
       int i = y*screen_buffer_width+x;
-      if (screen_buffer[i].ch != saved_screen_buffer[i].ch)
+      char ech = screen_buffer[i].ch;
+      if (ech < 32) ech = 32;
+      char gch = saved_screen_buffer[i].ch;
+      if (gch < 32) gch = 32;
+      if (ech != gch)
       {
         printf("\n(%d,%d) got '%c'(%d), expected '%c'(%d)\n", x, y, saved_screen_buffer[i].ch, (int)saved_screen_buffer[i].ch, screen_buffer[i].ch, (int)screen_buffer[i].ch);
         return 0;

@@ -16,15 +16,15 @@ long copyBufferCapacity = 0;
 
 void repaint_screen_lines(int yStart, int yEnd); // TODO proper declaration location
 
-void calculate_num_lines_and_chars_selected(unsigned long *lines, unsigned long *chars)
+void calculate_num_lines_and_chars_selected(long *lines, long *chars)
 {
   assert(lines);
   assert(chars);
 
   assert(selectionEndLine);
   assert(selectionStartColumn <= selectionStartLine->length);
-  unsigned long numLinesSelected = 0;
-  unsigned long numCharsSelected;
+  long numLinesSelected = 0;
+  long numCharsSelected;
   if (selectionStartLineNum != selectionEndLineNum)
   {
     numCharsSelected = selectionStartLine->length - selectionStartColumn;
@@ -60,8 +60,8 @@ static void copy_buffer_reserve(long newCap)
 
 void copy_selection()
 {
-  unsigned long numLinesSelected;
-  unsigned long numCharsSelected;
+  long numLinesSelected;
+  long numCharsSelected;
   calculate_num_lines_and_chars_selected(&numLinesSelected, &numCharsSelected);
   if (numCharsSelected == 0)
   {

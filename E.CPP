@@ -840,17 +840,17 @@ void print_textsel_info()
     return;
 
   assert(selectionStartLineNum <= selectionEndLineNum);
-  unsigned long numLinesSelected;
-  unsigned long numCharsSelected;
+  long numLinesSelected;
+  long numCharsSelected;
   calculate_num_lines_and_chars_selected(&numLinesSelected, &numCharsSelected);
 
   char str[64];
   if (numCharsSelected == 0)
     return;
   if (numLinesSelected == 1)
-    sprintf(str, "%lu chars selected.", numCharsSelected);
+    sprintf(str, "%ld chars selected.", numCharsSelected);
   else
-    sprintf(str, "%lu lines, %lu chars selected.", numLinesSelected, numCharsSelected);
+    sprintf(str, "%ld lines, %ld chars selected.", numLinesSelected, numCharsSelected);
   put_string_on_screen(str, (SCREEN_WIDTH-(int)strlen(str))>>1, SCREEN_HEIGHT-1, LTMAGENTA);
 }
 
@@ -886,7 +886,7 @@ void main_loop()
     assert(get_line_number(firstDisplayedLine) == firstDisplayedLineNumber);
     assert(currentLine);
     assert(get_line_number(currentLine) == current_line_number());
-//    verify_screen_is_painted_correctly();
+    verify_screen_is_painted_correctly();
     int key = get_key();
 
     // Doing text selection?

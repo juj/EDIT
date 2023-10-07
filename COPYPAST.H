@@ -1,7 +1,7 @@
 #ifndef _COPYPAST_H
 #define _COPYPAST_H
 
-void calculate_num_lines_and_chars_selected(unsigned long *lines, unsigned long *chars);
+void calculate_num_lines_and_chars_selected(long *lines, long *chars);
 
 void erase_selected_text();
 
