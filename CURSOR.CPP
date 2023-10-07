@@ -12,15 +12,9 @@ void toggle_insert()
 }
 
 #if defined(__TURBOC__) && defined(__MSDOS__)
-void set_cursor_pos(int x, int y)
-{
-  gotoxy(x+1, y+1);
-}
-#endif
 
 void set_vga_cursor_position(int x, int y)
 {
-#if defined(__TURBOC__) && defined(__MSDOS__)
   //  disable();
   union REGS regs = {0};
   regs.h.ah = 0x2;
@@ -29,5 +23,11 @@ void set_vga_cursor_position(int x, int y)
   regs.h.dl = x;
   int86(VIDEO_INTERRUPT, &regs, &regs);
   //  enable();
-#endif
 }
+
+void set_cursor_pos(int x, int y)
+{
+  gotoxy(x+1, y+1);
+  set_vga_cursor_position(cursorX, cursorY);
+}
+#endif

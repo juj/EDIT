@@ -56,17 +56,9 @@ void repaint_screen_lines(int yStart, int yEnd)
   assert(yStart <= yEnd);
   assert(yEnd >= 0);
   assert(yEnd <= SCREEN_HEIGHT);
-  Line far *curLine = firstDisplayedLine;
+  Line far *curLine = get_nth_line_on_screen(yStart);
   int y = 0;
-  int lineNumber = firstDisplayedLineNumber;
-  for(; y < yStart; ++y)
-  {
-    if (curLine)
-    {
-      curLine = curLine->nextLine;
-      ++lineNumber;
-    }
-  }
+  int lineNumber = firstDisplayedLineNumber + yStart;
 
   const unsigned char clearCHs[4] = { 0xB2, 0xB1, 0xB0, 0 };
   unsigned char clearCH = 0;
@@ -107,9 +99,34 @@ void repaint_screen_lines(int yStart, int yEnd)
     repaint_open_files_list(0);
 }
 
+void print_line_column_info()
+{
+  assert(get_current_line_number() == current_line_number());
+  //  long curLineNumber = get_current_line_number();
+  char str[64];
+  /*
+  sprintf(str, " %lub near/%lub far mem used    %ld:%d",
+  allocatedNearMemory, allocatedFarMemory,
+  curLineNumber, char_position_on_current_line()+1);
+  */
+
+  sprintf(str, " %ld:%d", current_line_number(), current_column()+1);
+
+  put_string_on_screen(str, SCREEN_WIDTH - (int)strlen(str), SCREEN_HEIGHT-1, LTGRAY);
+}
+
 void repaint_screen()
 {
   repaint_screen_lines(0, SCREEN_HEIGHT);
+  print_line_column_info();
+  set_cursor_pos(cursorX, cursorY);
+}
+
+void verify_screen_is_painted_correctly()
+{
+  save_screen();
+  repaint_screen();
+  assert(saved_screen_matches_current_screen());
 }
 
 void repaint_current_line_from_offset(int xOffset)
@@ -190,11 +207,14 @@ void insert_character(char ch)
     virtualX = cursorX;
 
     // TODO: only repaint the current line starting from currentCharOffset
+    repaint_screen();
+    /*
     if (full_repaint) repaint_screen();
     else
     {
       repaint_current_line_from_offset(cursorX-1);
     }
+    */
   }
 }
 
@@ -238,6 +258,7 @@ void delete_character()
   clear_highlight(currentLine);
   FILE_MODIFIED();
   // TODO: only repaint the current line starting from currentCharOffset
+//  repaint_current_line_from_offset(cursorX-1);
   repaint_screen();
 }
 
@@ -303,10 +324,10 @@ void move_viewport_vertically(int lines, int cursor_moves_along)
       --firstDisplayedLineNumber;
       if (cursor_moves_along || cursorY + 1 >= SCREEN_HEIGHT)
       {
-  currentLine = currentLine->prevLine;
+        currentLine = currentLine->prevLine;
       }
       else
-  ++cursorY;
+        ++cursorY;
       repaint_screen();
     }
     else
@@ -321,20 +342,20 @@ void move_viewport_vertically(int lines, int cursor_moves_along)
     {
       if (currentLine->nextLine && calculate_line_delta(firstDisplayedLine, lastPossibleViewportStartLine) > 0)
       {
-  --lines;
-  scrolled = 1;
-  firstDisplayedLine = firstDisplayedLine->nextLine;
-  ++firstDisplayedLineNumber;
-  if (cursor_moves_along || cursorY <= 0)
-  {
-    currentLine = currentLine->nextLine;
-  }
-  else
-    --cursorY;
-  repaint_screen();
+        --lines;
+        scrolled = 1;
+        firstDisplayedLine = firstDisplayedLine->nextLine;
+        ++firstDisplayedLineNumber;
+        if (cursor_moves_along || cursorY <= 0)
+        {
+          currentLine = currentLine->nextLine;
+        }
+        else
+          --cursorY;
+        repaint_screen();
       }
       else
-  break;
+        break;
     }
   }
 
@@ -366,13 +387,13 @@ void move_cursor_vertically(int lines)
       assert(currentLine == firstDisplayedLine);
       if (currentLine->prevLine)
       {
-  makeSound = -1;
-  currentLine = firstDisplayedLine = currentLine->prevLine;
-      --firstDisplayedLineNumber;
-  repaint_screen();
+        makeSound = -1;
+        currentLine = firstDisplayedLine = currentLine->prevLine;
+        --firstDisplayedLineNumber;
+        repaint_screen();
       }
       else if (!makeSound)
-  makeSound = 1;
+        makeSound = 1;
     }
     ++lines;
   }
@@ -386,13 +407,13 @@ void move_cursor_vertically(int lines)
       makeSound = -1;
       if (cursorY < SCREEN_HEIGHT-1)
       {
-  ++cursorY;
+        ++cursorY;
       }
       else
       {
-  firstDisplayedLine = firstDisplayedLine->nextLine;
-  ++firstDisplayedLineNumber;
-  repaint_screen();
+        firstDisplayedLine = firstDisplayedLine->nextLine;
+        ++firstDisplayedLineNumber;
+        repaint_screen();
       }
     }
     else if (!makeSound)
@@ -452,13 +473,13 @@ void move_cursor_horizontally(int chars)
     {
       if (currentLine->nextLine)
       {
-  move_cursor_vertically(1);
-  cursorX = virtualX = 0;
-  viewportXOffset = 0;
-  move_cursor_horizontally(chars-1);
+        move_cursor_vertically(1);
+        cursorX = virtualX = 0;
+        viewportXOffset = 0;
+        move_cursor_horizontally(chars-1);
       }
       else
-  ERROR_BEEP();
+        ERROR_BEEP();
     }
   }
   if (oldViewportXOffset != viewportXOffset)
@@ -474,22 +495,6 @@ void toggle_cursor_home()
   viewportXOffset = MAX(0, cursorX - SCREEN_WIDTH);
   if (oldViewportXOffset != viewportXOffset)
     repaint_screen();
-}
-
-void print_line_column_info()
-{
-  assert(get_current_line_number() == current_line_number());
-//  long curLineNumber = get_current_line_number();
-  char str[64];
-  /*
-  sprintf(str, " %lub near/%lub far mem used    %ld:%d",
-    allocatedNearMemory, allocatedFarMemory,
-    curLineNumber, char_position_on_current_line()+1);
-    */
-
-  sprintf(str, " %ld:%d", current_line_number(), current_column()+1);
-
-  put_string_on_screen(str, SCREEN_WIDTH - (int)strlen(str), SCREEN_HEIGHT-1, LTGRAY);
 }
 
 Line far *find_last_viewport_start_line(int *linesInView)
@@ -543,8 +548,8 @@ void move_cursor_to_prev_word()
   long currentCharOffset = char_position_on_current_line()-1;
 
   for(; currentCharOffset >= 0; --currentCharOffset)
-    if (isalnum(line->text[currentCharOffset])
-  && (currentCharOffset == 0 || !isalnum(line->text[currentCharOffset-1])))
+    if (isalnum((unsigned char)line->text[currentCharOffset])
+  && (currentCharOffset == 0 || !isalnum((unsigned char)line->text[currentCharOffset-1])))
     break;
 
   if (currentCharOffset < 0)
@@ -580,8 +585,8 @@ void move_cursor_to_next_word()
   long currentCharOffset = char_position_on_current_line()+1;
 
   for(; currentCharOffset < line->length; ++currentCharOffset)
-    if (isalnum(line->text[currentCharOffset])
-  && !isalnum(line->text[currentCharOffset-1]))
+    if (isalnum((unsigned char)line->text[currentCharOffset])
+  && !isalnum((unsigned char)line->text[currentCharOffset-1]))
     break;
 
   if (currentCharOffset >= line->length)
@@ -954,11 +959,11 @@ void run_goto_line_menu()
 
       if (targetLineNumber < viewportPos || targetLineNumber >= viewportPos + SCREEN_HEIGHT-1)
       {
-  viewportPos = MAX(1, targetLineNumber - SCREEN_HEIGHT/2);
-  firstDisplayedLine = get_nth_line(viewportPos);
-  firstDisplayedLineNumber = viewportPos;
+        viewportPos = MAX(1, targetLineNumber - SCREEN_HEIGHT/2);
+        firstDisplayedLine = get_nth_line_of_document(viewportPos);
+        firstDisplayedLineNumber = viewportPos;
       }
-      currentLine = get_nth_line(targetLineNumber);
+      currentLine = get_nth_line_of_document(targetLineNumber);
       cursorY = targetLineNumber - viewportPos;
       repaint_screen();
       put_string_on_screen("Go to line: ", 0, SCREEN_HEIGHT-1, LTGRAY);
@@ -1086,12 +1091,12 @@ void main_loop()
   {
     print_line_column_info();
     set_cursor_pos(cursorX, cursorY);
-    set_vga_cursor_position(cursorX, cursorY);
 
     assert(firstDisplayedLine);
     assert(get_line_number(firstDisplayedLine) == firstDisplayedLineNumber);
     assert(currentLine);
     assert(get_line_number(currentLine) == current_line_number());
+//    verify_screen_is_painted_correctly();
     int key = get_key();
 
     // Doing text selection?

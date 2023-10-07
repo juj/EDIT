@@ -32,6 +32,9 @@ extern unsigned char SCREEN_HEIGHT;
 
 //extern char far *screen;
 
+void save_screen();
+int saved_screen_matches_current_screen();
+
 int init_screen();
 void deinit_screen();
 

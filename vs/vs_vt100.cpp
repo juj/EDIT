@@ -30,7 +30,7 @@ static struct ScreenChar
 {
   char ch;
   unsigned char color;
-} *screen_buffer = 0;
+} *screen_buffer = 0, *saved_screen_buffer = 0;
 static int screen_buffer_size = 0;
 static int screen_buffer_width = 0;
 static int screen_buffer_height = 0;
@@ -44,6 +44,7 @@ static void init_screen_buffer()
   {
     size_t sz = sizeof(ScreenChar)*w*h;
     screen_buffer = (ScreenChar*)realloc(screen_buffer, sz);
+    saved_screen_buffer = (ScreenChar*)realloc(saved_screen_buffer, sz);
     screen_buffer_width = w;
     screen_buffer_height = h;
     screen_buffer_size = w*h;
@@ -101,7 +102,38 @@ static int vt_back_color(unsigned char dosColor)
 
 void set_cursor_pos(int x, int y)
 {
-  printf("\x1b[%d;%dH", y, x);
+  printf("\x1b[%d;%dH", y+1, x+1);
+}
+
+void save_screen()
+{
+  memcpy(saved_screen_buffer, screen_buffer, sizeof(ScreenChar)*screen_buffer_size);
+}
+
+int saved_screen_matches_current_screen()
+{
+  for(int y = 0; y < screen_buffer_height; ++y)
+    for(int x = 0; x < screen_buffer_width; ++x)
+    {
+      int i = y*screen_buffer_width+x;
+      if (screen_buffer[i].ch != saved_screen_buffer[i].ch)
+      {
+        printf("\n(%d,%d) got '%c'(%d), expected '%c'(%d)\n", x, y, saved_screen_buffer[i].ch, (int)saved_screen_buffer[i].ch, screen_buffer[i].ch, (int)screen_buffer[i].ch);
+        return 0;
+      }
+    }
+  for(int y = 0; y < screen_buffer_height; ++y)
+    for(int x = 0; x < screen_buffer_width; ++x)
+    {
+      int i = y*screen_buffer_width+x;
+      if (screen_buffer[i].color != saved_screen_buffer[i].color)
+      {
+        printf("\n(%d,%d) got color %d, expected %d\n", x, y, (int)saved_screen_buffer[i].color, (int)screen_buffer[i].color);
+        return 0;
+      }
+    }
+
+  return 1;
 }
 
 void put_screen(int linearPos, char ch, unsigned char color)
@@ -109,7 +141,7 @@ void put_screen(int linearPos, char ch, unsigned char color)
   init_screen_buffer();
   int x = linearPos % get_text_width();
   int y = linearPos / get_text_width();
-  printf("\x1b[%d;%dH\x1b[%d;%dm%c", y, x, vt_fore_color(color), vt_back_color(color), ch);
+  printf("\x1b[%d;%dH\x1b[%d;%dm%c", y+1, x+1, vt_fore_color(color), vt_back_color(color), ch < 32 ? 32 : ch);
   screen_buffer[linearPos].ch = ch;
   screen_buffer[linearPos].color = color;
 }

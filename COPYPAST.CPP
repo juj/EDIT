@@ -106,7 +106,7 @@ void erase_selected_text()
 {
   assert(selectionStartLine);
   assert(selectionEndLine);
-  if (selectionStartLineNum == selectionEndLineNum)
+  if (selectionStartLineNum == selectionEndLineNum) // Only a single line of selected text?
   {
     unsigned long newLineLength = selectionStartLine->length - (selectionEndColumn - selectionStartColumn);
     for(size_t i = 0; i < selectionStartLine->length - selectionEndColumn; ++i)

@@ -2,6 +2,10 @@
 #include <conio.h>
 #include <dos.h>
 
+#ifdef _MSC_VER
+#include <Windows.h>
+#endif
+
 #if defined(__TURBOC__) && defined(__MSDOS__)
 
 #define SCANCODE_LEFT_ALT 0x38
@@ -72,7 +76,7 @@ void unregister_keyboard_interrupt()
 int get_key()
 {
   int key = _getch();
-  if (!key)
+  if (!key || key == 0xE0)
     key = 0x100 | _getch();
   return key;
 }
@@ -95,6 +99,8 @@ bool is_shift_key_held()
 {
 #if defined(__TURBOC__) && defined(__MSDOS__)
   return leftShiftDown || rightShiftDown;
+#elif defined(_MSC_VER)
+  return GetAsyncKeyState(VK_SHIFT) || GetAsyncKeyState(VK_LSHIFT) || GetAsyncKeyState(VK_RSHIFT);
 #else
   return 0; // XXX TODO
 #endif

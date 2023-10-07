@@ -24,11 +24,17 @@ Line far *advance_n_lines(Line far *line, long numLinesForward)
   return line;
 }
 
-Line far *get_nth_line(long lineNumber)
+Line far *get_nth_line_of_document(long lineNumber)
 {
   assert(currentFile);
   assert(currentFile->firstLine);
   return advance_n_lines(currentFile->firstLine, lineNumber - 1);
+}
+
+Line far *get_nth_line_on_screen(long screenY)
+{
+  assert(firstDisplayedLine);
+  return advance_n_lines(firstDisplayedLine, screenY);
 }
 
 long get_line_number(Line far *line)
