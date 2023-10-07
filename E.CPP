@@ -1060,8 +1060,8 @@ void main_loop()
         }
         else
         {
-          set_cursor_pos(0,0);
-          printf("0x%x     \n", key);
+//          set_cursor_pos(0,0);
+  //        printf("0x%x     \n", key);
         }
         break;
     }
