@@ -258,8 +258,6 @@ void delete_character()
   repaint_screen();
 }
 
-void unindent();
-
 void backspace_character()
 {
   int currentCharOffset = char_position_on_current_line();
