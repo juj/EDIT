@@ -1,6 +1,8 @@
 #ifndef _INPUT_H
 #define _INPUT_H
 
+#define KEY_SHIFT_MODIFIER 0x4000
+
 #define KEY_CTRL_A 0x01
 #define KEY_CTRL_C 0x03
 #define KEY_CTRL_G 0x07
@@ -33,7 +35,9 @@
 #define KEY_ALT_F4     0x16B
 #define KEY_BACKSPACE  0x08
 #define KEY_INSERT     0x152
+#define KEY_SHIFT_INSERT (KEY_SHIFT_MODIFIER | KEY_INSERT)
 #define KEY_DELETE     0x153
+#define KEY_SHIFT_DELETE (KEY_SHIFT_MODIFIER | KEY_DELETE)
 #define KEY_CTRL_UP    0x18d
 #define KEY_CTRL_MINUS 0x18E
 #define KEY_CTRL_PLUS  0x190
@@ -47,7 +51,8 @@
 #define KEY_SHIFT_TAB  0x10F
 
 int get_key();
-bool is_shift_key_held();
+bool is_shift_key_held(int key);
+int is_navigation_action_key(int key);
 
 void init_keyboard();
 void deinit_keyboard();

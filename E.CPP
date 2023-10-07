@@ -110,7 +110,7 @@ void print_line_column_info()
   curLineNumber, char_position_on_current_line()+1);
   */
 
-  sprintf(str, " %ld:%d", current_line_number(), current_column()+1);
+  sprintf(str, " %ld:%ld", current_line_number(), current_column()+1);
 
   put_string_on_screen(str, SCREEN_WIDTH - (int)strlen(str), SCREEN_HEIGHT-1, LTGRAY);
 }
@@ -224,7 +224,7 @@ void delete_character()
   int currentCharOffset = char_position_on_current_line();
   if (currentCharOffset < currentLine->length)
   {
-    while(currentCharOffset < currentLine->length)
+    while(currentCharOffset+1 < currentLine->length)
     {
       currentLine->text[currentCharOffset] = currentLine->text[currentCharOffset+1];
       ++currentCharOffset;
@@ -647,16 +647,16 @@ void insert_new_line(int cursorMovesToNewline)
     delete_line(newLine);
     return;
   }
-  currentLine->length -= currentLine->length - currentCharOffset;
   // Copy indent
   for(long i = 0; i < curLineIndent; ++i)
     newLine->text[i] = currentLine->text[i];
   for(long j = 0; j < newIndent; ++j)
     newLine->text[curLineIndent+j] = tabChar;
 
-  // Copy text itself
-  for(long k = 0; k < newLine->length; ++k)
+  // Copy leftover text from the current line to the new line
+  for(long k = 0; k < newLine->length && currentCharOffset+k < currentLine->length; ++k)
     newLine->text[curLineIndent+newIndent+k] = currentLine->text[currentCharOffset+k];
+  currentLine->length -= currentLine->length - currentCharOffset;
   newLine->ownsPtr = 1;
   newLine->prevLine = currentLine;
   newLine->nextLine = currentLine->nextLine;
@@ -862,7 +862,7 @@ void unindent()
 
   curIndentAmount -= numCharsToUnindent;
 
-  for(long i = curIndentAmount; i < currentLine->length; ++i)
+  for(long i = curIndentAmount; i + numCharsToUnindent < currentLine->length; ++i)
     currentLine->text[i] = currentLine->text[i + numCharsToUnindent];
   currentLine->length -= numCharsToUnindent;
   clear_highlight(currentLine);
@@ -951,9 +951,9 @@ void run_goto_line_menu()
      && (inputLen > 0 || key != '0')))
     {
       if (key == KEY_BACKSPACE)
-  targetLineNumberStr[--inputLen] = 0;
+        targetLineNumberStr[--inputLen] = 0;
       else if (inputLen < 8)
-  targetLineNumberStr[inputLen++] = (char)key;
+        targetLineNumberStr[inputLen++] = (char)key;
 
       long targetLineNumber = inputLen == 0 ? origLineNumber : MIN(documentLengthLines, atol(targetLineNumberStr));
 
@@ -1018,30 +1018,6 @@ void erase_current_line()
 
 //extern unsigned short pendingScanCode; // TODO REMOVE
 
-int is_navigation_action_key(int key)
-{
-  switch(key)
-  {
-    case KEY_LEFT:
-    case KEY_RIGHT:
-    case KEY_UP:
-    case KEY_DOWN:
-    case KEY_PGUP:
-    case KEY_PGDN:
-    case KEY_HOME:
-    case KEY_END:
-    case KEY_CTRL_LEFT:
-    case KEY_CTRL_RIGHT:
-    case KEY_CTRL_UP:
-    case KEY_CTRL_DOWN:
-    case KEY_CTRL_HOME:
-    case KEY_CTRL_END:
-      return 1;
-    default:
-      return 0;
-  }
-}
-
 void print_textsel_info()
 {
   // TODO: Can this be optimized to occur less frequently?
@@ -1104,7 +1080,7 @@ void main_loop()
     int textSelection = 0;
     if (nav)
     {
-      textSelection = is_shift_key_held();
+      textSelection = is_shift_key_held(key);
       if (textSelection)
       {
         oldCursorPos = current_column();
@@ -1161,10 +1137,11 @@ void main_loop()
         else
           backspace_character();
         break;
+      case KEY_SHIFT_DELETE:
+        cut_selection();
+        break;
       case KEY_DELETE:
-        if (is_shift_key_held())
-          cut_selection();
-        else if (selectionStartLine)
+        if (selectionStartLine)
         {
           erase_selected_text();
           repaint_screen(); // TODO better repaint
@@ -1180,11 +1157,11 @@ void main_loop()
         break;
       case KEY_CTRL_K:
         erase_current_line(); break; // TODO: optimize to repaint only from given line forward
+      case KEY_SHIFT_INSERT:
+        paste_selection(); // TODO: this does not work, Shift-Ins generates a zero instead.
+        break;
       case KEY_INSERT:
-        if (is_shift_key_held())
-          paste_selection(); // TODO: this does not work, Shift-Ins generates a zero instead.
-        else
-          toggle_insert();
+        toggle_insert();
         break;
       case KEY_ENTER: insert_new_line(/*cursorMovesToNewLine=*/1); break;
       case KEY_TAB: insert_indent(); break;

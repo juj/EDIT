@@ -10,7 +10,10 @@
 
 #include <stdio.h> // todo remove
 
-extern int currentVideoMode = TEXT_MODE_80x25;
+#if defined(__TURBOC__) && defined(__MSDOS__)
+int currentVideoMode = TEXT_MODE_80x25;
+#endif
+
 unsigned char SCREEN_WIDTH = 80;
 unsigned char SCREEN_HEIGHT = 25;
 

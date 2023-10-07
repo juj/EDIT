@@ -73,12 +73,73 @@ void unregister_keyboard_interrupt()
 #define getch _getch
 #endif
 
+static bool is_shift_key_currently_down()
+{
+#if defined(__TURBOC__) && defined(__MSDOS__)
+  return leftShiftDown || rightShiftDown;
+#elif defined(_MSC_VER)
+  return GetAsyncKeyState(VK_SHIFT) || GetAsyncKeyState(VK_LSHIFT) || GetAsyncKeyState(VK_RSHIFT);
+#else
+  return 0; // XXX TODO
+#endif
+}
+
+int is_navigation_action_key(int key)
+{
+  switch((key & ~KEY_SHIFT_MODIFIER))
+  {
+  case KEY_LEFT:
+  case KEY_RIGHT:
+  case KEY_UP:
+  case KEY_DOWN:
+  case KEY_PGUP:
+  case KEY_PGDN:
+  case KEY_HOME:
+  case KEY_END:
+  case KEY_CTRL_LEFT:
+  case KEY_CTRL_RIGHT:
+  case KEY_CTRL_UP:
+  case KEY_CTRL_DOWN:
+  case KEY_CTRL_HOME:
+  case KEY_CTRL_END:
+    return 1;
+  default:
+    return 0;
+  }
+}
+
+int is_shift_aware_key(int key)
+{
+  switch(key)
+  {
+  case KEY_INSERT:
+  case KEY_DELETE:
+  case KEY_LEFT:
+  case KEY_RIGHT:
+  case KEY_UP:
+  case KEY_DOWN:
+  case KEY_PGUP:
+  case KEY_PGDN:
+  case KEY_HOME:
+  case KEY_END:
+    return 1;
+  default:
+    return 0;
+  }
+}
+
 int get_key()
 {
   int key = _getch();
   if (!key || key == 0xE0)
     key = 0x100 | _getch();
+  if (is_shift_key_currently_down() && is_shift_aware_key(key)) key |= KEY_SHIFT_MODIFIER;
   return key;
+}
+
+bool is_shift_key_held(int key)
+{
+  return key & KEY_SHIFT_MODIFIER;
 }
 
 void init_keyboard()
@@ -95,13 +156,7 @@ void deinit_keyboard()
 #endif
 }
 
-bool is_shift_key_held()
-{
-#if defined(__TURBOC__) && defined(__MSDOS__)
-  return leftShiftDown || rightShiftDown;
-#elif defined(_MSC_VER)
-  return GetAsyncKeyState(VK_SHIFT) || GetAsyncKeyState(VK_LSHIFT) || GetAsyncKeyState(VK_RSHIFT);
-#else
-  return 0; // XXX TODO
+#if defined(_MSC_VER)
+// For Clang
+#pragma comment(lib, "User32.lib")
 #endif
-}
