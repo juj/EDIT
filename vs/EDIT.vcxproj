@@ -158,6 +158,7 @@
     <ClCompile Include="..\UTIL.CPP" />
     <ClCompile Include="..\VGA.CPP" />
     <ClCompile Include="..\VIEWPORT.CPP" />
+    <ClCompile Include="vs_vt100.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

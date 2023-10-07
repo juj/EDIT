@@ -47,17 +47,9 @@
 #define KEY_SHIFT_TAB  0x10F
 
 int get_key();
+bool is_shift_key_held();
 
-extern unsigned char leftAltDown;
-extern unsigned char rightAltDown;
-
-extern unsigned char leftShiftDown;
-extern unsigned char rightShiftDown;
-
-extern unsigned char leftCtrlDown;
-extern unsigned char rightCtrlDown;
-
-void register_keyboard_interrupt();
-void unregister_keyboard_interrupt();
+void init_keyboard();
+void deinit_keyboard();
 
 #endif

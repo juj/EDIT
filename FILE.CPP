@@ -57,7 +57,9 @@ int find_lines(File *f)
   curLine->ownsPtr = 0;
   curLine->prevLine = curLine->nextLine = 0;
   curLine->text = data;
+#ifdef ENABLE_SYNTAX_HIGHLIGHTING
   curLine->colors = 0;
+#endif
   curLine->colorFlags = 0;
   f->firstLine = curLine;
 
@@ -81,13 +83,15 @@ int find_lines(File *f)
 	return 0;
       }
       nextLine->ownsPtr = 0;
+#ifdef ENABLE_SYNTAX_HIGHLIGHTING
       nextLine->colors = 0;
+#endif
       nextLine->colorFlags = 0;
       curLine->nextLine = nextLine;
       curLine->length = i - prevLineStart;
       curLine->capacity = curLine->length + 1; // '\n' adds to capacity.
       if (curLine->text[curLine->length-1] == 0x0D) // remove '\r'
-	--curLine->length;
+        --curLine->length;
       prevLineStart = i+1;
       nextLine->prevLine = curLine;
       nextLine->nextLine = 0;
@@ -132,7 +136,9 @@ File *open_new_file()
   firstLine->ownsPtr = 1;
   firstLine->prevLine = firstLine->nextLine = 0;
   firstLine->text = 0;
+#ifdef ENABLE_SYNTAX_HIGHLIGHTING
   firstLine->colors = 0;
+#endif
   firstLine->colorFlags = 0;
   f->firstLine = f->lastLine = firstLine;
   firstLine->length = firstLine->capacity = 0;
@@ -161,7 +167,9 @@ void close_file(File *file)
   {
     if (l->ownsPtr)
       Farfree(l->text, l->capacity);
+#ifdef ENABLE_SYNTAX_HIGHLIGHTING
     if (l->colors) Farfree(l->colors, l->capacity);
+#endif
   }
 
   Farfree(file->fileData, file->size);

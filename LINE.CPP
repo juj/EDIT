@@ -54,8 +54,10 @@ void delete_line(Line far *line)
   assert(line);
   if (line->ownsPtr)
     Farfree(line->text, line->capacity);
+#ifdef ENABLE_SYNTAX_HIGHLIGHTING
   if (line->colors)
     Farfree(line->colors, line->capacity);
+#endif
   Farfree(line, sizeof(Line));
 }
 
@@ -70,18 +72,19 @@ int increase_capacity(Line far *line, long newCapacity)
     return 0;
   for(long i = 0; i < line->length; ++i)
     newText[i] = line->text[i];
+#ifdef ENABLE_SYNTAX_HIGHLIGHTING
   if (line->colors)
   {
     Farfree(line->colors, line->capacity);
     line->colors = 0;
   }
+#endif
   if (line->ownsPtr)
     Farfree(line->text, line->capacity);
   else
   {
     // TODO: Move this ptr to small allocs buffer
   }
-  line->colors = 0;
   line->text = newText;
   line->capacity = newCapacity;
   line->ownsPtr = 1;

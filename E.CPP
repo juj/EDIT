@@ -79,25 +79,29 @@ void repaint_screen_lines(int yStart, int yEnd)
 
       int selStart = lineNumber == selectionStartLineNum ? selectionStartColumn : (lineNumber <= selectionEndLineNum ? 0 : 0x7FFF);
       int selEnd = lineNumber == selectionEndLineNum ? selectionEndColumn : (lineNumber >= selectionStartLineNum ? 0x7FFF : 0);
-      if (curLine->colors) show_line_with_colors_with_sel(&screen[(y * SCREEN_WIDTH) << 1], curLine->text, curLine->length, curLine->colors, selStart, selEnd);
-      else show_line_with_sel(&screen[(y * SCREEN_WIDTH) << 1], curLine->text, curLine->length, selStart, selEnd);
+#ifdef ENABLE_SYNTAX_HIGHLIGHTING
+      if (curLine->colors) show_line_with_colors_with_sel(y * SCREEN_WIDTH, curLine->text, curLine->length, curLine->colors, selStart, selEnd);
+      else
+#endif
+        show_line_with_sel(y * SCREEN_WIDTH, curLine->text, curLine->length, selStart, selEnd);
 
       if (y > 0 && y < SCREEN_HEIGHT-1)
       {
+        unsigned char existingColor = get_screen_color(y*SCREEN_WIDTH+SCREEN_WIDTH-1);
         if (curLine->length - viewportXOffset > SCREEN_WIDTH)
-          screen[((y*SCREEN_WIDTH+SCREEN_WIDTH-1)<<1) + 1] |= BGCOLOR(BROWN);
+          put_screen_color(y*SCREEN_WIDTH+SCREEN_WIDTH-1, existingColor | BGCOLOR(BROWN));
         else
-          screen[((y*SCREEN_WIDTH+SCREEN_WIDTH-1)<<1) + 1] &= ~BGCOLOR(BROWN);
+          put_screen_color(y*SCREEN_WIDTH+SCREEN_WIDTH-1, existingColor & ~BGCOLOR(BROWN));
       }
 
       curLine = curLine->nextLine;
       ++lineNumber;
     }
     else
-      clear_line(&screen[(y * SCREEN_WIDTH) << 1], clearCHs[clearCH < 3 ? clearCH++ : 3]);
+      clear_line(y * SCREEN_WIDTH, clearCHs[clearCH < 3 ? clearCH++ : 3]);
 
     if (viewportXOffset != 0)
-      screen[((y*SCREEN_WIDTH)<<1) + 1] |= BGCOLOR(BROWN);
+      put_screen_color(y*SCREEN_WIDTH, get_screen_color(y*SCREEN_WIDTH) | BGCOLOR(BROWN));
   }
   if (yStart == 0)
     repaint_open_files_list(0);
@@ -131,7 +135,7 @@ void insert_character(char ch)
     if (currentLine->length + numCharsToInsert > currentLine->capacity)
     {
       if (!increase_capacity(currentLine, currentLine->capacity*2+numCharsToInsert))
-  return;
+      return;
     }
 
     // Shift existing characters up
@@ -150,13 +154,13 @@ void insert_character(char ch)
     {
       for(long j = 1; j < numCharsToInsert; ++j)
       {
-  assert(currentCharOffset - j >= 0 && currentCharOffset - j < currentLine->length);
-  assert(numCharsToInsert-1-j >= 0 && prevLine->length && numCharsToInsert-1-j < prevLine->length);
+        assert(currentCharOffset - j >= 0 && currentCharOffset - j < currentLine->length);
+        assert(numCharsToInsert-1-j >= 0 && prevLine->length && numCharsToInsert-1-j < prevLine->length);
 
-  assert(currentLine->text);
-  currentLine->text[currentCharOffset - j] =
-      (prevLine->text[numCharsToInsert-1-j] <= 32)
-     ? prevLine->text[numCharsToInsert-1-j] : tabChar;
+        assert(currentLine->text);
+        currentLine->text[currentCharOffset - j] =
+            (prevLine->text[numCharsToInsert-1-j] <= 32)
+           ? prevLine->text[numCharsToInsert-1-j] : tabChar;
       }
     }
 
@@ -617,7 +621,9 @@ void insert_new_line(int cursorMovesToNewline)
 
   newLine->length = newLine->capacity = curLineIndent + newIndent + currentLine->length - currentCharOffset;
   newLine->text = newLine->length > 0 ? (char huge *)Farmalloc(newLine->length) : 0;
+#ifdef ENABLE_SYNTAX_HIGHLIGHTING
   newLine->colors = 0;
+#endif
   if (!newLine->text && newLine->length > 0)
   {
     delete_line(newLine);
@@ -1070,25 +1076,9 @@ void main_loop()
     set_vga_cursor_position(cursorX, cursorY);
 
     assert(firstDisplayedLine);
-    /*
-    if (get_line_number(firstDisplayedLine) != firstDisplayedLineNumber)
-    {
-//      printf("%lu vs %lu\n",
-  (unsigned long)get_line_number(firstDisplayedLine),
-  (unsigned long)firstDisplayedLineNumber);
-
-
-    }
-    */
     assert(get_line_number(firstDisplayedLine) == firstDisplayedLineNumber);
     assert(currentLine);
     assert(get_line_number(currentLine) == current_line_number());
- /*
-    gotoxy(1,1);
-    printf("0x%x     \n", pendingScanCode);
-
-    if (!kbhit()) continue;
-  */
     int key = get_key();
 
     // Doing text selection?
@@ -1096,32 +1086,32 @@ void main_loop()
     int textSelection = 0;
     if (nav)
     {
-      textSelection = (leftShiftDown || rightShiftDown);
+      textSelection = is_shift_key_held();
       if (textSelection)
       {
-  oldCursorPos = current_column();
-  oldLineNum = current_line_number();
-  oldLine = currentLine;
-  if (!selectionStartLine)
-  {
-    selectionStartLine = selectionEndLine = oldLine;
-    selectionStartLineNum = selectionEndLineNum = oldLineNum;
-    selectionStartColumn = selectionEndColumn = oldCursorPos;
-  }
+        oldCursorPos = current_column();
+        oldLineNum = current_line_number();
+        oldLine = currentLine;
+        if (!selectionStartLine)
+        {
+          selectionStartLine = selectionEndLine = oldLine;
+          selectionStartLineNum = selectionEndLineNum = oldLineNum;
+          selectionStartColumn = selectionEndColumn = oldCursorPos;
+        }
       }
       else
       {
-  // clear any selection
-  if (selectionStartLine)
-  {
-    int startLine = selectionStartLineNum-firstDisplayedLineNumber;
-    startLine = MAX(0, startLine);
-    int endLine = selectionEndLineNum+1-firstDisplayedLineNumber;
-    endLine = MIN(SCREEN_HEIGHT, endLine);
-    clear_selection();
-    repaint_screen_lines(startLine, endLine);
-    repaint_screen_lines(SCREEN_HEIGHT-1, SCREEN_HEIGHT);
-  }
+        // clear any selection
+        if (selectionStartLine)
+        {
+          int startLine = selectionStartLineNum-firstDisplayedLineNumber;
+          startLine = MAX(0, startLine);
+          int endLine = selectionEndLineNum+1-firstDisplayedLineNumber;
+          endLine = MIN(SCREEN_HEIGHT, endLine);
+          clear_selection();
+          repaint_screen_lines(startLine, endLine);
+          repaint_screen_lines(SCREEN_HEIGHT-1, SCREEN_HEIGHT);
+        }
       }
     }
 
@@ -1141,45 +1131,43 @@ void main_loop()
       case KEY_CTRL_DOWN: move_viewport_vertically(1, 0); break;
       case KEY_CTRL_HOME: scroll_to_beginning(); break;
       case KEY_CTRL_END: scroll_to_end(); break;
-
       case KEY_ESC:
       case KEY_ALT_F4:
       case KEY_CTRL_Q:
-  running = 0;
-  break;
-
+        running = 0;
+        break;
       case KEY_CTRL_A: select_all(); break;
       case KEY_BACKSPACE:
-  if (selectionStartLine)
-    erase_selected_text();
-  else
-    backspace_character();
-  break;
+        if (selectionStartLine)
+          erase_selected_text();
+        else
+          backspace_character();
+        break;
       case KEY_DELETE:
-  if (leftShiftDown || rightShiftDown)
-    cut_selection();
-  else if (selectionStartLine)
-  {
-    erase_selected_text();
-    repaint_screen(); // TODO better repaint
-  }
-  else
-    delete_character();
-  break;
+        if (is_shift_key_held())
+          cut_selection();
+        else if (selectionStartLine)
+        {
+          erase_selected_text();
+          repaint_screen(); // TODO better repaint
+        }
+        else
+          delete_character();
+        break;
       case KEY_CTRL_DELETE:
-  if (selectionStartLine)
-    erase_selected_text();
-  else
-    erase_current_line();
-  break;
+        if (selectionStartLine)
+          erase_selected_text();
+        else
+          erase_current_line();
+        break;
       case KEY_CTRL_K:
-  erase_current_line(); break; // TODO: optimize to repaint only from given line forward
+        erase_current_line(); break; // TODO: optimize to repaint only from given line forward
       case KEY_INSERT:
-  if (leftShiftDown || rightShiftDown)
-    paste_selection(); // TODO: this does not work, Shift-Ins generates a zero instead.
-  else
-    toggle_insert();
-  break;
+        if (is_shift_key_held())
+          paste_selection(); // TODO: this does not work, Shift-Ins generates a zero instead.
+        else
+          toggle_insert();
+        break;
       case KEY_ENTER: insert_new_line(/*cursorMovesToNewLine=*/1); break;
       case KEY_TAB: insert_indent(); break;
       case KEY_SHIFT_TAB: unindent(); break;
@@ -1187,59 +1175,59 @@ void main_loop()
       case KEY_ALT_TAB: run_alt_tab_menu(); repaint_screen(); break;
       case KEY_CTRL_N:
       {
-  File *f = open_new_file();
-  if (f)
-    open_file_in_viewport(f, /*bringToMruFront*/1);
+        File *f = open_new_file();
+        if (f)
+          open_file_in_viewport(f, /*bringToMruFront*/1);
       }
-  break;
+        break;
       case KEY_CTRL_C:
       case KEY_CTRL_INSERT:
-  copy_selection();
-  break;
+        copy_selection();
+        break;
       case KEY_CTRL_X:
-  cut_selection();
-  break;
+        cut_selection();
+        break;
       case KEY_CTRL_V:
-  paste_selection();
-  break;
+        paste_selection();
+        break;
       case KEY_CTRL_S:
       case KEY_F2:
-  save_file(currentFile);
-  repaint_screen();
-  break;
+        save_file(currentFile);
+        repaint_screen();
+        break;
       case KEY_CTRL_G: run_goto_line_menu(); break;
       case KEY_CTRL_O:
       case KEY_F3:
-  run_open_file_menu();
-  repaint_screen();
-  break;
+        run_open_file_menu();
+        repaint_screen();
+        break;
       case KEY_CTRL_W:
       case KEY_CTRL_F4:
-  close_file(currentFile);
-  repaint_screen();
-  break;
-      case KEY_CTRL_PLUS:
-  if (currentVideoMode > 0)
-  {
-    set_vga_text_mode(--currentVideoMode);
-    while(cursorY >= SCREEN_HEIGHT)
-    {
-      --cursorY;
-      assert(currentLine->prevLine);
-      currentLine = currentLine->prevLine;
-    }
-    repaint_screen();
-  }
-  break;
-      case KEY_CTRL_MINUS:
-  if (currentVideoMode < LAST_VIDEO_MODE)
-  {
-    set_vga_text_mode(++currentVideoMode);
-    repaint_screen();
-  }
-  break;
+        close_file(currentFile);
+        repaint_screen();
+        break;
 
 #if defined(__TURBOC__) && defined(__MSDOS__)
+      case KEY_CTRL_PLUS:
+        if (currentVideoMode > 0)
+        {
+          set_vga_text_mode(--currentVideoMode);
+          while(cursorY >= SCREEN_HEIGHT)
+          {
+            --cursorY;
+            assert(currentLine->prevLine);
+            currentLine = currentLine->prevLine;
+          }
+          repaint_screen();
+        }
+        break;
+      case KEY_CTRL_MINUS:
+        if (currentVideoMode < LAST_VIDEO_MODE)
+        {
+          set_vga_text_mode(++currentVideoMode);
+          repaint_screen();
+        }
+        break;
       case KEY_F10:
         clear_screen(0, LTGRAY);
         clrscr();
@@ -1249,16 +1237,17 @@ void main_loop()
 #endif
 
       default:
-  if (key >= 0x20 && key < 127)
-  {
-    if (showWhitespace && key == ' ') key = CHAR_MIDDLE_DOT;
-    insert_character(key);
-  }
-  else
-  {
-    set_cursor_pos(1,1);
-    printf("0x%x     \n", key);
-  }
+        if (key >= 0x20 && key < 127)
+        {
+          if (showWhitespace && key == ' ') key = CHAR_MIDDLE_DOT;
+          insert_character(key);
+        }
+        else
+        {
+          set_cursor_pos(1,1);
+          printf("0x%x     \n", key);
+        }
+        break;
     }
     if (textSelection)
     {
@@ -1268,42 +1257,42 @@ void main_loop()
       int oldCmpStart = cursor_pos_cmp(oldLineNum, oldCursorPos, selectionStartLineNum, selectionStartColumn);
       if (!oldCmpStart)
       {
-  int newCmpEnd = cursor_pos_cmp(lineNum, cursorPos, selectionEndLineNum, selectionEndColumn);
-  if (newCmpEnd <= 0)
-  {
-    selectionStartLineNum = lineNum;
-    selectionStartLine = line;
-    selectionStartColumn = cursorPos;
-  }
-  else
-  {
-    selectionStartLineNum = selectionEndLineNum;
-    selectionStartLine = selectionEndLine;
-    selectionStartColumn = selectionEndColumn;
-    selectionEndLineNum = lineNum;
-    selectionEndLine = line;
-    selectionEndColumn = cursorPos;
-  }
+        int newCmpEnd = cursor_pos_cmp(lineNum, cursorPos, selectionEndLineNum, selectionEndColumn);
+        if (newCmpEnd <= 0)
+        {
+          selectionStartLineNum = lineNum;
+          selectionStartLine = line;
+          selectionStartColumn = cursorPos;
+        }
+        else
+        {
+          selectionStartLineNum = selectionEndLineNum;
+          selectionStartLine = selectionEndLine;
+          selectionStartColumn = selectionEndColumn;
+          selectionEndLineNum = lineNum;
+          selectionEndLine = line;
+          selectionEndColumn = cursorPos;
+        }
       }
       else
       {
-  assert(!cursor_pos_cmp(oldLineNum, oldCursorPos, selectionEndLineNum, selectionEndColumn));
-  int startCmpNew = cursor_pos_cmp(selectionStartLineNum, selectionStartColumn, lineNum, cursorPos);
-  if (startCmpNew <= 0)
-  {
-    selectionEndLineNum = lineNum;
-    selectionEndLine = line;
-    selectionEndColumn = cursorPos;
-  }
-  else
-  {
-    selectionEndLineNum = selectionStartLineNum;
-    selectionEndLine = selectionStartLine;
-    selectionEndColumn = selectionStartColumn;
-    selectionStartLineNum = lineNum;
-    selectionStartLine = line;
-    selectionStartColumn = cursorPos;
-  }
+        assert(!cursor_pos_cmp(oldLineNum, oldCursorPos, selectionEndLineNum, selectionEndColumn));
+        int startCmpNew = cursor_pos_cmp(selectionStartLineNum, selectionStartColumn, lineNum, cursorPos);
+        if (startCmpNew <= 0)
+        {
+          selectionEndLineNum = lineNum;
+          selectionEndLine = line;
+          selectionEndColumn = cursorPos;
+        }
+        else
+        {
+          selectionEndLineNum = selectionStartLineNum;
+          selectionEndLine = selectionStartLine;
+          selectionEndColumn = selectionStartColumn;
+          selectionStartLineNum = lineNum;
+          selectionStartLine = line;
+          selectionStartColumn = cursorPos;
+        }
       }
       int repaintY0 = MIN(oldLineNum, lineNum) - firstDisplayedLineNumber;
       repaintY0 = MAX(0, repaintY0);
@@ -1316,13 +1305,13 @@ void main_loop()
   }
 }
 
-void query_svga_modes();
-
 int main(int argc, char **argv)
 {
  //// query_svga_modes();
 //  set_vga_text_mode(TEXT_MODE_90x60);
 //  set_vga_text_mode(TEXT_MODE_40x25);
+  init_screen();
+
   // TODO: Query current text mode to initialize defaults
   File *f = (argc > 1) ? load_file(argv[1]) : open_new_file();
 
@@ -1330,13 +1319,13 @@ int main(int argc, char **argv)
   assert(currentFile);
   assert(currentLine);
 
-  register_keyboard_interrupt();
+  init_keyboard();
   main_loop();
-  unregister_keyboard_interrupt();
-
+  deinit_keyboard();
   clear_screen(0, LTGRAY);
 #if defined(__TURBOC__) && defined(__MSDOS__)
   clrscr();
 #endif
+  deinit_screen();
   return 0;
 }

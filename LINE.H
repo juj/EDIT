@@ -2,6 +2,7 @@
 #define _LINE_H
 
 #include "memory.h"
+#include "highlite.h"
 
 // Line::colorsFlags bitfield
 #define LINE_STARTS_IN_COMMENT 0x01
@@ -14,7 +15,9 @@ struct Line
   long length;
   long capacity;
   char huge *text;
+#ifdef ENABLE_SYNTAX_HIGHLIGHTING
   unsigned char huge *colors;
+#endif
   Line far *prevLine;
   Line far *nextLine;
 };

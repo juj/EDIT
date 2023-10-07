@@ -8,6 +8,8 @@
 #include "screen.h"
 #include "state.h"
 
+#ifdef ENABLE_SYNTAX_HIGHLIGHTING
+
 /* Keywords recognized by Borland Turbo C++ 3.0:
 auto break case catch char class const continue default delete do double else
 enum extern float for friend goto if inline int long new operator private
@@ -266,3 +268,4 @@ void syntax_highlight(Line far *line)
   }
   line->colorFlags &= ~LINE_ENDS_IN_COMMENT;
 }
+#endif

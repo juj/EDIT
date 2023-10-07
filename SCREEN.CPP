@@ -10,29 +10,20 @@
 
 #include <stdio.h> // todo remove
 
-//char far *screen = (char far *)MK_FP(0xB800, 0);
-//char far *screen = (char far *)(uintptr_t)0xB8000000;
-
 extern int currentVideoMode = TEXT_MODE_80x25;
 unsigned char SCREEN_WIDTH = 80;
 unsigned char SCREEN_HEIGHT = 25;
 
 void clear_screen(unsigned char ch, unsigned char color)
 {
-  for(int i = 0; i < SCREEN_WIDTH*SCREEN_HEIGHT*2; i+= 2)
-  {
-    screen[i] = ch;
-    screen[i+1] = color;
-  }
+  for(int i = 0; i < SCREEN_WIDTH*SCREEN_HEIGHT; ++i)
+    put_screen(i, ch, color);
 }
 
-void clear_line(char far *screenPtr, unsigned char ch)
+void clear_line(int screenPos, unsigned char ch)
 {
   for(int i = 0; i < SCREEN_WIDTH; ++i)
-  {
-    screenPtr[i<<1] = ch;
-    screenPtr[(i<<1) + 1] = BLUE;//DKGRAY | BGCOLOR(BLUE);//editorTextColor;
-  }
+    put_screen(screenPos + i, ch, BLUE); //DKGRAY | BGCOLOR(BLUE);//editorTextColor;
 }
 
 void set_chars_color(int x, int y, int numChars, unsigned char color)
@@ -43,52 +34,39 @@ void set_chars_color(int x, int y, int numChars, unsigned char color)
   assert(x + numChars <= SCREEN_WIDTH);
   assert(y >= 0);
   assert(y < SCREEN_HEIGHT);
-  char far *screenPtr = &screen[(y*SCREEN_WIDTH+x)<<1];
+  int screenPos = y*SCREEN_WIDTH+x;
   for(int i = 0; i < numChars; ++i)
-  {
-    screenPtr[(i<<1) + 1] = color;
-  }
+    put_screen_color(screenPos + i, color);
 }
 
 void highlight_line(int yLine, unsigned char bgColor)
 {
   assert(yLine >= 0);
   assert(yLine < SCREEN_HEIGHT);
-  char far *screenPtr = &screen[yLine*(SCREEN_WIDTH*2)];
+  int screenPos = yLine*SCREEN_WIDTH;
   for(int i = 0; i < SCREEN_WIDTH; ++i)
-  {
-    screenPtr[(i<<1) + 1] = bgColor | (screenPtr[(i<<1) + 1] & 0x0F);
-  }
+    put_screen_color(screenPos + i, bgColor | get_screen_color(screenPos+i) & 0x0F);
 }
 
 void log_x(const char *str)
 {
   int x = (SCREEN_WIDTH - (int)strlen(str)) >> 1;
-  int pos = ((SCREEN_HEIGHT-1) * SCREEN_WIDTH + x) << 1;
-  for(int i = 0; str[i] != 0; ++i, pos += 2)
-  {
-    screen[pos] = str[i];
-    screen[pos+1] = WHITE | BGCOLOR(MAGENTA);
-  }
+  int pos = ((SCREEN_HEIGHT-1) * SCREEN_WIDTH + x);
+  for(int i = 0; str[i] != 0; ++i, ++pos)
+    put_screen(pos, str[i], WHITE | BGCOLOR(MAGENTA));
 }
 
-void show_line_with_colors(char far *screenPtr, char huge *text, int textLen, unsigned char *colors)
+void show_line_with_colors(int screenPos, char huge *text, int textLen, unsigned char *colors)
 {
   textLen = MIN(textLen - viewportXOffset, SCREEN_WIDTH);
   int x;
   for(x = 0; x < textLen; ++x)
-  {
-    screenPtr[x<<1] = text[x + viewportXOffset];
-    screenPtr[(x<<1)+1] = colors[x + viewportXOffset];
-  }
+    put_screen(screenPos+x, text[x + viewportXOffset], colors[x + viewportXOffset]);
   for(; x < SCREEN_WIDTH; ++x)
-  {
-    screenPtr[x<<1] = 0;
-    screenPtr[(x<<1)+1] = editorTextColor;
-  }
+    put_screen(screenPos+x, 0, editorTextColor);
 }
 
-void show_line_with_colors_with_sel(char far *screenPtr, char huge *text, int textLen, unsigned char *colors, int selStart, int selEnd)
+void show_line_with_colors_with_sel(int screenPos, char huge *text, int textLen, unsigned char *colors, int selStart, int selEnd)
 {
   selStart -= viewportXOffset;
   selEnd -= viewportXOffset;
@@ -97,33 +75,31 @@ void show_line_with_colors_with_sel(char far *screenPtr, char huge *text, int te
   int x;
   for(x = 0; x < textLen; ++x)
   {
-    screenPtr[x<<1] = text[x + viewportXOffset];
-    screenPtr[(x<<1)+1] = x < selStart || x >= selEnd ? colors[x + viewportXOffset] : selectionColor;
+    put_screen(screenPos + x, text[x + viewportXOffset], x < selStart || x >= selEnd ? colors[x + viewportXOffset] : selectionColor);
+//    screenPtr[x<<1] = ;
+//    screenPtr[(x<<1)+1] = ;
   }
   for(; x < SCREEN_WIDTH; ++x)
   {
-    screenPtr[x<<1] = 0;
-    screenPtr[(x<<1)+1] = editorTextColor;
+    put_screen(screenPos + x, 0, editorTextColor);
   }
 }
 
-void show_line(char far *screenPtr, char huge *text, int textLen)
+void show_line(int screenPos, char huge *text, int textLen)
 {
   textLen = MIN(textLen - viewportXOffset, SCREEN_WIDTH);
   int x;
   for(x = 0; x < textLen; ++x)
   {
-    screenPtr[x<<1] = text[x + viewportXOffset];
-    screenPtr[(x<<1)+1] = editorTextColor;
+    put_screen(screenPos + x, text[x + viewportXOffset], editorTextColor);
   }
   for(; x < SCREEN_WIDTH; ++x)
   {
-    screenPtr[x<<1] = 0;
-    screenPtr[(x<<1)+1] = editorTextColor;
+    put_screen(screenPos + x, 0, editorTextColor);
   }
 }
 
-void show_line_with_sel(char far *screenPtr, char huge *text, int textLen, int selStart, int selEnd)
+void show_line_with_sel(int screenPos, char huge *text, int textLen, int selStart, int selEnd)
 {
   selStart -= viewportXOffset;
   selEnd -= viewportXOffset;
@@ -132,43 +108,39 @@ void show_line_with_sel(char far *screenPtr, char huge *text, int textLen, int s
   int x;
   for(x = 0; x < textLen; ++x)
   {
-    screenPtr[x<<1] = text[x + viewportXOffset];
-    screenPtr[(x<<1)+1] = x < selStart || x >= selEnd ? editorTextColor : selectionColor;
+    put_screen(screenPos + x, text[x + viewportXOffset], x < selStart || x >= selEnd ? editorTextColor : selectionColor);
   }
   for(; x < SCREEN_WIDTH; ++x)
   {
-    screenPtr[x<<1] = 0;
-    screenPtr[(x<<1)+1] = editorTextColor;
+    put_screen(screenPos + x, 0, editorTextColor);
   }
 }
 
 void get_string_on_screen(int x, int y, int maxLength, char *dst)
 {
-  char far *screenPtr = &screen[(y*SCREEN_WIDTH+x)<<1];
+  int screenPos = y*SCREEN_WIDTH+x;
+//  char far *screenPtr = &screen[()<<1];
   int i = 0;
-  for(; i < maxLength && screenPtr[i << 1] <= 32; ++i)
+  for(; i < maxLength && get_screen(screenPos + i) <= 32; ++i)
     ;
   int len = 0;
-  for(; i < maxLength && screenPtr[i << 1] >= 32; ++i)
-    dst[len++] = screenPtr[i << 1];
+  for(; i < maxLength && get_screen(screenPos + i) >= 32; ++i)
+    dst[len++] = get_screen(screenPos + i);;
   dst[len] = 0;
 }
 
 void put_string_on_screen(const char *str, int x, int y)
 {
-  int pos = (y * SCREEN_WIDTH + x) << 1;
-  for(int i = 0; str[i] != 0; ++i, pos += 2)
-    screen[pos] = str[i];
+  int pos = y * SCREEN_WIDTH + x;
+  for(int i = 0; str[i] != 0; ++i, ++pos)
+    put_screen(pos, str[i]);
 }
 
 void put_string_on_screen(const char *str, int x, int y, unsigned char color)
 {
-  int pos = (y * SCREEN_WIDTH + x) << 1;
-  for(int i = 0; str[i] != 0; ++i, pos += 2)
-  {
-    screen[pos] = str[i];
-    screen[pos+1] = color;
-  }
+  int pos = y * SCREEN_WIDTH + x;
+  for(int i = 0; str[i] != 0; ++i, ++pos)
+    put_screen(pos, str[i], color);
 }
 
 void log_error(const char *errorText)
@@ -176,3 +148,35 @@ void log_error(const char *errorText)
   put_string_on_screen(errorText, 3, SCREEN_HEIGHT-1, YELLOW | BGCOLOR(RED));
   ERROR_BEEP();
 }
+
+#if defined(__TURBOC__) && defined(__MSDOS__)
+
+char far *screen = (char far *)MK_FP(0xB800, 0);
+
+void put_screen(int linearPos, char ch)
+{
+  screen[linearPos<<1] = ch;
+}
+
+void put_screen_color(int linearPos, unsigned char color)
+{
+  screen[(linearPos<<1)+1] = color;
+}
+
+void put_screen(int linearPos, char ch, unsigned char color)
+{
+  linearPos <<= 1;
+  screen[linearPos] = ch;
+  screen[linearPos+1] = color;
+}
+
+char get_screen(int linearPos)
+{
+  return screen[linearPos<<1];
+}
+
+unsigned char get_screen_color(int linearPos)
+{
+  return screen[(linearPos<<1)+1];
+}
+#endif

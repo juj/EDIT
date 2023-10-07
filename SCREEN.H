@@ -32,12 +32,21 @@ extern unsigned char SCREEN_HEIGHT;
 
 //extern char far *screen;
 
-void clear_line(char far *screenPtr, unsigned char ch);
-void show_line(char far *screenPtr, char huge *text, int textLen);
-void show_line_with_colors(char far *screenPtr, char huge *text, int textLen, unsigned char far *colors);
+int init_screen();
+void deinit_screen();
 
-void show_line_with_sel(char far *screenPtr, char huge *text, int textLen, int selStart, int selEnd);
-void show_line_with_colors_with_sel(char far *screenPtr, char huge *text, int textLen, unsigned char far *colors, int selStart, int selEnd);
+void put_screen(int linearPos, char ch);
+void put_screen_color(int linearPos, unsigned color);
+void put_screen(int linearPos, char ch, unsigned char color);
+char get_screen(int linearPos);
+unsigned char get_screen_color(int linearPos);
+
+void clear_line(int screenPos, unsigned char ch);
+void show_line(int screenPos, char huge *text, int textLen);
+void show_line_with_colors(int screenPos, char huge *text, int textLen, unsigned char far *colors);
+
+void show_line_with_sel(int screenPos, char huge *text, int textLen, int selStart, int selEnd);
+void show_line_with_colors_with_sel(int screenPos, char huge *text, int textLen, unsigned char far *colors, int selStart, int selEnd);
 
 void put_string_on_screen(const char *str, int x, int y);
 void put_string_on_screen(const char *str, int x, int y, unsigned char color);

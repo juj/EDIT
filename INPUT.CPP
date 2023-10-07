@@ -76,3 +76,26 @@ int get_key()
     key = 0x100 | _getch();
   return key;
 }
+
+void init_keyboard()
+{
+#if defined(__TURBOC__) && defined(__MSDOS__)
+  register_keyboard_interrupt();
+#endif
+}
+
+void deinit_keyboard()
+{
+#if defined(__TURBOC__) && defined(__MSDOS__)
+  unregister_keyboard_interrupt();
+#endif
+}
+
+bool is_shift_key_held()
+{
+#if defined(__TURBOC__) && defined(__MSDOS__)
+  return leftShiftDown || rightShiftDown;
+#else
+  return 0; // XXX TODO
+#endif
+}

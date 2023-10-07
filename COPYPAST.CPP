@@ -247,7 +247,9 @@ void paste_selection()
       return;
     newLine->length = newLine->capacity = j - i;
     newLine->text = newLine->length > 0 ? (char huge *)Farmalloc(newLine->length) : 0;
+#ifdef ENABLE_SYNTAX_HIGHLIGHTING
     newLine->colors = 0;
+#endif
     if (!newLine->text && newLine->length > 0)
     {
       delete_line(newLine);
