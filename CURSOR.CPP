@@ -11,12 +11,12 @@ void toggle_insert()
 #endif
 }
 
+#if defined(__TURBOC__) && defined(__MSDOS__)
 void set_cursor_pos(int x, int y)
 {
-#if defined(__TURBOC__) && defined(__MSDOS__)
-  gotoxy(x, y);
-#endif
+  gotoxy(x+1, y+1);
 }
+#endif
 
 void set_vga_cursor_position(int x, int y)
 {

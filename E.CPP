@@ -112,6 +112,12 @@ void repaint_screen()
   repaint_screen_lines(0, SCREEN_HEIGHT);
 }
 
+void repaint_current_line_from_offset(int xOffset)
+{
+  // TODO: actually paint from current offset onwards only
+  repaint_screen_lines(cursorY, cursorY+1);
+}
+
 void insert_character(char ch)
 {
   assert(currentLine);
@@ -122,6 +128,7 @@ void insert_character(char ch)
     currentLine->text[currentCharOffset] = ch;
     clear_highlight(currentLine);
     FILE_MODIFIED();
+    put_screen(cursorY*SCREEN_WIDTH+cursorX, ch);
     ++cursorX;
     virtualX = cursorX;
   }
@@ -173,16 +180,22 @@ void insert_character(char ch)
     assert(currentLine->length <= currentLine->capacity);
     clear_highlight(currentLine);
     FILE_MODIFIED();
+    int full_repaint = 0;
     if (++cursorX >= SCREEN_WIDTH)
     {
       --cursorX;
       ++viewportXOffset;
+      full_repaint = 1;
     }
     virtualX = cursorX;
+
+    // TODO: only repaint the current line starting from currentCharOffset
+    if (full_repaint) repaint_screen();
+    else
+    {
+      repaint_current_line_from_offset(cursorX-1);
+    }
   }
-  // TODO: only repaint the current line starting from currentCharOffset
-  // (if viewportXOffset did not change)
-  repaint_screen();
 }
 
 void delete_character()
@@ -914,7 +927,7 @@ void run_goto_line_menu()
   char origLineNumberStr[32];
   sprintf(origLineNumberStr, "%ld ", origLineNumber);
   put_string_on_screen(origLineNumberStr, 12, SCREEN_HEIGHT-1, DKGRAY);
-  set_cursor_pos(13, SCREEN_HEIGHT);
+  set_cursor_pos(12, SCREEN_HEIGHT-1);
   const char *empty = " ";
 
 //  Line far *originalFirstDisplayedLine = firstDisplayedLine;
@@ -958,11 +971,11 @@ void run_goto_line_menu()
       put_string_on_screen(targetLineNumberStr, 12, SCREEN_HEIGHT-1, YELLOW);
       put_string_on_screen(empty, 12 + inputLen, SCREEN_HEIGHT-1, YELLOW);
 
-      set_cursor_pos(13 + inputLen, SCREEN_HEIGHT);
+      set_cursor_pos(12 + inputLen, SCREEN_HEIGHT-1);
       if (inputLen == 0)
       {
         put_string_on_screen(origLineNumberStr, 12, SCREEN_HEIGHT-1, DKGRAY);
-        set_cursor_pos(13, SCREEN_HEIGHT);
+        set_cursor_pos(12, SCREEN_HEIGHT-1);
       }
       // TODO: Goto line
     }
@@ -1072,7 +1085,7 @@ void main_loop()
   while(running)
   {
     print_line_column_info();
-    set_cursor_pos(cursorX+1, cursorY+1);
+    set_cursor_pos(cursorX, cursorY);
     set_vga_cursor_position(cursorX, cursorY);
 
     assert(firstDisplayedLine);
@@ -1244,7 +1257,7 @@ void main_loop()
         }
         else
         {
-          set_cursor_pos(1,1);
+          set_cursor_pos(0,0);
           printf("0x%x     \n", key);
         }
         break;

@@ -99,6 +99,11 @@ static int vt_back_color(unsigned char dosColor)
   }
 }
 
+void set_cursor_pos(int x, int y)
+{
+  printf("\x1b[%d;%dH", y, x);
+}
+
 void put_screen(int linearPos, char ch, unsigned char color)
 {
   init_screen_buffer();
