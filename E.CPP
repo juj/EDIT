@@ -84,7 +84,7 @@ void repaint_screen_lines(int yStart, int yEnd)
   assert(yEnd >= 0);
   assert(yEnd <= SCREEN_HEIGHT);
   Line far *curLine = get_nth_line_on_screen(yStart);
-  int screenY = 0;
+  int screenY = yStart;
   int lineNumber = firstDisplayedLineNumber + yStart;
 
   for(; screenY < yEnd; ++screenY)
@@ -211,7 +211,6 @@ void insert_character(char ch)
     }
     virtualX = cursorX;
 
-    // TODO: only repaint the current line starting from currentCharOffset
     if (full_repaint) repaint_screen();
     else
     {
@@ -234,7 +233,7 @@ void delete_character()
     }
     --currentLine->length;
     clear_highlight(currentLine);
-    repaint_current_line_from_offset(cursorX-1, currentLine->length+1);
+    repaint_current_line_from_offset(MAX(cursorX-1, 0), currentLine->length+1);
   }
   else // join next line on this
   {
@@ -260,7 +259,10 @@ void delete_character()
     }
     delete_line(next);
     clear_highlight(currentLine);
-    repaint_screen(); // TODO: Repaint only from cursor down
+
+    int endY = screen_end_y_of_last_line_on_screen(currentLine, cursorY)+2;
+    if (endY > SCREEN_HEIGHT) endY = SCREEN_HEIGHT;
+    repaint_screen_lines(cursorY, endY);
   }
   FILE_MODIFIED();
   // TODO: only repaint the current line starting from currentCharOffset
@@ -696,8 +698,11 @@ void insert_new_line(int cursorMovesToNewline)
 
   FILE_MODIFIED();
 
-  // TODO: Hoist this higher
-  repaint_screen();
+  Line *prevLine = currentLine->prevLine;
+  assert(prevLine);
+  int endY = screen_end_y_of_last_line_on_screen(prevLine, cursorY-1)+1;
+  if (endY > SCREEN_HEIGHT) endY = SCREEN_HEIGHT;
+  repaint_screen_lines(cursorY-1, endY);
 }
 
 void erase_line(Line *line)
@@ -1049,6 +1054,7 @@ void main_loop()
       default:
         if (key >= 0x20 && key < 127)
         {
+          if (key == '}') unindent();
           if (showWhitespace && key == ' ') key = CHAR_MIDDLE_DOT;
           insert_character(key);
         }

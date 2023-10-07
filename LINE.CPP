@@ -37,6 +37,16 @@ Line far *get_nth_line_on_screen(long screenY)
   return advance_n_lines(firstDisplayedLine, screenY);
 }
 
+long screen_end_y_of_last_line_on_screen(Line far *startingLine, int startingScreenY)
+{
+  while(startingLine->nextLine && startingScreenY < SCREEN_HEIGHT)
+  {
+    ++startingScreenY;
+    startingLine = startingLine->nextLine;
+  }
+  return startingScreenY;
+}
+
 long get_line_number(Line far *line)
 {
   assert(line);

@@ -132,6 +132,9 @@ void insert_indent()
     insert_character(guessedIndentChar);
 }
 
+void repaint_current_line_from_offset(int xOffset, int xEnd);
+void verify_screen_is_painted_correctly();
+
 void unindent()
 {
   assert(currentLine);
@@ -190,6 +193,6 @@ void unindent()
   viewportXOffset = MIN(viewportXOffset, curIndentAmount);
   cursorX = virtualX = newCursorPos - viewportXOffset;
 
-  // TODO: optimize to only repaint current line
-  repaint_screen();
+  repaint_current_line_from_offset(cursorX, currentLine->length + numCharsToUnindent);
+  verify_screen_is_painted_correctly();
 }

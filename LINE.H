@@ -26,6 +26,8 @@ Line far *advance_n_lines(Line far *startingLine, long numLinesForward);
 Line far *get_nth_line_of_document(long lineNumber); // Linear search from start of doc to find Nth line
 Line far *get_nth_line_on_screen(long screenY); // Linear search from start of screen to find Nth line
 
+long screen_end_y_of_last_line_on_screen(Line far *startingLine, int startingScreenY);
+
 // Returns 1-based line number
 long get_line_number(Line far *line);
 long get_current_line_number();
