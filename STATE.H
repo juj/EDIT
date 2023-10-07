@@ -47,5 +47,6 @@ extern long selectionStartColumn, selectionEndColumn;
 
 long current_line_number();
 long current_column();
+long char_position_on_current_line();
 
 #endif

@@ -139,6 +139,7 @@
     <ClInclude Include="..\MEMORY.H" />
     <ClInclude Include="..\OPENFILE.H" />
     <ClInclude Include="..\SCREEN.H" />
+    <ClInclude Include="..\SMINDENT.H" />
     <ClInclude Include="..\STATE.H" />
     <ClInclude Include="..\UTIL.H" />
     <ClInclude Include="..\VGA.H" />
@@ -156,6 +157,7 @@
     <ClCompile Include="..\MEMORY.CPP" />
     <ClCompile Include="..\OPENFILE.CPP" />
     <ClCompile Include="..\SCREEN.CPP" />
+    <ClCompile Include="..\SMINDENT.CPP" />
     <ClCompile Include="..\STATE.CPP" />
     <ClCompile Include="..\UTIL.CPP" />
     <ClCompile Include="..\VGA.CPP" />
