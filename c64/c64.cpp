@@ -2,10 +2,10 @@
 #include "../screen.h"
 #include <stdio.h>
 
-unsigned char *screen_mem = (unsigned char*)0x0400;
+static volatile unsigned char * const screen_mem = (unsigned char*)0x0400;
 
 // Color RAM: https://www.c64-wiki.com/wiki/Color_RAM
-unsigned char *color_ram = (unsigned char*)0xD800;
+static volatile unsigned char * const color_ram = (unsigned char*)0xD800;
 
 int get_text_width()
 {
@@ -17,19 +17,8 @@ int get_text_height()
   return 25;
 }
 
-volatile unsigned char *cursor_blink = (unsigned char *)0x00CC;
-
-void set_cursor_pos(int x, int y)
-{
-  unsigned char prev_blink = *cursor_blink;
-  *cursor_blink = 1; // disable cursor temporarily
-    // https://sta.c64.org/cbm64krnfunc.html:
-    // $E50A == Save (get) or restore (set) cursor position.
-    asm volatile("CLC\n" // Clear Carry: Carry flag 0 signals to the KERNAL subroutine that it should set the cursor position
-                 "JSR $E50A\n"
-                :: "x"((unsigned char)y), "y"((unsigned char)x) : "a", "x", "y", "memory");
-  *cursor_blink = prev_blink;
-}
+static volatile unsigned char * const cursor_blink = (unsigned char *)0xCC;
+static volatile unsigned char * const cursor_blink_phase = (unsigned char *)0xCF;
 
 #define CURSOR_NONE   0
 #define CURSOR_NORMAL 1
@@ -37,6 +26,23 @@ void set_cursor_pos(int x, int y)
 void set_cursor_style(int style)
 {
   *cursor_blink = (style == CURSOR_NONE) ? 1 : 0;
+}
+
+static unsigned char cx, cy;
+void set_cursor_pos(int x, int y)
+{
+  // https://sta.c64.org/cbm64krnfunc.html:
+  // $E50A == Save (get) or restore (set) cursor position.
+  // Disassembly at https://skoolkid.github.io/sk6502/c64rom/asm/E50A.html
+  asm volatile("CLC\n" // Clear Carry: Carry flag 0 signals to the KERNAL subroutine that it should set the cursor position
+               "JSR $E50A\n"
+              :: "x"((unsigned char)y), "y"((unsigned char)x) : "a", "x", "y", "c", "memory");
+
+  // After changing cursor position, we need to clean up the old character, which
+  // might have been left inverted by the blinking cursor in the old location
+  screen_mem[cy*SCREEN_WIDTH+cx] = screen_mem[cy*SCREEN_WIDTH+cx] & 0x7F;
+  cx = x;
+  cy = y;
 }
 
 void put_screen(int linearPos, char ch, unsigned char color)
@@ -66,7 +72,7 @@ void put_screen_color(int linearPos, unsigned color)
 
 unsigned char get_screen_color(int linearPos)
 {
-  return 0; // TODO
+  return color_ram[linearPos];
 }
 
 int init_screen()

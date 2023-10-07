@@ -16,6 +16,8 @@ int is_tab(char ch)
 
 int is_space(char ch)
 {
+// TODO: maybe?
+//  return (unsigned char)ch <= 32 || ch == (char)CHAR_MIDDLE_DOT || (unsigned char)ch == 0xBA || (unsigned char)ch == 0xFA;
   return ch == ' ' || ch == (char)CHAR_MIDDLE_DOT;
 }
 
