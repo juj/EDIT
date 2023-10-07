@@ -1,6 +1,8 @@
 #ifndef _MEMORY_H
 #define _MEMORY_H
 
+//#define DEBUG_INCREMENTAL_REPAINTING 1
+
 #if defined(__TURBOC__) && defined(__MSDOS__)
 #include <alloc.h>
 #endif

@@ -45,6 +45,37 @@ void repaint_open_files_list(File *highlightFilename)
   }
 }
 
+void repaint_line(int screenY, Line *line, int startX, int endX)
+{
+  if (line)
+  {
+    syntax_highlight(line);
+
+    int lineNumber = firstDisplayedLineNumber + screenY;
+    int selStart = (lineNumber == selectionStartLineNum) ? selectionStartColumn : (lineNumber <= selectionEndLineNum ? 0 : 0x7FFF);
+    int selEnd = (lineNumber == selectionEndLineNum) ? selectionEndColumn : (lineNumber >= selectionStartLineNum ? 0x7FFF : 0);
+#ifdef ENABLE_SYNTAX_HIGHLIGHTING
+    if (curLine->colors) show_line_with_colors_with_sel(y * SCREEN_WIDTH, curLine->text, curLine->length, curLine->colors, selStart, selEnd);
+    else
+#endif
+      show_line_with_sel(screenY * SCREEN_WIDTH, line->text, line->length, selStart, selEnd, startX, endX);
+
+    if (screenY > 0 && screenY < SCREEN_HEIGHT-1)
+    {
+      unsigned char existingColor = get_screen_color(screenY*SCREEN_WIDTH+SCREEN_WIDTH-1);
+      if (line->length > SCREEN_WIDTH + viewportXOffset)
+        put_screen_color(screenY*SCREEN_WIDTH+SCREEN_WIDTH-1, existingColor | BGCOLOR(BROWN));
+      else
+        put_screen_color(screenY*SCREEN_WIDTH+SCREEN_WIDTH-1, existingColor & ~BGCOLOR(BROWN));
+    }
+  }
+  else
+    clear_line(screenY * SCREEN_WIDTH, 0);
+
+  if (viewportXOffset != 0)
+    put_screen_color(screenY*SCREEN_WIDTH, get_screen_color(screenY*SCREEN_WIDTH) | BGCOLOR(BROWN));
+}
+
 void repaint_screen_lines(int yStart, int yEnd)
 {
   assert(yStart >= 0);
@@ -53,43 +84,14 @@ void repaint_screen_lines(int yStart, int yEnd)
   assert(yEnd >= 0);
   assert(yEnd <= SCREEN_HEIGHT);
   Line far *curLine = get_nth_line_on_screen(yStart);
-  int y = 0;
+  int screenY = 0;
   int lineNumber = firstDisplayedLineNumber + yStart;
 
-  const unsigned char clearCHs[4] = { 0xB2, 0xB1, 0xB0, 0 };
-  unsigned char clearCH = 0;
-
-  for(; y < yEnd; ++y)
+  for(; screenY < yEnd; ++screenY)
   {
-    if (curLine)
-    {
-      syntax_highlight(curLine);
-
-      int selStart = lineNumber == selectionStartLineNum ? selectionStartColumn : (lineNumber <= selectionEndLineNum ? 0 : 0x7FFF);
-      int selEnd = lineNumber == selectionEndLineNum ? selectionEndColumn : (lineNumber >= selectionStartLineNum ? 0x7FFF : 0);
-#ifdef ENABLE_SYNTAX_HIGHLIGHTING
-      if (curLine->colors) show_line_with_colors_with_sel(y * SCREEN_WIDTH, curLine->text, curLine->length, curLine->colors, selStart, selEnd);
-      else
-#endif
-        show_line_with_sel(y * SCREEN_WIDTH, curLine->text, curLine->length, selStart, selEnd);
-
-      if (y > 0 && y < SCREEN_HEIGHT-1)
-      {
-        unsigned char existingColor = get_screen_color(y*SCREEN_WIDTH+SCREEN_WIDTH-1);
-        if (curLine->length - viewportXOffset > SCREEN_WIDTH)
-          put_screen_color(y*SCREEN_WIDTH+SCREEN_WIDTH-1, existingColor | BGCOLOR(BROWN));
-        else
-          put_screen_color(y*SCREEN_WIDTH+SCREEN_WIDTH-1, existingColor & ~BGCOLOR(BROWN));
-      }
-
-      curLine = curLine->nextLine;
-      ++lineNumber;
-    }
-    else
-      clear_line(y * SCREEN_WIDTH, clearCHs[clearCH < 3 ? clearCH++ : 3]);
-
-    if (viewportXOffset != 0)
-      put_screen_color(y*SCREEN_WIDTH, get_screen_color(y*SCREEN_WIDTH) | BGCOLOR(BROWN));
+    repaint_line(screenY, curLine, 0, SCREEN_WIDTH);
+    if (curLine) curLine = curLine->nextLine;
+    ++lineNumber;
   }
   if (yStart == 0)
     repaint_open_files_list(0);
@@ -120,15 +122,22 @@ void repaint_screen()
 
 void verify_screen_is_painted_correctly()
 {
+#ifdef DEBUG_INCREMENTAL_REPAINTING
+  print_line_column_info(); // this might be out of date, since we print int lazily only later to save code size
   save_screen();
   repaint_screen();
   assert(saved_screen_matches_current_screen());
+  set_cursor_pos(cursorX, cursorY);
+#endif
 }
 
-void repaint_current_line_from_offset(int xOffset)
+void repaint_current_line_from_offset(int xOffset, int xEnd)
 {
   // TODO: actually paint from current offset onwards only
-  repaint_screen_lines(cursorY, cursorY+1);
+  repaint_line(cursorY, currentLine, xOffset, xEnd);
+  if (cursorY == 0)
+    repaint_open_files_list(0);
+  //repaint_screen_lines(cursorY, cursorY+1);
 }
 
 void insert_character(char ch)
@@ -203,14 +212,12 @@ void insert_character(char ch)
     virtualX = cursorX;
 
     // TODO: only repaint the current line starting from currentCharOffset
-    repaint_screen();
-    /*
     if (full_repaint) repaint_screen();
     else
     {
-      repaint_current_line_from_offset(cursorX-1);
+      repaint_current_line_from_offset(cursorX-1, currentLine->length);
+      verify_screen_is_painted_correctly();
     }
-    */
   }
 }
 
@@ -226,6 +233,8 @@ void delete_character()
       ++currentCharOffset;
     }
     --currentLine->length;
+    clear_highlight(currentLine);
+    repaint_current_line_from_offset(cursorX-1, currentLine->length+1);
   }
   else // join next line on this
   {
@@ -250,12 +259,14 @@ void delete_character()
       currentFile->lastLine = currentLine;
     }
     delete_line(next);
+    clear_highlight(currentLine);
+    repaint_screen(); // TODO: Repaint only from cursor down
   }
-  clear_highlight(currentLine);
   FILE_MODIFIED();
   // TODO: only repaint the current line starting from currentCharOffset
-//  repaint_current_line_from_offset(cursorX-1);
-  repaint_screen();
+  //if (full_repaint) repaint_screen();
+  /*else*/// repaint_current_line_from_offset(cursorX-1);
+  verify_screen_is_painted_correctly();
 }
 
 void backspace_character()
@@ -882,7 +893,6 @@ void main_loop()
     assert(get_line_number(firstDisplayedLine) == firstDisplayedLineNumber);
     assert(currentLine);
     assert(get_line_number(currentLine) == current_line_number());
-    verify_screen_is_painted_correctly();
     int key = get_key();
 
     // Doing text selection?

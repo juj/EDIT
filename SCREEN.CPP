@@ -102,18 +102,18 @@ void show_line(int screenPos, char huge *text, int textLen)
   }
 }
 
-void show_line_with_sel(int screenPos, char huge *text, int textLen, int selStart, int selEnd)
+void show_line_with_sel(int screenPos, char huge *text, int textLen, int selStart, int selEnd, int drawStartX, int drawEndX)
 {
   selStart -= viewportXOffset;
   selEnd -= viewportXOffset;
   const unsigned char selectionColor = BLUE | BGCOLOR(LTGRAY);
   textLen = MIN(textLen - viewportXOffset, SCREEN_WIDTH);
   int x;
-  for(x = 0; x < textLen; ++x)
+  for(x = drawStartX; x < textLen; ++x)
   {
     put_screen(screenPos + x, text[x + viewportXOffset], x < selStart || x >= selEnd ? editorTextColor : selectionColor);
   }
-  for(; x < SCREEN_WIDTH; ++x)
+  for(; x < drawEndX; ++x)
   {
     put_screen(screenPos + x, 0, editorTextColor);
   }

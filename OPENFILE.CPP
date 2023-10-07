@@ -31,7 +31,7 @@ void run_open_file_menu()
       y = 0;
       x += FILE_WIDTH;
       if (x + FILE_WIDTH > SCREEN_WIDTH)
-	break;
+	      break;
     }
   }
   int selectionX = 0;
@@ -49,10 +49,10 @@ void run_open_file_menu()
       File *f = load_file(fname);
       if (f)
       {
-	open_file_in_viewport(f, /*bringToMruFront:*/1);
+	      open_file_in_viewport(f, /*bringToMruFront:*/1);
       }
       else
-	ERROR_BEEP();
+	      ERROR_BEEP();
       break;
     }
     if (key == KEY_UP || key == KEY_DOWN || key == KEY_LEFT || key == KEY_RIGHT)

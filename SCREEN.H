@@ -48,7 +48,7 @@ void clear_line(int screenPos, unsigned char ch);
 void show_line(int screenPos, char huge *text, int textLen);
 void show_line_with_colors(int screenPos, char huge *text, int textLen, unsigned char far *colors);
 
-void show_line_with_sel(int screenPos, char huge *text, int textLen, int selStart, int selEnd);
+void show_line_with_sel(int screenPos, char huge *text, int textLen, int selStart, int selEnd, int drawStartX, int drawEndX);
 void show_line_with_colors_with_sel(int screenPos, char huge *text, int textLen, unsigned char far *colors, int selStart, int selEnd);
 
 void put_string_on_screen(const char *str, int x, int y);
