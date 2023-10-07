@@ -249,6 +249,7 @@ void paste_selection()
     newLine->text = newLine->length > 0 ? (char huge *)Farmalloc(newLine->length) : 0;
 #ifdef ENABLE_SYNTAX_HIGHLIGHTING
     newLine->colors = 0;
+    newLine->colorFlags = 0;
 #endif
     if (!newLine->text && newLine->length > 0)
     {

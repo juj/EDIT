@@ -650,6 +650,7 @@ void insert_new_line(int cursorMovesToNewline)
   newLine->text = newLine->length > 0 ? (char huge *)Farmalloc(newLine->length) : 0;
 #ifdef ENABLE_SYNTAX_HIGHLIGHTING
   newLine->colors = 0;
+  newLine->colorFlags = 0;
 #endif
   if (!newLine->text && newLine->length > 0)
   {
@@ -902,7 +903,7 @@ void main_loop()
     assert(get_line_number(firstDisplayedLine) == firstDisplayedLineNumber);
     assert(currentLine);
     assert(get_line_number(currentLine) == current_line_number());
-    repaint_screen();
+//    repaint_screen();
     int key = get_key();
 
     // Doing text selection?

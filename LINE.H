@@ -11,7 +11,9 @@
 struct Line
 {
   unsigned ownsPtr : 1;
+#ifdef ENABLE_SYNTAX_HIGHLIGHTING
   unsigned char colorFlags;
+#endif
   long length;
   long capacity;
   char huge *text;

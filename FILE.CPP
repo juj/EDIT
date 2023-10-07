@@ -63,8 +63,8 @@ int find_lines(File *f)
   curLine->text = data;
 #ifdef ENABLE_SYNTAX_HIGHLIGHTING
   curLine->colors = 0;
-#endif
   curLine->colorFlags = 0;
+#endif
   f->firstLine = curLine;
 
   char huge *ch = data;
@@ -83,14 +83,14 @@ int find_lines(File *f)
       Line far *nextLine = (Line far *)Farmalloc(sizeof(Line));
       if (!nextLine)
       {
-	// TODO: Deallocate file!?
-	return 0;
+	      // TODO: Deallocate file!?
+	      return 0;
       }
       nextLine->ownsPtr = 0;
 #ifdef ENABLE_SYNTAX_HIGHLIGHTING
       nextLine->colors = 0;
-#endif
       nextLine->colorFlags = 0;
+#endif
       curLine->nextLine = nextLine;
       curLine->length = i - prevLineStart;
       curLine->capacity = curLine->length + 1; // '\n' adds to capacity.
@@ -146,8 +146,8 @@ File *open_new_file()
   firstLine->text = 0;
 #ifdef ENABLE_SYNTAX_HIGHLIGHTING
   firstLine->colors = 0;
-#endif
   firstLine->colorFlags = 0;
+#endif
   f->firstLine = f->lastLine = firstLine;
   firstLine->length = firstLine->capacity = 0;
 

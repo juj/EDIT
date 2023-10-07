@@ -144,11 +144,8 @@ void syntax_highlight(Line far *line)
     line->colors = (unsigned char far *)Farmalloc(line->capacity);
     line->colorFlags = 0;
   }
-  else
-  {
-    if ((prevLineFlags >> 1) == line->colorFlags)
-      return;
-  }
+  else if ((prevLineFlags >> 1) == line->colorFlags)
+    return;
   line->colorFlags = prevLineFlags >> 1;
 
   int indentLength = find_line_indent_position(line);
@@ -178,27 +175,27 @@ void syntax_highlight(Line far *line)
   }
 
   for(; i < line->length; ++i)
-  {                                  //   % 'asdfasd'
-    if (line->text[i] <= 32)          // !     ! () 0        :;<=>? @ |
-      line->colors[i] = editorTextColor;// &  *+,-./  01 0x23 [ ~ \ ^ _ ` { }
-    else if (isalnum(line->text[i]) || line->text[i] == '_')
+  {                                      //   % 'asdfasd'
+    if (line->text[i] <= 32)             // !     ! () 0        :;<=>? @ |
+      line->colors[i] = editorTextColor; // &  *+,-./  01 0x23 [ ~ \ ^ _ ` { }
+    else if (isalnum((unsigned char)line->text[i]) || line->text[i] == '_')
     {
       size_t j = i+1;
       while(j < line->length && (isalnum((unsigned char)line->text[j]) || line->text[j] == '_'))
-	++j;
+	      ++j;
       unsigned char color = LTGREEN | bg;
       if (line->text[i] == '0' && j-i>1)
       {
-	if (line->text[i+1] == 'x') color = scan_hex_number(&line->text[i], j-i);
-	else color = scan_octal_number(&line->text[i], j-i);
+	      if (line->text[i+1] == 'x') color = scan_hex_number(&line->text[i], j-i);
+	      else color = scan_octal_number(&line->text[i], j-i);
       }
       else if (line->text[i] >= '0' && line->text[i] <= '9')
-	color = scan_decimal_number(&line->text[i], j-i);
+	      color = scan_decimal_number(&line->text[i], j-i);
       else if (is_cpp_reserved_word(&line->text[i], &line->text[j]))
-	color = WHITE | bg;
+	      color = WHITE | bg;
 
       while(i != j)
-	line->colors[i++] = color;
+	      line->colors[i++] = color;
       --i;
     }
     else if (line->text[i] == '/')
@@ -206,29 +203,29 @@ void syntax_highlight(Line far *line)
       unsigned char nextCh = i + 1 < line->length ? line->text[i+1] : 0;
       if (nextCh == '/')
       {
-	for(; i < line->length; ++i)
-	  line->colors[i] = CYAN | bg;
+	      for(; i < line->length; ++i)
+	        line->colors[i] = CYAN | bg;
       }
       else if (nextCh == '*')
       {
-	line->colors[i++] = CYAN | bg;
-	int commentTerminated = 0;
-	for(; i < line->length; ++i)
-	{
-	  line->colors[i] = CYAN | bg;
-	  if (line->text[i] == '*' && i+1 < line->length && line->text[i+1] == '/')
-	  {
-	    line->colors[i+1] = CYAN | bg;
-	    ++i;
-	    commentTerminated = 1;
-	    break;
-	  }
-	}
-	if (!commentTerminated)
-	{
-	  line->colorFlags |= LINE_ENDS_IN_COMMENT;
-	  return;
-	}
+	      line->colors[i++] = CYAN | bg;
+	      int commentTerminated = 0;
+	      for(; i < line->length; ++i)
+	      {
+	        line->colors[i] = CYAN | bg;
+	        if (line->text[i] == '*' && i+1 < line->length && line->text[i+1] == '/')
+	        {
+	          line->colors[i+1] = CYAN | bg;
+	          ++i;
+	          commentTerminated = 1;
+	          break;
+	        }
+	      }
+	      if (!commentTerminated)
+	      {
+	        line->colorFlags |= LINE_ENDS_IN_COMMENT;
+	        return;
+	      }
       }
       else
 	       line->colors[i] = YELLOW | bg;
@@ -248,9 +245,9 @@ void syntax_highlight(Line far *line)
       line->colors[i++] = RED | bg;
       for(; i < line->length; ++i)
       {
-	line->colors[i] = RED | bg;
-	if (line->text[i] == '"')
-	  break;
+	      line->colors[i] = RED | bg;
+	      if (line->text[i] == '"')
+	        break;
       }
     }
     else if (is_one_of(line->text[i], "$@\\`"))
