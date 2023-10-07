@@ -1,5 +1,14 @@
+# Borland Turbo C++ 3.0
 *.BAK
 *.OBJ
 *.SWP
 *.LOG
 *.DSK
+
+# Visual Studio
+.vs
+*.filters
+*.user
+*.tlog
+*.idb
+*.pdb
