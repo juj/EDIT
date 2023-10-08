@@ -15,6 +15,7 @@
 #include "audio.h"
 #include "line.h"
 #include "openfile.h"
+#include "savefile.h"
 #include "viewport.h"
 #include "memory.h"
 #include "copypast.h"
@@ -632,7 +633,7 @@ void insert_new_line(int cursorMovesToNewline)
   long currentCharOffset = char_position_on_current_line();
 
   // TODO: Also guess indent here
-  long newIndent = (last_nonws_char_on_line(currentLine, currentCharOffset-1) == '{') ? indentSize : 0;
+  long newIndent = (last_nonws_char_on_line(currentLine, currentCharOffset-1) == LEFT_CURLY_BRACE) ? indentSize : 0;
 
   // We copy indent from current line to the new line up to
   // the character position
@@ -1016,6 +1017,7 @@ void main_loop()
         break;
       case KEY_CTRL_S:
       case KEY_F2:
+        ask_name_for_file(currentFile);
         save_file(currentFile);
         save_file_to_network(currentFile);
         repaint_screen();
@@ -1064,13 +1066,13 @@ void main_loop()
 #endif
 
       default:
-        if (key >= 0x20 && key < 127)
+//        if ((key >= 0x20 && key < 127) ||
         {
-          if (key == '}') unindent();
+          if (key == RIGHT_CURLY_BRACE) unindent();
           if (showWhitespace && key == ' ') key = CHAR_MIDDLE_DOT;
           insert_character(key);
         }
-        else
+//        else
         {
 //          set_cursor_pos(0,0);
   //        printf("0x%x     \n", key);

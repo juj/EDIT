@@ -8,6 +8,10 @@
 #include <Windows.h>
 #endif
 
+#include <string.h>
+#include "screen.h"
+#include "cursor.h"
+
 #if defined(__TURBOC__) && defined(__MSDOS__)
 
 #define SCANCODE_LEFT_ALT 0x38
@@ -164,6 +168,44 @@ void deinit_keyboard()
 #if defined(__TURBOC__) && defined(__MSDOS__)
   unregister_keyboard_interrupt();
 #endif
+}
+
+int ask_string_prompt(const char *prompt, char *dst, int maxLen)
+{
+  put_string_on_screen(prompt, 0, SCREEN_HEIGHT-1, WHITE);
+  int prompt_len = (int)strlen(prompt);
+  int x = (int)strlen(dst);
+  put_string_on_screen(dst, prompt_len, SCREEN_HEIGHT-1, LTGRAY);
+  const int pos = (SCREEN_HEIGHT-1)*SCREEN_WIDTH+prompt_len;
+  int result = 0;
+  while(result == 0)
+  {
+    set_cursor_pos(prompt_len+x, SCREEN_HEIGHT-1);
+    int key = get_key();
+    switch(key)
+    {
+#ifndef __C64__
+    case KEY_ESC: result = -1; break;
+#endif
+    case KEY_ENTER: if (x > 0) result = 1; break;
+    case KEY_BACKSPACE:
+      if (x > 0)
+      {
+        dst[--x] = 0;
+        put_screen(pos+x, ' ', LTGRAY);
+      }
+      break;
+    default:
+      if (x < 15 && key >= 0x20 && key < 127)
+      {
+        put_screen(pos+x, key, LTGRAY);
+        dst[x++] = key;
+      }
+      break;
+    }
+  }
+  dst[x] = 0;
+  return x;
 }
 
 #if defined(_MSC_VER)

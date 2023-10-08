@@ -242,10 +242,10 @@ void syntax_highlight(Line far *line)
     }
     else if (line->text[i] == '"')
     {
-      line->colors[i++] = RED | bg;
+      line->colors[i++] = LTRED | bg;
       for(; i < line->length; ++i)
       {
-	      line->colors[i] = RED | bg;
+	      line->colors[i] = LTRED | bg;
 	      if (line->text[i] == '"')
 	        break;
       }

@@ -1,5 +1,6 @@
 #include "../iassert.h"
 #include "../screen.h"
+#include "../input.h" // TODO REMOVE
 #include <stdio.h>
 
 static volatile unsigned char * const screen_mem = (unsigned char*)0x0400;
@@ -45,11 +46,24 @@ void set_cursor_pos(int x, int y)
   cy = y;
 }
 
+unsigned char petscii_to_screen_code(unsigned char petscii)
+{
+  if (petscii <= 31) return 32;//petscii + 128;
+  if (petscii <= 63) return petscii;
+  if (petscii <= 95) return petscii - 64;
+  if (petscii <= 127) return petscii - 32;
+  if (petscii <= 159) return 32;//petscii + 64;
+  if (petscii <= 191) return petscii - 64;
+  if (petscii <= 254) return petscii - 128;
+  return 0x5E;
+}
+
 void put_screen(int linearPos, char ch, unsigned char color)
 {
-  if (ch == 0xBA || ch == 0xFA) ch = 32;
-  if (ch < 32) screen_mem[linearPos] = 32;
-  else screen_mem[linearPos] = ch;
+//  if (ch == 0xBA || ch == 0xFA) ch = 32;
+//  if (ch < 32) screen_mem[linearPos] = 32;
+  //else 
+    screen_mem[linearPos] = petscii_to_screen_code(ch);
 
   color_ram[linearPos] = color;
   //screen_mem[linearPos] = (ch == 0) ? 32 : ch;
@@ -62,7 +76,7 @@ void put_screen(int linearPos, char ch)
 
 char get_screen(int linearPos)
 {
-  return screen_mem[linearPos];
+  return screen_mem[linearPos]; // TODO: screen code to PETSCII
 }
 
 void put_screen_color(int linearPos, unsigned color)
@@ -75,10 +89,20 @@ unsigned char get_screen_color(int linearPos)
   return color_ram[linearPos];
 }
 
+static volatile unsigned char * const mem_setup_register = (unsigned char *)0xD018;
+
 int init_screen()
 {
   SCREEN_WIDTH = get_text_width();
   SCREEN_HEIGHT = get_text_height();
+
+  // Switch charset into text mode, where both lower case and upper case characters
+  // are available.
+  //*mem_setup_register ^= 2;
+//  printf("%02XH\n", *mem_setup_register); // 0x15
+  *mem_setup_register = 0x17;
+//  printf("%02XH\n", *mem_setup_register); // 0x17
+//  get_key();
 
   return true;
 }

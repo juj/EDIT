@@ -139,6 +139,7 @@
     <ClInclude Include="..\MEMORY.H" />
     <ClInclude Include="..\NETWORK.H" />
     <ClInclude Include="..\OPENFILE.H" />
+    <ClInclude Include="..\SAVEFILE.H" />
     <ClInclude Include="..\SCREEN.H" />
     <ClInclude Include="..\SMINDENT.H" />
     <ClInclude Include="..\STATE.H" />
@@ -159,6 +160,7 @@
     <ClCompile Include="..\MEMORY.CPP" />
     <ClCompile Include="..\NETWORK.CPP" />
     <ClCompile Include="..\OPENFILE.CPP" />
+    <ClCompile Include="..\SAVEFILE.CPP" />
     <ClCompile Include="..\SCREEN.CPP" />
     <ClCompile Include="..\SMINDENT.CPP" />
     <ClCompile Include="..\STATE.CPP" />

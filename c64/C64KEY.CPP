@@ -1,10 +1,13 @@
 #include "../input.h"
 
-volatile unsigned char *key_address = (unsigned char *)0x00CB;
-volatile unsigned char *key_modifiers = (unsigned char *)0x028D;
+#include <stdio.h> /// TODO REMOVE
+void put_screen(int linearPos, char ch); // TODO REMOVE
+
+static volatile unsigned char * const key_address = (unsigned char *)0x00CB;
+static volatile unsigned char * const key_modifiers = (unsigned char *)0x028D;
 
 // https://www.c64-wiki.com/wiki/Zeropage: $0002 is unused so safe to access.
-volatile unsigned char *tmp = (unsigned char *)0x0002; // arbitrary safe temporary memory address for getting data out of inline assembly
+static volatile unsigned char * const tmp = (unsigned char *)0x0002; // arbitrary safe temporary memory address for getting data out of inline assembly
 
 static volatile unsigned char * const jiffy_lsb = (unsigned char*)0xA2;
 
@@ -52,8 +55,42 @@ int get_key()
 //  bool is_cmdre = (modifiers&2);
 //  bool is_ctrl = (modifiers&4);
   unsigned int key = keyCode;
-  if (key == 0xA0) key = 0x20; // convert shift-space back to space.
-  if (is_shift && is_shift_aware_key(key)) key |= KEY_SHIFT_MODIFIER;
+  unsigned char key_matrix_code = *key_address;
+
+  if (key >= 0xC1 && key <= 0xDA) key -= 0x60;
+//  key &= 0x7F; // xxx why this?
+  if (keyCode == 0xBA && key_matrix_code == 0x2E) key = LEFT_CURLY_BRACE;
+  else if (keyCode == 0xC0 && key_matrix_code == 0x31) key = RIGHT_CURLY_BRACE;
+  else if (keyCode == 0xDE && key_matrix_code == 0x36) key = TEXT_BACKSLASH;
+  else if (key == 0xA0) key = 0x20; // convert shift-space back to space. xxx why this?
+
+  if (is_shift)
+  {
+    if (is_shift_aware_key(key)) key |= KEY_SHIFT_MODIFIER;
+    else if (key >= 'A' && key <= 'Z')
+      key ^= 0x20;
+//    else if ((key >= 'a' && key <= 'z') || (key >= 'A' && key <= 'Z'))
+  //    key ^= 0x20;
+//    else if ((key >= 'A' && key <= 'Z'))
+  //    key -= 0x20;
+  }
+//  else if (key >= 0x41 && key <= 0x5a)
+  //  key -= 0x20;:"{{}{}{[[{{{[[["
+//  else if ((key >= 'a' && key <= 'z') || (key >= 'A' && key <= 'Z'))
+  //  key ^= 0x20; // In PETSCII uppercase and lowercase are reversed
+//  printf("  %XH/%XH\n", (int)key, (int)*key_address);
+
+// static volatile unsigned char * const mem_setup_register = (unsigned char *)0xD018;
+// *mem_setup_register = 0x17;//^= 2;
+/*
+ for(int y = 0; y < 16; ++y)
+  for(int x = 0; x < 16; ++x)
+  {
+    unsigned int addr = y*40+x;
+    put_screen(addr, y*16+x);
+  }
+ get_key();
+ */
   return key;
 }
 

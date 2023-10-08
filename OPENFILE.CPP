@@ -13,9 +13,19 @@
 #include "file.h"
 #include "viewport.h"
 
+void open_file(const char *filename)
+{
+  File *f = load_file(filename);
+  if (f)
+    open_file_in_viewport(f, /*bringToMruFront:*/1);
+  else
+    ERROR_BEEP();
+}
+
+#if defined(__TURBOC__) && defined(__MSDOS__)
+
 void run_open_file_menu()
 {
-#if defined(__TURBOC__) && defined(__MSDOS__)
   struct find_t ffblk;
   int x = 0;
   int y = 1;
@@ -48,13 +58,7 @@ void run_open_file_menu()
     {
       char fname[FILE_WIDTH];
       get_string_on_screen(selectionX*FILE_WIDTH, selectionY, FILE_WIDTH-1, fname);
-      File *f = load_file(fname);
-      if (f)
-      {
-	      open_file_in_viewport(f, /*bringToMruFront:*/1);
-      }
-      else
-	      ERROR_BEEP();
+      open_file(fname);
       break;
     }
     if (key == KEY_UP || key == KEY_DOWN || key == KEY_LEFT || key == KEY_RIGHT)
@@ -69,5 +73,14 @@ void run_open_file_menu()
       set_chars_color(selectionX*FILE_WIDTH, selectionY, FILE_WIDTH-1, WHITE | BGCOLOR(LTGRAY));
     }
   }
-#endif
 }
+#else
+
+void run_open_file_menu()
+{
+  char filename[16] = {};
+  ask_string_prompt("OPEN FILE: ", filename, 15);
+  open_file(filename);
+}
+
+#endif

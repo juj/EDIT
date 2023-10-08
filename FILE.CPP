@@ -122,7 +122,6 @@ File *open_new_file()
 #else
   const char *filename = "<untitled>";
 #endif
-  filename = "TEST.CPP";
   f->filename = (char*)Malloc(strlen(filename)+1);
   if (!f->filename)
   {
@@ -240,51 +239,6 @@ File *load_file(const char *filename)
   return f;
 #else
   return 0;
-#endif
-}
-
-void save_file(File *file)
-{
-#if defined(_MSC_VER) || defined(__TURBOC__)
-  assert(file);
-  if (!strcmp(file->filename, "<unsaved>"))
-  {
-    NOTIMPL("Save As.. dialog not yet implemented");
-    return;
-  }
-  Line far *line = file->firstLine;
-
-  FILE *handle = fopen(file->filename, "wb");
-  if (!handle)
-    goto error;
-
-  while(line)
-  {
-    long numWritten = huge_fwrite(line->text, line->length, handle);
-    if (numWritten != line->length)
-    {
-      fclose(handle);
-      goto error;
-    }
-    if (line->nextLine)
-    {
-      size_t written = fwrite("\r\n", 1, 2, handle);
-      if (written != 2)
-        goto error;
-      line = line->nextLine;
-    }
-    else break;
-
-  }
-  fclose(handle);
-  file->hasUnsavedChanges = 0;
-  return;
-
-error:
-  char str[64];
-  sprintf(str, "Unable to save file \"%s\"!", file->filename);
-  log_error(str);
-  return;
 #endif
 }
 

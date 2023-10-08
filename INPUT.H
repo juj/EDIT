@@ -16,6 +16,11 @@
 #define KEY_CTRL_X 0x18
 
 #ifdef __C64__
+
+#define LEFT_CURLY_BRACE  0xAB
+#define RIGHT_CURLY_BRACE 0xB3
+#define TEXT_BACKSLASH    0xBF
+
 //#define KEY_ESC    0x03 On C64, ESC and Ctrl-C give the same PETSCII key code
 #define KEY_F1         0x85
 #define KEY_F3         0x86
@@ -34,6 +39,10 @@
 #define KEY_END        0x5F
 #define KEY_PGDN       0x5E
 #else
+
+#define LEFT_CURLY_BRACE  '{'
+#define RIGHT_CURLY_BRACE '}'
+#define TEXT_BACKSLASH    '\\'
 
 #define KEY_F2         0x13C
 #define KEY_F3         0x13D
@@ -80,5 +89,7 @@ int is_navigation_action_key(int key);
 
 void init_keyboard();
 void deinit_keyboard();
+
+int ask_string_prompt(const char *prompt, char *dst, int maxLen);
 
 #endif
