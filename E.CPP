@@ -21,6 +21,7 @@
 #include "highlite.h"
 #include "cursor.h"
 #include "smindent.h"
+#include "network.h"
 
 void repaint_open_files_list(File *highlightFilename)
 {
@@ -1016,6 +1017,7 @@ void main_loop()
       case KEY_CTRL_S:
       case KEY_F2:
         save_file(currentFile);
+        save_file_to_network(currentFile);
         repaint_screen();
         break;
       case KEY_CTRL_G: run_goto_line_menu(); break;
@@ -1136,6 +1138,7 @@ int main(int argc, char **argv)
  //// query_svga_modes();
 //  set_vga_text_mode(TEXT_MODE_90x60);
 //  set_vga_text_mode(TEXT_MODE_40x25);
+  init_network();
   init_screen();
 
   // TODO: Query current text mode to initialize defaults
@@ -1154,5 +1157,6 @@ int main(int argc, char **argv)
   clrscr();
 #endif
   deinit_screen();
+  deinit_network();
   return 0;
 }

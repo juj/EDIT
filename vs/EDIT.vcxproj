@@ -137,6 +137,7 @@
     <ClInclude Include="..\INPUT.H" />
     <ClInclude Include="..\LINE.H" />
     <ClInclude Include="..\MEMORY.H" />
+    <ClInclude Include="..\NETWORK.H" />
     <ClInclude Include="..\OPENFILE.H" />
     <ClInclude Include="..\SCREEN.H" />
     <ClInclude Include="..\SMINDENT.H" />
@@ -144,6 +145,7 @@
     <ClInclude Include="..\UTIL.H" />
     <ClInclude Include="..\VGA.H" />
     <ClInclude Include="..\VIEWPORT.H" />
+    <ClInclude Include="vs_network.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\AUDIO.CPP" />
@@ -155,6 +157,7 @@
     <ClCompile Include="..\INPUT.CPP" />
     <ClCompile Include="..\LINE.CPP" />
     <ClCompile Include="..\MEMORY.CPP" />
+    <ClCompile Include="..\NETWORK.CPP" />
     <ClCompile Include="..\OPENFILE.CPP" />
     <ClCompile Include="..\SCREEN.CPP" />
     <ClCompile Include="..\SMINDENT.CPP" />
@@ -162,6 +165,8 @@
     <ClCompile Include="..\UTIL.CPP" />
     <ClCompile Include="..\VGA.CPP" />
     <ClCompile Include="..\VIEWPORT.CPP" />
+    <ClCompile Include="vs_network.cpp" />
+    <ClCompile Include="vs_network_client.cpp" />
     <ClCompile Include="vs_vt100.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

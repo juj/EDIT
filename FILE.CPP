@@ -122,6 +122,7 @@ File *open_new_file()
 #else
   const char *filename = "<untitled>";
 #endif
+  filename = "TEST.CPP";
   f->filename = (char*)Malloc(strlen(filename)+1);
   if (!f->filename)
   {
@@ -285,4 +286,16 @@ error:
   log_error(str);
   return;
 #endif
+}
+
+long calculate_file_byte_size(File *f)
+{
+  long size = 0;
+  Line *l = f->firstLine;
+  while(l)
+  {
+    size += l->length+1;
+    l = l->nextLine;
+  }
+  return size;
 }

@@ -25,6 +25,8 @@ File *open_new_file();
 struct FILE;
 #endif
 
+long calculate_file_byte_size(File *f);
+
 long huge_fread(char huge *dst, long numBytes, FILE *handle);
 File *load_file(const char *filename);
 void save_file(File *file);
