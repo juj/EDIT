@@ -1,12 +1,14 @@
 #ifndef _CURSOR_H
 #define _CURSOR_H
 
+#include <stdint.h>
+
 void toggle_insert(void);
-void set_cursor_pos(int x, int y);
+void set_cursor_pos(uint8_t x, uint8_t y);
 
 #define CURSOR_NONE   0
 #define CURSOR_NORMAL 1
 #define CURSOR_INSERT 2
-void set_cursor_style(int style);
+void set_cursor_style(uint8_t style);
 
 #endif

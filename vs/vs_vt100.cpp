@@ -102,7 +102,7 @@ static int vt_back_color(unsigned char dosColor)
   }
 }
 
-void set_cursor_pos(int x, int y)
+void set_cursor_pos(uint8_t x, uint8_t y)
 {
   printf("\x1b[%d;%dH", y+1, x+1);
 }

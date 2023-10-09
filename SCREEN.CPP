@@ -24,13 +24,13 @@ void clear_screen(unsigned char ch, unsigned char color)
     put_screen(i, ch, color);
 }
 
-void clear_line(int screenPos, unsigned char ch)
+void clear_line(uint16_t screenPos, unsigned char ch)
 {
   for(int i = 0; i < SCREEN_WIDTH; ++i)
     put_screen(screenPos + i, ch, BLUE); //DKGRAY | BGCOLOR(BLUE);//editorTextColor;
 }
 
-void set_chars_color(int x, int y, int numChars, unsigned char color)
+void set_chars_color(cursor_pos x, cursor_pos y, int numChars, unsigned char color)
 {
   assert(x >= 0);
   assert(x < SCREEN_WIDTH);
@@ -38,32 +38,32 @@ void set_chars_color(int x, int y, int numChars, unsigned char color)
   assert(x + numChars <= SCREEN_WIDTH);
   assert(y >= 0);
   assert(y < SCREEN_HEIGHT);
-  int screenPos = y*SCREEN_WIDTH+x;
-  for(int i = 0; i < numChars; ++i)
+  uint16_t screenPos = (uint16_t)y*SCREEN_WIDTH+x;
+  for(uint16_t i = 0; i < numChars; ++i)
     put_screen_color(screenPos + i, color);
 }
 
-void highlight_line(int yLine, unsigned char bgColor)
+void highlight_line(cursor_pos yLine, unsigned char bgColor)
 {
   assert(yLine >= 0);
   assert(yLine < SCREEN_HEIGHT);
-  int screenPos = yLine*SCREEN_WIDTH;
-  for(int i = 0; i < SCREEN_WIDTH; ++i)
+  uint16_t screenPos = (uint16_t)yLine*SCREEN_WIDTH;
+  for(cursor_pos i = 0; i < SCREEN_WIDTH; ++i)
     put_screen_color(screenPos + i, bgColor | get_screen_color(screenPos+i) & 0x0F);
 }
 
 void log_x(const char *str)
 {
-  int x = (SCREEN_WIDTH - (int)strlen(str)) >> 1;
-  int pos = ((SCREEN_HEIGHT-1) * SCREEN_WIDTH + x);
-  for(int i = 0; str[i] != 0; ++i, ++pos)
+  cursor_pos x = (SCREEN_WIDTH - (cursor_pos)strlen(str)) >> 1;
+  uint16_t pos = ((uint16_t)(SCREEN_HEIGHT-1) * SCREEN_WIDTH + x);
+  for(uint8_t i = 0; str[i] != 0; ++i, ++pos)
     put_screen(pos, str[i], WHITE | BGCOLOR(MAGENTA));
 }
 
-void show_line_with_colors(int screenPos, char huge *text, int textLen, unsigned char *colors, int drawStartX, int drawEndX)
+void show_line_with_colors(uint16_t screenPos, char huge *text, line_xpos textLen, unsigned char *colors, line_xpos drawStartX, line_xpos drawEndX)
 {
   textLen = MIN(textLen - viewportXOffset, drawEndX);
-  int x;
+  line_xpos x;
   for(x = drawStartX; x < textLen; ++x)
     put_screen(screenPos+x, text[x + viewportXOffset], colors[x + viewportXOffset]);
   for(; x < drawEndX; ++x)
@@ -76,78 +76,64 @@ void show_line_with_colors(int screenPos, char huge *text, int textLen, unsigned
   const unsigned char selectionColor = BLUE | BGCOLOR(LTGRAY);
 #endif
 
-void show_line_with_colors_with_sel(int screenPos, char huge *text, int textLen, unsigned char *colors, int selStart, int selEnd, int drawStartX, int drawEndX)
+void show_line_with_colors_with_sel(uint16_t screenPos, char huge *text, line_xpos textLen, unsigned char *colors, line_xpos selStart, line_xpos selEnd, line_xpos drawStartX, line_xpos drawEndX)
 {
   selStart -= viewportXOffset;
   selEnd -= viewportXOffset;
   textLen = MIN(textLen - viewportXOffset, drawEndX);
-  int x;
+  line_xpos x;
   for(x = drawStartX; x < textLen; ++x)
-  {
     put_screen(screenPos + x, text[x + viewportXOffset], x < selStart || x >= selEnd ? colors[x + viewportXOffset] : selectionColor);
-//    screenPtr[x<<1] = ;
-//    screenPtr[(x<<1)+1] = ;
-  }
   for(; x < drawEndX; ++x)
-  {
     put_screen(screenPos + x, 0, editorTextColor);
-  }
 }
 
-void show_line(int screenPos, char huge *text, int textLen)
+void show_line(uint16_t screenPos, char huge *text, line_xpos textLen)
 {
   textLen = MIN(textLen - viewportXOffset, SCREEN_WIDTH);
-  int x;
+  line_xpos x;
   for(x = 0; x < textLen; ++x)
-  {
     put_screen(screenPos + x, text[x + viewportXOffset], editorTextColor);
-  }
   for(; x < SCREEN_WIDTH; ++x)
-  {
     put_screen(screenPos + x, 0, editorTextColor);
-  }
 }
 
-void show_line_with_sel(int screenPos, char huge *text, int textLen, int selStart, int selEnd, int drawStartX, int drawEndX)
+void show_line_with_sel(uint16_t screenPos, char huge *text, line_xpos textLen, line_xpos selStart, line_xpos selEnd, line_xpos drawStartX, line_xpos drawEndX)
 {
   selStart -= viewportXOffset;
   selEnd -= viewportXOffset;
   textLen = MIN(textLen - viewportXOffset, SCREEN_WIDTH);
-  int x;
+  line_xpos x;
   for(x = drawStartX; x < textLen; ++x)
-  {
     put_screen(screenPos + x, text[x + viewportXOffset], x < selStart || x >= selEnd ? editorTextColor : selectionColor);
-  }
   for(; x < drawEndX; ++x)
-  {
     put_screen(screenPos + x, 0, editorTextColor);
-  }
 }
 
-void get_string_on_screen(int x, int y, int maxLength, char *dst)
+void get_string_on_screen(cursor_pos x, cursor_pos y, cursor_pos maxLength, char *dst)
 {
-  int screenPos = y*SCREEN_WIDTH+x;
+  uint16_t screenPos = (uint16_t)y*SCREEN_WIDTH+x;
 //  char far *screenPtr = &screen[()<<1];
-  int i = 0;
+  line_xpos i = 0;
   for(; i < maxLength && is_whitespace(get_screen(screenPos + i)); ++i)
     ;
-  int len = 0;
+  line_xpos len = 0;
   for(; i < maxLength && get_screen(screenPos + i) >= 32; ++i)
     dst[len++] = get_screen(screenPos + i);;
   dst[len] = 0;
 }
 
-void put_string_on_screen(const char *str, int x, int y)
+void put_string_on_screen(const char *str, cursor_pos x, cursor_pos y)
 {
-  int pos = y * SCREEN_WIDTH + x;
-  for(int i = 0; str[i] != 0; ++i, ++pos)
+  uint16_t pos = (uint16_t)y*SCREEN_WIDTH + x;
+  for(line_xpos i = 0; str[i] != 0; ++i, ++pos)
     put_screen(pos, str[i]);
 }
 
-void put_string_on_screen(const char *str, int x, int y, unsigned char color)
+void put_string_on_screen(const char *str, cursor_pos x, cursor_pos y, unsigned char color)
 {
-  int pos = y * SCREEN_WIDTH + x;
-  for(int i = 0; str[i] != 0; ++i, ++pos)
+  uint16_t pos = (uint16_t)y*SCREEN_WIDTH + x;
+  for(line_xpos i = 0; str[i] != 0; ++i, ++pos)
     put_screen(pos, str[i], color);
 }
 
@@ -161,29 +147,29 @@ void log_error(const char *errorText)
 
 char far *screen = (char far *)MK_FP(0xB800, 0);
 
-void put_screen(int linearPos, char ch)
+void put_screen(uint16_t linearPos, char ch)
 {
   screen[linearPos<<1] = ch;
 }
 
-void put_screen_color(int linearPos, unsigned char color)
+void put_screen_color(uint16_t linearPos, unsigned char color)
 {
   screen[(linearPos<<1)+1] = color;
 }
 
-void put_screen(int linearPos, char ch, unsigned char color)
+void put_screen(uint16_t linearPos, char ch, unsigned char color)
 {
   linearPos <<= 1;
   screen[linearPos] = ch;
   screen[linearPos+1] = color;
 }
 
-char get_screen(int linearPos)
+char get_screen(uint16_t linearPos)
 {
   return screen[linearPos<<1];
 }
 
-unsigned char get_screen_color(int linearPos)
+unsigned char get_screen_color(uint16_t linearPos)
 {
   return screen[(linearPos<<1)+1];
 }

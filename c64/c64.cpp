@@ -1,6 +1,7 @@
 #include "../iassert.h"
 #include "../screen.h"
 #include <stdio.h>
+#include <stdint.h>
 
 // Color RAM: https://www.c64-wiki.com/wiki/Color_RAM
 static volatile unsigned char * const color_ram = (unsigned char*)0xD800;
@@ -12,25 +13,25 @@ static volatile unsigned char * const cursor_color = (unsigned char*)0x0286;
 #define CURSOR_NONE   0
 #define CURSOR_NORMAL 1
 #define CURSOR_INSERT 2
-void set_cursor_style(int style)
+void set_cursor_style(uint8_t style)
 {
   *cursor_blink = (style == CURSOR_NONE) ? 1 : 0;
 }
 
 static unsigned char cx, cy;
 unsigned char colorUnderCursor = 7;
-void set_cursor_pos(int x, int y)
+void set_cursor_pos(uint8_t x, uint8_t y)
 {
   // https://sta.c64.org/cbm64krnfunc.html:
   // $E50A == Save (get) or restore (set) cursor position.
   // Disassembly at https://skoolkid.github.io/sk6502/c64rom/asm/E50A.html
   asm volatile(R"(CLC // Clear Carry: Carry flag 0 signals to the KERNAL subroutine that it should set the cursor position
                   JSR $E50A)"
-              :: "x"((unsigned char)y), "y"((unsigned char)x) : "a", "c", "memory");
+              :: "x"(y), "y"(x) : "a", "c", "memory");
 
   // After changing cursor position, we need to clean up the old character, which
   // might have been left inverted by the blinking cursor in the old location
-  int pos = cy*SCREEN_WIDTH+cx;
+  uint16_t pos = (uint16_t)cy*SCREEN_WIDTH+cx;
   screen_mem[pos] = screen_mem[pos] & 0x7F;
   //color_ram[pos] = colorUnderCursor;
   cx = x;
@@ -51,37 +52,37 @@ unsigned char petscii_to_screen_code(unsigned char petscii)
   return 0x5E;
 }
 
-void put_screen(int linearPos, char ch, unsigned char color)
+void put_screen(uint16_t linearPos, char ch, unsigned char color)
 {
   screen_mem[linearPos] = petscii_to_screen_code(ch) ^ (color&0x80);
   color_ram[linearPos] = color;
 }
 
-void put_screen(int linearPos, char ch)
+void put_screen(uint16_t linearPos, char ch)
 {
   put_screen(linearPos, ch, 7);
 }
 
-char get_screen(int linearPos)
+char get_screen(uint16_t linearPos)
 {
   return screen_mem[linearPos]; // TODO: screen code to PETSCII
 }
 
-void put_screen_color(int linearPos, unsigned color)
+void put_screen_color(uint16_t linearPos, unsigned color)
 {
   put_screen(linearPos, get_screen(linearPos), 7);
 }
 
-unsigned char get_screen_color(int linearPos)
+unsigned char get_screen_color(uint16_t linearPos)
 {
   return color_ram[linearPos];
 }
 
 static volatile unsigned char * const mem_setup_register = (unsigned char *)0xD018;
 
-int init_screen()
+bool init_screen()
 {
-  unsigned char w,h;
+  uint8_t w,h;
   asm("JSR 0xE505"
     :"=x"(w), "=y"(h));
   SCREEN_WIDTH = w;

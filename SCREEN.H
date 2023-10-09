@@ -2,6 +2,7 @@
 #define _SCREEN_H
 
 #include "memory.h"
+#include "types.h"
 
 #ifdef __C64__
 // C64 colors: https://www.c64-wiki.com/wiki/Color
@@ -62,31 +63,31 @@ extern unsigned char SCREEN_HEIGHT;
 //extern char far *screen;
 
 void save_screen();
-int saved_screen_matches_current_screen();
+bool saved_screen_matches_current_screen();
 
-int init_screen();
+bool init_screen();
 void deinit_screen();
 
-void put_screen(int linearPos, char ch);
-void put_screen_color(int linearPos, unsigned color);
-void put_screen(int linearPos, char ch, unsigned char color);
-char get_screen(int linearPos);
-unsigned char get_screen_color(int linearPos);
+void put_screen(uint16_t linearPos, char ch);
+void put_screen_color(uint16_t linearPos, unsigned color);
+void put_screen(uint16_t linearPos, char ch, unsigned char color);
+char get_screen(uint16_t linearPos);
+unsigned char get_screen_color(uint16_t linearPos);
 
-void clear_line(int screenPos, unsigned char ch);
-void show_line(int screenPos, char huge *text, int textLen);
-void show_line_with_colors(int screenPos, char huge *text, int textLen, unsigned char far *colors);
+void clear_line(uint16_t screenPos, unsigned char ch);
+void show_line(uint16_t screenPos, char huge *text, line_xpos textLen);
+void show_line_with_colors(uint16_t screenPos, char huge *text, line_xpos textLen, unsigned char far *colors);
 
-void show_line_with_sel(int screenPos, char huge *text, int textLen, int selStart, int selEnd, int drawStartX, int drawEndX);
-void show_line_with_colors_with_sel(int screenPos, char huge *text, int textLen, unsigned char far *colors, int selStart, int selEnd, int drawStartX, int drawEndX);
+void show_line_with_sel(uint16_t screenPos, char huge *text, line_xpos textLen, line_xpos selStart, line_xpos selEnd, line_xpos drawStartX, line_xpos drawEndX);
+void show_line_with_colors_with_sel(uint16_t screenPos, char huge *text, line_xpos textLen, unsigned char far *colors, line_xpos selStart, line_xpos selEnd, line_xpos drawStartX, line_xpos drawEndX);
 
-void put_string_on_screen(const char *str, int x, int y);
-void put_string_on_screen(const char *str, int x, int y, unsigned char color);
+void put_string_on_screen(const char *str, cursor_pos x, cursor_pos y);
+void put_string_on_screen(const char *str, cursor_pos x, cursor_pos y, unsigned char color);
 
-void get_string_on_screen(int x, int y, int maxLength, char *dst);
+void get_string_on_screen(cursor_pos x, cursor_pos y, cursor_pos maxLength, char *dst);
 
-void set_chars_color(int x, int y, int numChars, unsigned char color);
-void highlight_line(int yLine, unsigned char bgColor);
+void set_chars_color(cursor_pos x, cursor_pos y, cursor_pos numChars, unsigned char color);
+void highlight_line(cursor_pos yLine, unsigned char bgColor);
 
 void log_error(const char *errorText);
 

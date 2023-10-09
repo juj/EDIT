@@ -36,7 +36,7 @@ void set_vga_cursor_position(int x, int y)
   //  enable();
 }
 
-void set_cursor_pos(int x, int y)
+void set_cursor_pos(uint8_t x, uint8_t y)
 {
   gotoxy(x+1, y+1);
   set_vga_cursor_position(cursorX, cursorY);
