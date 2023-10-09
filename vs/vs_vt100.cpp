@@ -178,8 +178,52 @@ unsigned char get_screen_color(uint16_t linearPos)
   return screen_buffer[linearPos].color;
 }
 
+static BOOL SetConsoleSize(int cols, int rows) {
+  HWND hWnd;
+  HANDLE hConOut;
+  CONSOLE_FONT_INFO fi;
+  CONSOLE_SCREEN_BUFFER_INFO bi;
+  int w, h, bw, bh;
+  RECT rect = {0, 0, 0, 0};
+  COORD coord = {0, 0};
+  hWnd = GetConsoleWindow();
+  if (hWnd) {
+    hConOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (hConOut && hConOut != (HANDLE)-1) {
+      if (GetCurrentConsoleFont(hConOut, FALSE, &fi)) {
+        if (GetClientRect(hWnd, &rect)) {
+          w = rect.right-rect.left;
+          h = rect.bottom-rect.top;
+          if (GetWindowRect(hWnd, &rect)) {
+            bw = rect.right-rect.left-w;
+            bh = rect.bottom-rect.top-h;
+            if (GetConsoleScreenBufferInfo(hConOut, &bi)) {
+              coord.X = bi.dwSize.X;
+              coord.Y = bi.dwSize.Y;
+              if (coord.X < cols || coord.Y < rows) {
+                if (coord.X < cols) {
+                  coord.X = cols;
+                }
+                if (coord.Y < rows) {
+                  coord.Y = rows;
+                }
+                if (!SetConsoleScreenBufferSize(hConOut, coord)) {
+                  return FALSE;
+                }
+              }
+              return SetWindowPos(hWnd, NULL, rect.left, rect.top, cols*fi.dwFontSize.X+bw, rows*fi.dwFontSize.Y+bh, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOOWNERZORDER | SWP_NOZORDER);
+            }
+          }
+        }
+      }
+    }
+  }
+  return FALSE;
+}
+
 bool init_screen()
 {
+  SetConsoleSize(40,25);
   // Set output mode to handle virtual terminal sequences
   HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
   if (hOut == INVALID_HANDLE_VALUE)
