@@ -34,7 +34,7 @@ struct SaveFileMsg
 {
   char messageId;
   char filename[16];
-  long dataSize;
+  uint16_t dataSize;
 #pragma warning(disable : 4200)
   char data[];
 };

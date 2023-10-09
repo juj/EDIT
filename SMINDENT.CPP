@@ -59,15 +59,15 @@ void insert_indent()
 {
   assert(currentLine);
 
-  long currentCharOffset = current_column();
+  line_xpos currentCharOffset = current_column();
 
   // Guess indentation from previous line
   char guessedIndentChar = 0;
-  int guessedIndentAmount = 1;
+  line_xpos guessedIndentAmount = 1;
 
   Line far *prev = currentLine->prevLine;
-  int prevIndentAmount = prev ? find_line_indent_position(prev) : 0;
-  int curIndentAmount = find_line_indent_position(currentLine);
+  line_xpos prevIndentAmount = prev ? find_line_indent_position(prev) : 0;
+  line_xpos curIndentAmount = find_line_indent_position(currentLine);
 
   if (currentCharOffset <= curIndentAmount)
   {
@@ -106,8 +106,9 @@ void insert_indent()
   {
     guessedIndentAmount = indentSize;
     // Find the last whitespace on the current line.
-    for(long i = currentCharOffset-1; i >= 0; --i)
+    for(line_xpos i = currentCharOffset; i > 0;)
     {
+      --i;
       assert(i < currentLine->length);
       if (is_tab(currentLine->text[i]) || is_whitespace(currentLine->text[i]))
       {
@@ -118,11 +119,11 @@ void insert_indent()
     if (!guessedIndentChar) guessedIndentChar = tabChar;
   }
   assert(is_tab(guessedIndentChar) || is_whitespace(guessedIndentChar));
-  for(int i = 0; i < guessedIndentAmount; ++i)
+  for(line_xpos i = 0; i < guessedIndentAmount; ++i)
     insert_character(guessedIndentChar);
 }
 
-void repaint_current_line_from_offset(int xOffset, int xEnd);
+void repaint_current_line_from_offset(cursor_pos xOffset, cursor_pos xEnd);
 void verify_screen_is_painted_correctly();
 
 void unindent()
@@ -172,14 +173,14 @@ void unindent()
 
   curIndentAmount -= numCharsToUnindent;
 
-  for(long i = curIndentAmount; i + numCharsToUnindent < currentLine->length; ++i)
+  for(line_xpos i = curIndentAmount; i + numCharsToUnindent < currentLine->length; ++i)
     currentLine->text[i] = currentLine->text[i + numCharsToUnindent];
   currentLine->length -= numCharsToUnindent;
   clear_highlight(currentLine);
   mark_current_file_modified();
 
-  int oldCursorPos = cursorX + viewportXOffset;
-  int newCursorPos = MAX(oldCursorPos - numCharsToUnindent, curIndentAmount);
+  line_xpos oldCursorPos = current_column();
+  line_xpos newCursorPos = MAX(oldCursorPos - numCharsToUnindent, curIndentAmount);
   viewportXOffset = MIN(viewportXOffset, curIndentAmount);
   cursorX = virtualX = newCursorPos - viewportXOffset;
 
@@ -189,8 +190,8 @@ void unindent()
 
 bool all_chars_left_of_cursor_are_whitespace()
 {
-  int x = current_column();
-  for(int i = 0; i < x; ++i)
+  line_xpos x = current_column();
+  for(line_xpos i = 0; i < x; ++i)
     if (!is_whitespace(currentLine->text[i]))
       return false;
   return true;

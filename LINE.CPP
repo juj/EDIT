@@ -113,10 +113,10 @@ bool increase_capacity(Line far *line, line_xpos newCapacity)
   return 1;
 }
 
-char last_nonws_char_on_line(Line far *line, line_xpos fromPosition)
+char last_nonws_char_on_line(Line far *line, line_xpos beforePosition)
 {
   assert(line);
-  for(line_xpos i = MIN(fromPosition+1, line->length); i > 0;)
+  for(line_xpos i = MIN(beforePosition, line->length); i > 0;)
     if (!is_whitespace(line->text[--i]))
       return line->text[i];
   return 0;

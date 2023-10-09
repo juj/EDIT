@@ -59,9 +59,9 @@ void repaint_line(int screenY, Line *line, int startX, int endX)
       syntax_highlight(line);
     }
 
-    int lineNumber = firstDisplayedLineNumber + screenY;
-    int selStart = (lineNumber == selectionStartLineNum) ? selectionStartColumn : (lineNumber <= selectionEndLineNum ? 0 : 0x7FFF);
-    int selEnd = (lineNumber == selectionEndLineNum) ? selectionEndColumn : (lineNumber >= selectionStartLineNum ? 0x7FFF : 0);
+    line_num lineNumber = firstDisplayedLineNumber + screenY;
+    line_xpos selStart = (lineNumber == selectionStartLineNum) ? selectionStartColumn : (lineNumber <= selectionEndLineNum ? 0 : MAX_CHARS_PER_LINE);
+    line_xpos selEnd = (lineNumber == selectionEndLineNum) ? selectionEndColumn : (lineNumber >= selectionStartLineNum ? MAX_CHARS_PER_LINE : 0);
 #ifdef ENABLE_SYNTAX_HIGHLIGHTING
     if (line->colors) show_line_with_colors_with_sel(screenY * SCREEN_WIDTH, line->text, line->length, line->colors, selStart, selEnd, startX, endX);
     else
@@ -93,7 +93,7 @@ void repaint_screen_lines(cursor_pos yStart, cursor_pos yEnd)
   assert(yEnd <= SCREEN_HEIGHT);
   Line far *curLine = get_nth_line_on_screen(yStart);
   cursor_pos screenY = yStart;
-  int lineNumber = firstDisplayedLineNumber + yStart;
+  line_num lineNumber = firstDisplayedLineNumber + yStart;
 
   for(; screenY < yEnd; ++screenY)
   {
@@ -109,16 +109,16 @@ void print_line_column_info()
 {
   assert(get_current_line_number() == current_line_number());
   //  line_num curLineNumber = get_current_line_number();
-  char str[64];
+  char str[32];
   /*
   sprintf(str, " %lub near/%lub far mem used    %ld:%d",
   allocatedNearMemory, allocatedFarMemory,
   curLineNumber, current_column()+1);
   */
 
-  sprintf(str, " %ld:%ld", current_line_number(), current_column()+1);
+  sprintf(str, " " LINE_NUM_PRINTF_MOD ":" LINE_XPOS_PRINTF_MOD, current_line_number(), (int)(current_column()+1));
 
-  put_string_on_screen(str, SCREEN_WIDTH - (int)strlen(str), SCREEN_HEIGHT-1, LTGRAY);
+  put_string_on_screen(str, SCREEN_WIDTH - (cursor_pos)strlen(str), SCREEN_HEIGHT-1, LTGRAY);
 }
 
 void repaint_screen()
@@ -139,7 +139,7 @@ void verify_screen_is_painted_correctly()
 #endif
 }
 
-void repaint_current_line_from_offset(int xOffset, int xEnd)
+void repaint_current_line_from_offset(cursor_pos xOffset, cursor_pos xEnd)
 {
   // TODO: actually paint from current offset onwards only
   repaint_line(cursorY, currentLine, xOffset, xEnd);
@@ -634,20 +634,20 @@ void move_cursor_to_next_word()
   }
 }
 
+// Inserts a new line after the current one, e.g. when enter is pressed (maybe in the middle of a line)
 void insert_new_line(bool cursorMovesToNewline)
 {
-  long currentCharOffset = current_column();
+  line_xpos currentCharOffset = current_column();
 
   // TODO: Also guess indent here
-  long newIndent = (last_nonws_char_on_line(currentLine, currentCharOffset-1) == LEFT_CURLY_BRACE) ? indentSize : 0;
+  line_xpos newIndent = (last_nonws_char_on_line(currentLine, currentCharOffset) == LEFT_CURLY_BRACE) ? indentSize : 0;
 
   // We copy indent from current line to the new line up to
   // the character position
-  long curLineIndent = MIN(currentCharOffset, find_line_indent_position(currentLine));
+  line_xpos curLineIndent = MIN(currentCharOffset, find_line_indent_position(currentLine));
 
   Line far *newLine = (Line far *)Farmalloc(sizeof(Line));
-  if (!newLine)
-    return;
+  if (!newLine) return; // OOM!
 
   // move all chars from current line cursor position onwards to new line
 
@@ -666,13 +666,13 @@ void insert_new_line(bool cursorMovesToNewline)
     return;
   }
   // Copy indent
-  for(long i = 0; i < curLineIndent; ++i)
+  for(line_xpos i = 0; i < curLineIndent; ++i)
     newLine->text[i] = currentLine->text[i];
-  for(long j = 0; j < newIndent; ++j)
+  for(line_xpos j = 0; j < newIndent; ++j)
     newLine->text[curLineIndent+j] = tabChar;
 
   // Copy leftover text from the current line to the new line
-  for(long k = 0; k < newLine->length && currentCharOffset+k < currentLine->length; ++k)
+  for(line_xpos k = 0; k < newLine->length && currentCharOffset+k < currentLine->length; ++k)
     newLine->text[curLineIndent+newIndent+k] = currentLine->text[currentCharOffset+k];
   currentLine->length -= currentLine->length - currentCharOffset;
   newLine->ownsPtr = 1;
@@ -758,7 +758,7 @@ void erase_line(Line *line)
 
 void run_goto_line_menu()
 {
-  long origLineNumber = get_current_line_number();
+  line_num origLineNumber = get_current_line_number();
   char targetLineNumberStr[32] = {0};
 
   if (viewportXOffset > 0)
@@ -767,9 +767,9 @@ void run_goto_line_menu()
     repaint_screen();
   }
 
-  put_string_on_screen("Go to line: ", 0, SCREEN_HEIGHT-1, LTGRAY);
+  put_string_on_screen("GO TO LINE: ", 0, SCREEN_HEIGHT-1, LTGRAY);
   char origLineNumberStr[32];
-  sprintf(origLineNumberStr, "%ld ", origLineNumber);
+  sprintf(origLineNumberStr, LINE_NUM_PRINTF_MOD " ", origLineNumber);
   put_string_on_screen(origLineNumberStr, 12, SCREEN_HEIGHT-1, DKGRAY);
   set_cursor_pos(12, SCREEN_HEIGHT-1);
   const char *empty = " ";
@@ -777,12 +777,12 @@ void run_goto_line_menu()
 //  Line far *originalFirstDisplayedLine = firstDisplayedLine;
   Line far *originalCurrentLine = currentLine;
   Line far *originalFirstDisplayedLine = firstDisplayedLine;
-  long originalCursorY = cursorY;
-  long originalViewportPos = get_line_number(firstDisplayedLine);
-  long viewportPos = originalViewportPos;
+  cursor_pos originalCursorY = cursorY;
+  line_num originalViewportPos = get_line_number(firstDisplayedLine);
+  line_num viewportPos = originalViewportPos;
   highlight_line(origLineNumber - originalViewportPos, BGCOLOR(LTGRAY));
-  long inputLen = 0;
-  long documentLengthLines = get_line_number(currentFile->lastLine);
+  int8_t inputLen = 0;
+  line_num documentLengthLines = get_line_number(currentFile->lastLine);
   while(1)
   {
     int key = get_key();
@@ -794,7 +794,7 @@ void run_goto_line_menu()
       else if (inputLen < 8)
         targetLineNumberStr[inputLen++] = (char)key;
 
-      long targetLineNumber = inputLen == 0 ? origLineNumber : MIN(documentLengthLines, atol(targetLineNumberStr));
+      line_num targetLineNumber = (inputLen == 0) ? origLineNumber : MIN(documentLengthLines, atol(targetLineNumberStr));
 
       if (targetLineNumber < viewportPos || targetLineNumber >= viewportPos + SCREEN_HEIGHT-1)
       {
@@ -913,10 +913,10 @@ void main_loop()
 {
   clear_screen(' ', editorTextColor);
   repaint_screen();
-  int running = 1;
+  bool running = 1;
 
-  int oldCursorPos;
-  unsigned long oldLineNum;
+  line_xpos oldCursorPos;
+  line_num oldLineNum;
   Line far *oldLine;
 
   while(running)
@@ -932,7 +932,7 @@ void main_loop()
     int key = get_key();
 
     // Doing text selection?
-    int textSelection = 0;
+    bool textSelection = 0;
     if (is_navigation_action_key(key))
     {
 #ifdef __C64__
@@ -1094,28 +1094,20 @@ void main_loop()
 #endif
 
       default:
-//        if ((key >= 0x20 && key < 127) ||
-        {
-          if (key == RIGHT_CURLY_BRACE && all_chars_left_of_cursor_are_whitespace()) unindent();
-          if (showWhitespace && key == ' ') key = CHAR_MIDDLE_DOT;
-          insert_character(key);
-        }
-//        else
-        {
-//          set_cursor_pos(0,0);
-  //        printf("0x%x     \n", key);
-        }
+        if (key == RIGHT_CURLY_BRACE && all_chars_left_of_cursor_are_whitespace()) unindent();
+        if (showWhitespace && key == ' ') key = CHAR_MIDDLE_DOT;
+        insert_character(key);
         break;
     }
     if (textSelection)
     {
-      int cursorPos = current_column();
-      unsigned long lineNum = current_line_number();
+      line_xpos cursorPos = current_column();
+      line_num lineNum = current_line_number();
       Line far *line = currentLine;
-      int oldCmpStart = cursor_pos_cmp(oldLineNum, oldCursorPos, selectionStartLineNum, selectionStartColumn);
+      int8_t oldCmpStart = cursor_pos_cmp(oldLineNum, oldCursorPos, selectionStartLineNum, selectionStartColumn);
       if (!oldCmpStart)
       {
-        int newCmpEnd = cursor_pos_cmp(lineNum, cursorPos, selectionEndLineNum, selectionEndColumn);
+        int8_t newCmpEnd = cursor_pos_cmp(lineNum, cursorPos, selectionEndLineNum, selectionEndColumn);
         if (newCmpEnd <= 0)
         {
           selectionStartLineNum = lineNum;
@@ -1135,7 +1127,7 @@ void main_loop()
       else
       {
         assert(!cursor_pos_cmp(oldLineNum, oldCursorPos, selectionEndLineNum, selectionEndColumn));
-        int startCmpNew = cursor_pos_cmp(selectionStartLineNum, selectionStartColumn, lineNum, cursorPos);
+        int8_t startCmpNew = cursor_pos_cmp(selectionStartLineNum, selectionStartColumn, lineNum, cursorPos);
         if (startCmpNew <= 0)
         {
           selectionEndLineNum = lineNum;
@@ -1152,9 +1144,9 @@ void main_loop()
           selectionStartColumn = cursorPos;
         }
       }
-      int repaintY0 = MIN(oldLineNum, lineNum) - firstDisplayedLineNumber;
+      cursor_pos repaintY0 = (cursor_pos)(MIN(oldLineNum, lineNum) - firstDisplayedLineNumber);
       repaintY0 = MAX(0, repaintY0);
-      int repaintY1 = MAX(oldLineNum, lineNum) + 1 - firstDisplayedLineNumber;
+      cursor_pos repaintY1 = (cursor_pos)(MAX(oldLineNum, lineNum) + 1 - firstDisplayedLineNumber);
       repaintY1 = MIN(SCREEN_HEIGHT, repaintY1);
       assert(repaintY0 <= repaintY1);
       repaint_screen_lines(repaintY0, repaintY1);

@@ -43,15 +43,15 @@ extern unsigned char editorTextColor;
 
 void clear_selection();
 
-extern long selectionStartLineNum, selectionEndLineNum;
+extern line_num selectionStartLineNum, selectionEndLineNum;
 extern Line far *selectionStartLine; // if 0, no active selection
 extern Line far *selectionEndLine;
-extern long selectionStartColumn, selectionEndColumn;
+extern line_xpos selectionStartColumn, selectionEndColumn;
 
-long current_line_number();
+line_num current_line_number();
 
 // Returns zero-based current coordinate of the cursor on current line.
 // If 0, cursor is at start of line. Max value == line->length.
-long current_column();
+line_xpos current_column();
 
 #endif

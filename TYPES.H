@@ -24,6 +24,7 @@ typedef uint16_t file_idx;
 // Maximum # of characters on a single line
 #define MAX_CHARS_PER_LINE 254
 typedef uint8_t line_xpos;
+#define LINE_XPOS_PRINTF_MOD "%d"
 
 // Maximum number of lines in a document
 #define MAX_LINES_IN_FILE 32760
