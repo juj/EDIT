@@ -80,6 +80,8 @@ void unregister_keyboard_interrupt()
 #define kbhit _kbhit
 #endif
 
+#ifndef __C64__
+
 bool is_shift_key_currently_down()
 {
 #if defined(__TURBOC__) && defined(__MSDOS__)
@@ -113,6 +115,7 @@ bool is_alt_key_currently_down()
   return 0; // XXX TODO
 #endif
 }
+#endif
 
 int is_navigation_action_key(int key)
 {
@@ -154,6 +157,9 @@ int is_shift_aware_key(int key)
   case KEY_DOWN:
 #ifndef __C64__ // TODO
   case KEY_PGUP:
+#endif
+#ifdef __C64__
+  case KEY_F2:
 #endif
   case KEY_PGDN:
   case KEY_HOME:

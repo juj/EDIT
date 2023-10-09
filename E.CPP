@@ -933,7 +933,12 @@ void main_loop()
     int textSelection = 0;
     if (is_navigation_action_key(key))
     {
+#ifdef __C64__
+      // C64 does not support shift-keys for movement.
+      textSelection = textSelectionModeActive;
+#else
       textSelection = textSelectionModeActive || is_shift_key_held(key);
+#endif
       if (textSelection)
       {
         oldCursorPos = current_column();

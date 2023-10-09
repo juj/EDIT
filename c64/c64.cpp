@@ -1,25 +1,13 @@
 #include "../iassert.h"
 #include "../screen.h"
-#include "../input.h" // TODO REMOVE
 #include <stdio.h>
-
-static volatile unsigned char * const screen_mem = (unsigned char*)0x0400;
 
 // Color RAM: https://www.c64-wiki.com/wiki/Color_RAM
 static volatile unsigned char * const color_ram = (unsigned char*)0xD800;
-
-int get_text_width()
-{
-  return 40;
-}
-
-int get_text_height()
-{
-  return 25;
-}
-
+static volatile unsigned char * const screen_mem = (unsigned char*)0x0400;
 static volatile unsigned char * const cursor_blink = (unsigned char *)0xCC;
 static volatile unsigned char * const cursor_blink_phase = (unsigned char *)0xCF;
+static volatile unsigned char * const cursor_color = (unsigned char*)0x0286;
 
 #define CURSOR_NONE   0
 #define CURSOR_NORMAL 1
@@ -30,6 +18,7 @@ void set_cursor_style(int style)
 }
 
 static unsigned char cx, cy;
+unsigned char colorUnderCursor = 7;
 void set_cursor_pos(int x, int y)
 {
   // https://sta.c64.org/cbm64krnfunc.html:
@@ -41,9 +30,12 @@ void set_cursor_pos(int x, int y)
 
   // After changing cursor position, we need to clean up the old character, which
   // might have been left inverted by the blinking cursor in the old location
-  screen_mem[cy*SCREEN_WIDTH+cx] = screen_mem[cy*SCREEN_WIDTH+cx] & 0x7F;
+  int pos = cy*SCREEN_WIDTH+cx;
+  screen_mem[pos] = screen_mem[pos] & 0x7F;
+  color_ram[pos] = colorUnderCursor;
   cx = x;
   cy = y;
+  colorUnderCursor = *cursor_color = color_ram[y*SCREEN_WIDTH+x];
 }
 
 unsigned char petscii_to_screen_code(unsigned char petscii)
@@ -60,13 +52,8 @@ unsigned char petscii_to_screen_code(unsigned char petscii)
 
 void put_screen(int linearPos, char ch, unsigned char color)
 {
-//  if (ch == 0xBA || ch == 0xFA) ch = 32;
-//  if (ch < 32) screen_mem[linearPos] = 32;
-  //else 
-    screen_mem[linearPos] = petscii_to_screen_code(ch);
-
+  screen_mem[linearPos] = petscii_to_screen_code(ch);
   color_ram[linearPos] = color;
-  //screen_mem[linearPos] = (ch == 0) ? 32 : ch;
 }
 
 void put_screen(int linearPos, char ch)
@@ -93,16 +80,15 @@ static volatile unsigned char * const mem_setup_register = (unsigned char *)0xD0
 
 int init_screen()
 {
-  SCREEN_WIDTH = get_text_width();
-  SCREEN_HEIGHT = get_text_height();
+  unsigned char w,h;
+  asm("JSR 0xE505"
+    :"=x"(w), "=y"(h));
+  SCREEN_WIDTH = w;
+  SCREEN_HEIGHT = h;
 
   // Switch charset into text mode, where both lower case and upper case characters
-  // are available.
-  //*mem_setup_register ^= 2;
-//  printf("%02XH\n", *mem_setup_register); // 0x15
+  // are available. Default register value at boot is 0x15.
   *mem_setup_register = 0x17;
-//  printf("%02XH\n", *mem_setup_register); // 0x17
-//  get_key();
 
   return true;
 }
