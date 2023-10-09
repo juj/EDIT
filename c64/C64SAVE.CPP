@@ -82,7 +82,7 @@ static void CLRCHN()
   asm volatile("JSR $FFCC\n" // FFCC = CLRCHN - Restore default I/O channels
                 : // outputs
                 : // inputs
-                : "a", "x");  
+                : "a", "x");
 }
 
 void save_file(File *file)
