@@ -32,10 +32,11 @@ void set_cursor_pos(int x, int y)
   // might have been left inverted by the blinking cursor in the old location
   int pos = cy*SCREEN_WIDTH+cx;
   screen_mem[pos] = screen_mem[pos] & 0x7F;
-  color_ram[pos] = colorUnderCursor;
+  //color_ram[pos] = colorUnderCursor;
   cx = x;
   cy = y;
-  colorUnderCursor = *cursor_color = color_ram[y*SCREEN_WIDTH+x];
+  //colorUnderCursor = *cursor_color = color_ram[y*SCREEN_WIDTH+x];
+  *cursor_color = color_ram[y*SCREEN_WIDTH+x];
 }
 
 unsigned char petscii_to_screen_code(unsigned char petscii)
@@ -52,7 +53,7 @@ unsigned char petscii_to_screen_code(unsigned char petscii)
 
 void put_screen(int linearPos, char ch, unsigned char color)
 {
-  screen_mem[linearPos] = petscii_to_screen_code(ch);
+  screen_mem[linearPos] = petscii_to_screen_code(ch) ^ (color&0x80);
   color_ram[linearPos] = color;
 }
 

@@ -71,11 +71,16 @@ void show_line_with_colors(int screenPos, char huge *text, int textLen, unsigned
     put_screen(screenPos+x, 0, editorTextColor);
 }
 
+#ifdef __C64__
+  const unsigned char selectionColor = 0x80; // TODO: #define INVERT 0x80
+#else
+  const unsigned char selectionColor = BLUE | BGCOLOR(LTGRAY);
+#endif
+
 void show_line_with_colors_with_sel(int screenPos, char huge *text, int textLen, unsigned char *colors, int selStart, int selEnd, int drawStartX, int drawEndX)
 {
   selStart -= viewportXOffset;
   selEnd -= viewportXOffset;
-  const unsigned char selectionColor = BLUE | BGCOLOR(LTGRAY);
   textLen = MIN(textLen - viewportXOffset, drawEndX);
   int x;
   for(x = drawStartX; x < textLen; ++x)
@@ -108,7 +113,6 @@ void show_line_with_sel(int screenPos, char huge *text, int textLen, int selStar
 {
   selStart -= viewportXOffset;
   selEnd -= viewportXOffset;
-  const unsigned char selectionColor = BLUE | BGCOLOR(LTGRAY);
   textLen = MIN(textLen - viewportXOffset, SCREEN_WIDTH);
   int x;
   for(x = drawStartX; x < textLen; ++x)
