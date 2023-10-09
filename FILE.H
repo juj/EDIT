@@ -32,8 +32,8 @@ bool is_file_unnamed(File *f);
 
 file_idx calculate_file_byte_size(File *f);
 
-file_idx huge_fread(char huge *dst, file_idx numBytes, FILE *handle);
-file_idx huge_fwrite(char huge *src, file_idx numBytes, FILE *handle);
+long huge_fread(char huge *dst, long numBytes, FILE *handle);
+long huge_fwrite(char huge *src, long numBytes, FILE *handle);
 File *load_file(const char *filename);
 void save_file(File *file);
 void close_file(File *file);

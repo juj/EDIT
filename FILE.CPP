@@ -13,15 +13,15 @@
 
 #if defined(_MSC_VER) || defined(__TURBOC__)
 
-static file_idx huge_fread(char huge *dst, file_idx numBytes, FILE *handle)
+static long huge_fread(char huge *dst, long numBytes, FILE *handle)
 {
-  file_idx numSuccessfullyRead = 0;
+  long numSuccessfullyRead = 0;
   while(numBytes > 0)
   {
-    file_idx blockSize = MIN(numBytes, 1024);
+    long blockSize = MIN(numBytes, 1024);
     size_t numRead = fread(dst, 1, blockSize, handle);
     dst = &dst[blockSize];
-    numSuccessfullyRead += (file_idx)numRead;
+    numSuccessfullyRead += (long)numRead;
     if (numRead != blockSize)
       break;
     numBytes -= blockSize;
@@ -29,15 +29,15 @@ static file_idx huge_fread(char huge *dst, file_idx numBytes, FILE *handle)
   return numSuccessfullyRead;
 }
 
-file_idx huge_fwrite(char huge *src, file_idx numBytes, FILE *handle)
+long huge_fwrite(char huge *src, long numBytes, FILE *handle)
 {
-  file_idx numWritten = 0;
+  long numWritten = 0;
   while(numBytes > 0)
   {
-    file_idx blockSize = MIN(numBytes, 1024);
+    long blockSize = MIN(numBytes, 1024);
     size_t nW = fwrite(src, 1, blockSize, handle);
     src = &src[blockSize];
-    numWritten += (file_idx)nW;
+    numWritten += (long)nW;
     if (numWritten != blockSize)
       break;
     numBytes -= blockSize;
@@ -198,6 +198,13 @@ File *load_file(const char *filename)
   long size = ftell(handle);
   fseek(handle, 0, SEEK_SET);
 
+  if (size > MAX_CHARS_IN_FILE)
+  {
+    printf("File is too large!\n");
+    fclose(handle);
+    return 0;
+  }
+
   File *f = (File*)Malloc(sizeof(File));
   if (!f)
   {
@@ -214,8 +221,8 @@ File *load_file(const char *filename)
     fclose(handle);
     return 0;
   }
-  f->size = size;
-  file_idx numRead = huge_fread(f->fileData, size, handle);
+  f->size = (file_idx)size;
+  file_idx numRead = (file_idx)huge_fread(f->fileData, size, handle);
   if (numRead != size)
   {
     printf("Failed to read %ld bytes, only read %ld bytes!\n", size, (long)numRead);

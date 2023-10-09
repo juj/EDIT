@@ -6,8 +6,8 @@
 
 int save_file_to_network(File *file)
 {
-  long file_size = calculate_file_byte_size(file);
-  long msg_size = sizeof(SaveFileMsg) + file_size;
+  file_idx file_size = calculate_file_byte_size(file);
+  file_idx msg_size = sizeof(SaveFileMsg) + file_size;
   SaveFileMsg *msg = (SaveFileMsg*)malloc(msg_size);
   msg->messageId = MessageSaveFile;
   strncpy(msg->filename, file->filename, sizeof(msg->filename));
