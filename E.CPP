@@ -343,7 +343,6 @@ void move_viewport_vertically(int lines, int cursor_moves_along)
       }
       else
         ++cursorY;
-      repaint_screen();
     }
     else
       break;
@@ -367,7 +366,6 @@ void move_viewport_vertically(int lines, int cursor_moves_along)
         }
         else
           --cursorY;
-        repaint_screen();
       }
       else
         break;
@@ -381,6 +379,8 @@ void move_viewport_vertically(int lines, int cursor_moves_along)
   }
 
   restrict_cursor_on_line();
+
+  if (scrolled) repaint_screen();
 }
 
 void move_cursor_vertically(int lines)
