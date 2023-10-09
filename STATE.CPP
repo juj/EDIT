@@ -16,10 +16,9 @@ int virtualX = 0;
 int cursorX = 0, cursorY = 0;
 
 bool insertMode = 0;
+bool textSelectionModeActive = 0;
 
-uint8_t textSelectionModeActive = 0;
-
-int showWhitespace = 0;
+bool showWhitespace = 0;
 
 char tabMode = ' ';
 

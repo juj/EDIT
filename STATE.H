@@ -28,9 +28,9 @@ extern bool insertMode;
 
 // If true, text selection mode is active, so cursor keys select text as the cursor is moved.
 // This is used on platforms that don't have Shift-text select support.
-extern uint8_t textSelectionModeActive;
+extern bool textSelectionModeActive;
 
-extern int showWhitespace;
+extern bool showWhitespace;
 
 // 32: spaces as indentation, 9: tab chars as indentation
 extern char tabMode;
