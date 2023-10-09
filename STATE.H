@@ -1,6 +1,7 @@
 #ifndef _STATE_H
 #define _STATE_H
 
+#include <stdint.h>
 #include "memory.h"
 
 struct File;
@@ -24,6 +25,10 @@ extern int cursorY;
 
 // If true, character insert mode is enabled.
 extern int insertMode;
+
+// If true, text selection mode is active, so cursor keys select text as the cursor is moved.
+// This is used on platforms that don't have Shift-text select support.
+extern uint8_t textSelectionModeActive;
 
 extern int showWhitespace;
 

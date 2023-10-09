@@ -194,6 +194,8 @@ int init_screen()
   }
 
   dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+  dwMode &= ~ENABLE_QUICK_EDIT_MODE; // Disable mouse from selecting text
+//  dwMode &= ~ENABLE_PROCESSED_INPUT; // We want Ctrl-C to be handled by us, not by system.
   if (!SetConsoleMode(hOut, dwMode))
   {
     return false;

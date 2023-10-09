@@ -17,6 +17,8 @@ int cursorX = 0, cursorY = 0;
 
 int insertMode = 0;
 
+uint8_t textSelectionModeActive = 0;
+
 int showWhitespace = 0;
 
 char tabMode = ' ';

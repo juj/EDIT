@@ -34,7 +34,12 @@ Line far *get_nth_line_of_document(long lineNumber)
 Line far *get_nth_line_on_screen(long screenY)
 {
   assert(firstDisplayedLine);
-  return advance_n_lines(firstDisplayedLine, screenY);
+  Line *line = firstDisplayedLine;
+  while(line && screenY-- > 0)
+    line = line->nextLine;
+  return line;
+
+//  return advance_n_lines(firstDisplayedLine, screenY);
 }
 
 long screen_end_y_of_last_line_on_screen(Line far *startingLine, int startingScreenY)

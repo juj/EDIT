@@ -21,29 +21,31 @@ void calculate_num_lines_and_chars_selected(long *lines, long *chars)
   assert(lines);
   assert(chars);
 
-  assert(selectionEndLine);
-  assert(selectionStartColumn <= selectionStartLine->length);
   long numLinesSelected = 0;
-  long numCharsSelected;
-  if (selectionStartLineNum != selectionEndLineNum)
+  long numCharsSelected = 0;
+  if (selectionStartLine && selectionEndLine)
   {
-    numCharsSelected = selectionStartLine->length - selectionStartColumn;
-    if (numCharsSelected > 0) ++numLinesSelected;
-    for(Line far *l = selectionStartLine->nextLine; l != selectionEndLine; l = l->nextLine)
+    assert(selectionStartColumn <= selectionStartLine->length);
+    if (selectionStartLineNum != selectionEndLineNum)
     {
-      assert(l);
-      numCharsSelected += l->length;
-      ++numLinesSelected;
+      numCharsSelected = selectionStartLine->length - selectionStartColumn;
+      if (numCharsSelected > 0) ++numLinesSelected;
+      for(Line far *l = selectionStartLine->nextLine; l != selectionEndLine; l = l->nextLine)
+      {
+        assert(l);
+        numCharsSelected += l->length;
+        ++numLinesSelected;
+      }
+      if (selectionEndColumn > 0) ++numLinesSelected;
+      numCharsSelected += selectionEndColumn;
     }
-    if (selectionEndColumn > 0) ++numLinesSelected;
-    numCharsSelected += selectionEndColumn;
+    else
+    {
+      numLinesSelected = 1;
+      numCharsSelected = selectionEndColumn - selectionStartColumn;
+    }
+    assert(selectionEndColumn <= selectionEndLine->length);
   }
-  else
-  {
-    numLinesSelected = 1;
-    numCharsSelected = selectionEndColumn - selectionStartColumn;
-  }
-  assert(selectionEndColumn <= selectionEndLine->length);
   *lines = numLinesSelected;
   *chars = numCharsSelected;
 }
@@ -57,6 +59,8 @@ static void copy_buffer_reserve(long newCap)
     copyBufferCapacity = copyBuffer ? newCap : 0;
   }
 }
+
+void repaint_screen(); // TODO REMOVE
 
 void copy_selection()
 {
@@ -99,9 +103,14 @@ void copy_selection()
   }
   assert(dstOfs <= copyBufferCapacity);
   copyBufferLength = dstOfs;
+  if (textSelectionModeActive)
+  {
+    textSelectionModeActive = 0;
+    clear_selection();
+    repaint_screen();
+  }
 }
 
-void repaint_screen(); // TODO REMOVE
 void erase_selected_text()
 {
   assert(selectionStartLine);

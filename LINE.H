@@ -46,6 +46,8 @@ char last_nonws_char_on_line(Line far *line, long fromPosition);
 
 int find_line_indent_position(Line far *line);
 
+// Compares whether line1:col1 comes before or after line2:col2.
+// Returns -1 if before, +1 if after and 0 if they are equal.
 int cursor_pos_cmp(unsigned long line1, unsigned long col1, unsigned long line2, unsigned long col2);
 
 #endif

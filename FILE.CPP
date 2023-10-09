@@ -6,9 +6,10 @@
 #include "memory.h"
 #include "viewport.h"
 #include "audio.h"
+#include "iassert.h"
+#include "input.h"
 #include <stdlib.h>
 #include <string.h>
-#include "iassert.h"
 
 long huge_fread(char huge *dst, long numBytes, FILE *handle)
 {
@@ -157,11 +158,9 @@ File *open_new_file()
 void close_file(File *file)
 {
   assert(file);
-  if (file->hasUnsavedChanges)
-  {
-    NOTIMPL("Closing unsaved files (asking to save dialog) not yet implemented.");
+  if (file->hasUnsavedChanges && !ask_yes_no_prompt("CLOSE UNSAVED FILE (Y/N)? "))
     return;
-  }
+
   if (file == currentFile)
   {
     File *newCurFile = file->nextFile ? file->nextFile : file->prevFile;

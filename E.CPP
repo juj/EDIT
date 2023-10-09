@@ -53,7 +53,11 @@ void repaint_line(int screenY, Line *line, int startX, int endX)
 {
   if (line)
   {
-    syntax_highlight(line);
+    if (!line->colors)
+    {
+      startX = 0;
+      syntax_highlight(line);
+    }
 
     int lineNumber = firstDisplayedLineNumber + screenY;
     int selStart = (lineNumber == selectionStartLineNum) ? selectionStartColumn : (lineNumber <= selectionEndLineNum ? 0 : 0x7FFF);
@@ -855,7 +859,7 @@ void print_textsel_info()
 {
   // TODO: Can this be optimized to occur less frequently?
   repaint_screen_lines(SCREEN_HEIGHT-1, SCREEN_HEIGHT);
-  if (!selectionStartLine)
+  if (!selectionStartLine && !textSelectionModeActive)
     return;
 
   assert(selectionStartLineNum <= selectionEndLineNum);
@@ -865,8 +869,11 @@ void print_textsel_info()
 
   char str[64];
   if (numCharsSelected == 0)
-    return;
-  if (numLinesSelected == 1)
+  {
+    if (textSelectionModeActive) sprintf(str, "SELECT");
+    else str[0] = 0;
+  }
+  else if (numLinesSelected == 1)
     sprintf(str, "%ld chars selected.", numCharsSelected);
   else
     sprintf(str, "%ld lines, %ld chars selected.", numLinesSelected, numCharsSelected);
@@ -884,6 +891,20 @@ void select_all()
   selectionEndColumn = current_column();
   repaint_screen();
   print_textsel_info();
+}
+
+void clear_currently_selected_text()
+{
+  if (selectionStartLine)
+  {
+    int startLine = selectionStartLineNum-firstDisplayedLineNumber;
+    startLine = MAX(0, startLine);
+    int endLine = selectionEndLineNum+1-firstDisplayedLineNumber;
+    endLine = MIN(SCREEN_HEIGHT, endLine);
+    clear_selection();
+    repaint_screen_lines(startLine, endLine);
+    repaint_screen_lines(SCREEN_HEIGHT-1, SCREEN_HEIGHT);
+  }
 }
 
 void main_loop()
@@ -912,12 +933,13 @@ void main_loop()
     int textSelection = 0;
     if (is_navigation_action_key(key))
     {
-      textSelection = is_shift_key_held(key);
+      textSelection = textSelectionModeActive || is_shift_key_held(key);
       if (textSelection)
       {
         oldCursorPos = current_column();
         oldLineNum = current_line_number();
         oldLine = currentLine;
+        // start new text selection
         if (!selectionStartLine)
         {
           selectionStartLine = selectionEndLine = oldLine;
@@ -925,19 +947,12 @@ void main_loop()
           selectionStartColumn = selectionEndColumn = oldCursorPos;
         }
       }
-      else if (selectionStartLine) // clear any selection
-      {
-        int startLine = selectionStartLineNum-firstDisplayedLineNumber;
-        startLine = MAX(0, startLine);
-        int endLine = selectionEndLineNum+1-firstDisplayedLineNumber;
-        endLine = MIN(SCREEN_HEIGHT, endLine);
-        clear_selection();
-        repaint_screen_lines(startLine, endLine);
-        repaint_screen_lines(SCREEN_HEIGHT-1, SCREEN_HEIGHT);
-      }
+      // If text selection mode is not active, and cursor is moved,
+      // clear any previous text selection
+      else clear_currently_selected_text();
     }
 
-    switch(key)
+    switch(key & ~KEY_SHIFT_MODIFIER)
     {
       case KEY_LEFT: move_cursor_horizontally(-1); break;
       case KEY_RIGHT: move_cursor_horizontally(1); break;
@@ -967,11 +982,10 @@ void main_loop()
         else
           backspace_character();
         break;
-      case KEY_SHIFT_DELETE:
-        cut_selection();
-        break;
       case KEY_DELETE:
-        if (selectionStartLine)
+        if (key == KEY_SHIFT_DELETE)
+          cut_selection();
+        else if (selectionStartLine)
         {
           erase_selected_text();
           repaint_screen(); // TODO better repaint
@@ -987,11 +1001,11 @@ void main_loop()
         break;
       case KEY_CTRL_K:
         erase_current_line(); break; // TODO: optimize to repaint only from given line forward
-      case KEY_SHIFT_INSERT:
-        paste_selection(); // TODO: this does not work, Shift-Ins generates a zero instead.
-        break;
       case KEY_INSERT:
-        toggle_insert();
+        if (key == KEY_SHIFT_INSERT)
+          paste_selection(); // TODO: this does not work, Shift-Ins generates a zero instead.
+        else
+          toggle_insert();
         break;
       case KEY_ENTER: insert_new_line(/*cursorMovesToNewLine=*/1); break;
       case KEY_TAB: insert_indent(); break;
@@ -1014,6 +1028,10 @@ void main_loop()
         break;
       case KEY_CTRL_V:
         paste_selection();
+        break;
+      case KEY_F1:
+        textSelectionModeActive = !textSelectionModeActive;
+        print_textsel_info();
         break;
       case KEY_CTRL_S:
       case KEY_F2:

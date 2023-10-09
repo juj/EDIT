@@ -44,6 +44,7 @@
 #define RIGHT_CURLY_BRACE '}'
 #define TEXT_BACKSLASH    '\\'
 
+#define KEY_F1         0x13B
 #define KEY_F2         0x13C
 #define KEY_F3         0x13D
 #define KEY_F10        0x144
@@ -90,6 +91,10 @@ int is_navigation_action_key(int key);
 void init_keyboard();
 void deinit_keyboard();
 
+// Returns -1 if cancelled (ESC), or the length of entered string.
 int ask_string_prompt(const char *prompt, char *dst, int maxLen);
+
+// Returns 1 if yes, 0 if no
+int ask_yes_no_prompt(const char *prompt);
 
 #endif

@@ -196,16 +196,27 @@ int ask_string_prompt(const char *prompt, char *dst, int maxLen)
       }
       break;
     default:
-      if (x < 15 && key >= 0x20 && key < 127)
+      if (x < maxLen && key >= 0x20 && key < 127)
       {
-        put_screen(pos+x, key, LTGRAY);
-        dst[x++] = key;
+        if (maxLen > 1 || key == 'y' || key == 'Y' || key == 'n' || key == 'N')
+        {
+          put_screen(pos+x, key, LTGRAY);
+          dst[x++] = key;
+        }
       }
       break;
     }
   }
   dst[x] = 0;
+  if (result < 0) return -1;
   return x;
+}
+
+int ask_yes_no_prompt(const char *prompt)
+{
+  char dst[2] = {0};
+  int ret = ask_string_prompt(prompt, dst, 1);
+  return ret > 0 && (dst[0] == 'y' || dst[0] == 'Y');
 }
 
 #if defined(_MSC_VER)
