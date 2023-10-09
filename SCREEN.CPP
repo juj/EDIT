@@ -60,52 +60,31 @@ void log_x(const char *str)
     put_screen(pos, str[i], WHITE | BGCOLOR(MAGENTA));
 }
 
-void show_line_with_colors(uint16_t screenPos, char huge *text, line_xpos textLen, unsigned char *colors, line_xpos drawStartX, line_xpos drawEndX)
-{
-  textLen = MIN(textLen - viewportXOffset, drawEndX);
-  line_xpos x;
-  for(x = drawStartX; x < textLen; ++x)
-    put_screen(screenPos+x, text[x + viewportXOffset], colors[x + viewportXOffset]);
-  for(; x < drawEndX; ++x)
-    put_screen(screenPos+x, 0, editorTextColor);
-}
-
 #ifdef __C64__
   const unsigned char selectionColor = 0x80; // TODO: #define INVERT 0x80
 #else
   const unsigned char selectionColor = BLUE | BGCOLOR(LTGRAY);
 #endif
 
-void show_line_with_colors_with_sel(uint16_t screenPos, char huge *text, line_xpos textLen, unsigned char *colors, line_xpos selStart, line_xpos selEnd, line_xpos drawStartX, line_xpos drawEndX)
+void show_line_with_colors_with_sel(uint16_t screenPos, char huge *text, line_xpos textLen, 
+#ifdef ENABLE_SYNTAX_HIGHLIGHTING
+  unsigned char *colors,
+#endif
+  line_xpos selStart, line_xpos selEnd, line_xpos drawStartX, line_xpos drawEndX)
 {
   selStart -= viewportXOffset;
   selEnd -= viewportXOffset;
-  textLen = MIN(textLen - viewportXOffset, drawEndX);
-  line_xpos x;
-  for(x = drawStartX; x < textLen; ++x)
-    put_screen(screenPos + x, text[x + viewportXOffset], x < selStart || x >= selEnd ? colors[x + viewportXOffset] : selectionColor);
-  for(; x < drawEndX; ++x)
-    put_screen(screenPos + x, 0, editorTextColor);
-}
-
-void show_line(uint16_t screenPos, char huge *text, line_xpos textLen)
-{
-  textLen = MIN(textLen - viewportXOffset, SCREEN_WIDTH);
-  line_xpos x;
-  for(x = 0; x < textLen; ++x)
-    put_screen(screenPos + x, text[x + viewportXOffset], editorTextColor);
-  for(; x < SCREEN_WIDTH; ++x)
-    put_screen(screenPos + x, 0, editorTextColor);
-}
-
-void show_line_with_sel(uint16_t screenPos, char huge *text, line_xpos textLen, line_xpos selStart, line_xpos selEnd, line_xpos drawStartX, line_xpos drawEndX)
-{
-  selStart -= viewportXOffset;
-  selEnd -= viewportXOffset;
-  textLen = MIN(textLen - viewportXOffset, SCREEN_WIDTH);
-  line_xpos x;
-  for(x = drawStartX; x < textLen; ++x)
-    put_screen(screenPos + x, text[x + viewportXOffset], x < selStart || x >= selEnd ? editorTextColor : selectionColor);
+  textLen = MIN(SUB_U8_SAT(textLen, viewportXOffset), drawEndX); // Calculate how many chars of this line are visible if viewport is scrolled to right
+  line_xpos x = drawStartX;
+  for(x; x < textLen; ++x)
+  {
+#ifdef ENABLE_SYNTAX_HIGHLIGHTING
+    unsigned char color = (x < selStart || x >= selEnd) ? (colors ? colors[x + viewportXOffset] : editorTextColor) : selectionColor;
+#else
+    unsigned char color = editorTextColor;
+#endif
+    put_screen(screenPos + x, text[x + viewportXOffset], color);
+  }
   for(; x < drawEndX; ++x)
     put_screen(screenPos + x, 0, editorTextColor);
 }

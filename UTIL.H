@@ -11,6 +11,9 @@ void log_x(const char *str);
 
 void NOTIMPL(const char *x);
 
+// Returns min(a+b,255)
 uint8_t ADD_U8_SAT(uint8_t a, uint8_t b);
+// Returns max(a-b, 0)
+uint8_t SUB_U8_SAT(uint8_t a, uint8_t b);
 
 #endif

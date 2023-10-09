@@ -3,6 +3,7 @@
 
 #include "memory.h"
 #include "types.h"
+#include "highlite.h"
 
 #ifdef __C64__
 // C64 colors: https://www.c64-wiki.com/wiki/Color
@@ -75,11 +76,12 @@ char get_screen(uint16_t linearPos);
 unsigned char get_screen_color(uint16_t linearPos);
 
 void clear_line(uint16_t screenPos, unsigned char ch);
-void show_line(uint16_t screenPos, char huge *text, line_xpos textLen);
-void show_line_with_colors(uint16_t screenPos, char huge *text, line_xpos textLen, unsigned char far *colors);
 
-void show_line_with_sel(uint16_t screenPos, char huge *text, line_xpos textLen, line_xpos selStart, line_xpos selEnd, line_xpos drawStartX, line_xpos drawEndX);
-void show_line_with_colors_with_sel(uint16_t screenPos, char huge *text, line_xpos textLen, unsigned char far *colors, line_xpos selStart, line_xpos selEnd, line_xpos drawStartX, line_xpos drawEndX);
+void show_line_with_colors_with_sel(uint16_t screenPos, char huge *text, line_xpos textLen,
+#ifdef ENABLE_SYNTAX_HIGHLIGHTING
+  unsigned char far *colors,
+#endif
+  line_xpos selStart, line_xpos selEnd, line_xpos drawStartX, line_xpos drawEndX);
 
 void put_string_on_screen(const char *str, cursor_pos x, cursor_pos y);
 void put_string_on_screen(const char *str, cursor_pos x, cursor_pos y, unsigned char color);

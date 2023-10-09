@@ -23,3 +23,10 @@ uint8_t ADD_U8_SAT(uint8_t a, uint8_t b)
   if (result >= 0xFF) return 0xFF;
   else return (uint8_t)result;
 }
+
+uint8_t SUB_U8_SAT(uint8_t a, uint8_t b)
+{
+  // TODO OPTIMIZE with ASM!
+  if (a <= b) return 0;
+  return a - b;
+}

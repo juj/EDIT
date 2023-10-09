@@ -62,11 +62,11 @@ void repaint_line(int screenY, Line *line, int startX, int endX)
     line_num lineNumber = firstDisplayedLineNumber + screenY;
     line_xpos selStart = (lineNumber == selectionStartLineNum) ? selectionStartColumn : (lineNumber <= selectionEndLineNum ? 0 : MAX_CHARS_PER_LINE);
     line_xpos selEnd = (lineNumber == selectionEndLineNum) ? selectionEndColumn : (lineNumber >= selectionStartLineNum ? MAX_CHARS_PER_LINE : 0);
+    show_line_with_colors_with_sel(screenY * SCREEN_WIDTH, line->text, line->length,
 #ifdef ENABLE_SYNTAX_HIGHLIGHTING
-    if (line->colors) show_line_with_colors_with_sel(screenY * SCREEN_WIDTH, line->text, line->length, line->colors, selStart, selEnd, startX, endX);
-    else
+      line->colors,
 #endif
-      show_line_with_sel(screenY * SCREEN_WIDTH, line->text, line->length, selStart, selEnd, startX, endX);
+      selStart, selEnd, startX, endX);
 
     if (screenY > 0 && screenY < SCREEN_HEIGHT-1)
     {
