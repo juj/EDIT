@@ -87,9 +87,15 @@ static void CLRCHN()
 
 void save_file(File *file)
 {
-  char fn[20];
-  uint8_t i = 0;
+  char fn[30];
+  // Prepend "@0:" to the filename to have any existing filename be replaced.
+  fn[0] = 64; // '@' in PETSCII
+  fn[1] = '0';
+  fn[2] = ':';
+  uint8_t i = 3;
   while(file->filename[i]) { fn[i] = file->filename[i]; ++i; }
+  // Append ",U,W" to filename to tell that the file type is USER, and that
+  // we are Writing to the file.
   fn[i++] = ',';
   fn[i++] = 'U';
   fn[i++] = ',';
