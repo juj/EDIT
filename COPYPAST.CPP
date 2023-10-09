@@ -14,7 +14,10 @@ char huge *copyBuffer = 0;
 file_idx copyBufferLength = 0;
 file_idx copyBufferCapacity = 0;
 
-void repaint_screen_lines(int yStart, int yEnd); // TODO proper declaration location
+void repaint_screen_lines(cursor_pos yStart, cursor_pos yEnd); // TODO proper declaration location
+void repaint_screen();
+void insert_new_line(bool cursorMovesToNewline);
+void restrict_cursor_on_line();
 
 void calculate_num_lines_and_chars_selected(line_num *lines, file_idx *chars)
 {
@@ -173,11 +176,6 @@ void cut_selection()
   copy_selection();
   erase_selected_text();
 }
-
-void repaint_screen_lines(int8_t yStart, int8_t yEnd);
-void repaint_screen();
-void insert_new_line(bool cursorMovesToNewline);
-void restrict_cursor_on_line();
 
 void paste_selection()
 {

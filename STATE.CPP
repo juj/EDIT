@@ -5,15 +5,17 @@ long allocatedMemory = 0;
 
 File *currentFile = 0;
 Line far *firstDisplayedLine = 0; // the topmost line that the view is scrolled to
-unsigned long firstDisplayedLineNumber = 1;
-int viewportXOffset = 0;
+line_num firstDisplayedLineNumber = 1;
 Line far *currentLine = 0;
+
+line_xpos viewportXOffset = 0;
 
 // The desired X coordinate, which might not be reachable if the
 // current line is too short.
-int virtualX = 0;
+line_xpos virtualX = 0;
 
-int cursorX = 0, cursorY = 0;
+line_xpos cursorX = 0;
+cursor_pos cursorY = 0;
 
 bool insertMode = 0;
 bool textSelectionModeActive = 0;
@@ -22,7 +24,7 @@ bool showWhitespace = 0;
 
 char tabMode = ' ';
 
-int indentSize = 2;
+line_xpos indentSize = 2;
 
 char tabChar = showWhitespace ? (tabMode == ' ' ? CHAR_MIDDLE_DOT : CHAR_RIGHT_ARROW) : tabMode;
 

@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "memory.h"
+#include "types.h"
 
 struct File;
 struct Line;
@@ -12,16 +13,15 @@ extern long allocatedMemory;
 // Global editor state
 extern File *currentFile;
 extern Line far *firstDisplayedLine; // the topmost line that the view is scrolled to
-extern unsigned long firstDisplayedLineNumber;
-extern int viewportXOffset; // TODO: implement
+extern line_num firstDisplayedLineNumber;
 extern Line far *currentLine;
 
 // The desired X coordinate, which might not be reachable if the
 // current line is too short.
-extern int virtualX;
-
-extern int cursorX;
-extern int cursorY;
+extern line_xpos viewportXOffset;
+extern line_xpos virtualX;
+extern line_xpos cursorX;
+extern cursor_pos cursorY;
 
 // If true, character insert mode is enabled.
 extern bool insertMode;
@@ -37,7 +37,7 @@ extern char tabMode;
 extern char tabChar;
 
 // number of chars for indentation.
-extern int indentSize;
+extern line_xpos indentSize;
 
 extern unsigned char editorTextColor;
 

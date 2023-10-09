@@ -27,6 +27,6 @@ typedef int16_t line_num;
 #define LINE_NUM_PRINTF_MOD "%d"
 
 // Type to store cursor x or y position on screen
-typedef char cursor_pos;
+typedef int8_t cursor_pos;
 
 #endif

@@ -84,7 +84,7 @@ void repaint_line(int screenY, Line *line, int startX, int endX)
     put_screen_color(screenY*SCREEN_WIDTH, get_screen_color(screenY*SCREEN_WIDTH) | BGCOLOR(BROWN));
 }
 
-void repaint_screen_lines(int yStart, int yEnd)
+void repaint_screen_lines(cursor_pos yStart, cursor_pos yEnd)
 {
   assert(yStart >= 0);
   assert(yStart <= SCREEN_HEIGHT);
@@ -92,7 +92,7 @@ void repaint_screen_lines(int yStart, int yEnd)
   assert(yEnd >= 0);
   assert(yEnd <= SCREEN_HEIGHT);
   Line far *curLine = get_nth_line_on_screen(yStart);
-  int screenY = yStart;
+  cursor_pos screenY = yStart;
   int lineNumber = firstDisplayedLineNumber + yStart;
 
   for(; screenY < yEnd; ++screenY)
@@ -320,14 +320,14 @@ void restrict_cursor_on_line()
   }
 }
 
-Line far *find_last_viewport_start_line(int *linesInView);
+Line far *find_last_viewport_start_line(cursor_pos *linesInView);
 void scroll_to_beginning();
 void scroll_to_end();
 void restrict_cursor_on_line();
 
-void move_viewport_vertically(int lines, int cursor_moves_along)
+void move_viewport_vertically(cursor_pos lines, bool cursor_moves_along)
 {
-  int scrolled = 0;
+  bool scrolled = 0;
 
   while(lines < 0)
   {
@@ -383,9 +383,9 @@ void move_viewport_vertically(int lines, int cursor_moves_along)
   if (scrolled) repaint_screen();
 }
 
-void move_cursor_vertically(int lines)
+void move_cursor_vertically(cursor_pos lines)
 {
-  int makeSound = 0;
+  bool makeSound = 0;
 
   while(lines < 0)
   {
@@ -442,13 +442,13 @@ void move_cursor_vertically(int lines)
     beep(170, 50);
 }
 
-void move_cursor_horizontally(int chars)
+void move_cursor_horizontally(cursor_pos chars)
 {
-  int oldViewportXOffset = viewportXOffset;
+  cursor_pos oldViewportXOffset = viewportXOffset;
 
   if (chars < 0)
   {
-    int left = MIN(cursorX, -chars);
+    cursor_pos left = MIN(cursorX, -chars);
     cursorX -= left;
     virtualX = cursorX;
     chars += left;
@@ -475,7 +475,7 @@ void move_cursor_horizontally(int chars)
   }
   else if (chars > 0)
   {
-    int right = MIN(currentLine->length - viewportXOffset - cursorX, chars);
+    cursor_pos right = MIN(currentLine->length - viewportXOffset - cursorX, chars);
     cursorX += right;
     virtualX = cursorX;
     chars -= right;
@@ -503,19 +503,19 @@ void move_cursor_horizontally(int chars)
 
 void toggle_cursor_home()
 {
-  int indentPos = find_line_indent_position(currentLine);
+  cursor_pos indentPos = find_line_indent_position(currentLine);
   cursorX = virtualX = (cursorX != indentPos) ? indentPos : 0;
 
-  int oldViewportXOffset = viewportXOffset;
+  cursor_pos oldViewportXOffset = viewportXOffset;
   viewportXOffset = MAX(0, cursorX - SCREEN_WIDTH);
   if (oldViewportXOffset != viewportXOffset)
     repaint_screen();
 }
 
-Line far *find_last_viewport_start_line(int *linesInView)
+Line far *find_last_viewport_start_line(cursor_pos *linesInView)
 {
   Line far *lastLine = currentFile->lastLine;
-  int y = 0;
+  cursor_pos y = 0;
   for(;y < SCREEN_HEIGHT - 2 && lastLine->prevLine; ++y)
     lastLine = lastLine->prevLine;
   if (linesInView) *linesInView = y;
