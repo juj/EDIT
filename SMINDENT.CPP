@@ -9,18 +9,6 @@
 #include "file.h"
 #include "iassert.h"
 
-int is_tab(char ch)
-{
-  return ch == '\t' || ch == CHAR_RIGHT_ARROW;
-}
-
-int is_space(char ch)
-{
-// TODO: maybe?
-//  return (unsigned char)ch <= 32 || ch == (char)CHAR_MIDDLE_DOT || (unsigned char)ch == 0xBA || (unsigned char)ch == 0xFA;
-  return ch == ' ' || ch == (char)CHAR_MIDDLE_DOT;
-}
-
 int gcd(int a, int b)
 {
   int c;
@@ -97,7 +85,7 @@ void insert_indent()
     else if (curIndentAmount > 0 && prev)
     {
       guessedIndentChar = currentLine->text[curIndentAmount-1];
-      if (is_space(guessedIndentChar))
+      if (is_whitespace(guessedIndentChar))
       {
         guessedIndentAmount = infer_indent_gcd(prev);
         /*
@@ -121,7 +109,7 @@ void insert_indent()
     for(long i = currentCharOffset-1; i >= 0; --i)
     {
       assert(i < currentLine->length);
-      if (is_tab(currentLine->text[i]) || is_space(currentLine->text[i]))
+      if (is_tab(currentLine->text[i]) || is_whitespace(currentLine->text[i]))
       {
         guessedIndentChar = currentLine->text[i];
         break;
@@ -129,7 +117,7 @@ void insert_indent()
     }
     if (!guessedIndentChar) guessedIndentChar = tabChar;
   }
-  assert(is_tab(guessedIndentChar) || is_space(guessedIndentChar));
+  assert(is_tab(guessedIndentChar) || is_whitespace(guessedIndentChar));
   for(int i = 0; i < guessedIndentAmount; ++i)
     insert_character(guessedIndentChar);
 }

@@ -56,7 +56,7 @@ extern int currentVideoMode;
 extern unsigned char SCREEN_WIDTH;
 extern unsigned char SCREEN_HEIGHT;
 
-#define CHAR_RIGHT_ARROW 0x1A
+#define CHAR_RIGHT_ARROW ((char)0x1A)
 #define CHAR_MIDDLE_DOT ((char)0xFA)
 
 //extern char far *screen;

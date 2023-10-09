@@ -6,17 +6,17 @@
 #include "memory.h"
 #include "iassert.h"
 
-int find_line_indent_position(Line far *line)
+line_xpos find_line_indent_position(Line far *line)
 {
   assert(line);
   // Find line indentation position
-  int indentPos = 0;
-  for(long i = 0; i < line->length && line->text[i] <= 32; ++i)
+  line_xpos indentPos = 0;
+  for(line_xpos i = 0; i < line->length && is_whitespace(line->text[i]); ++i)
     ++indentPos;
   return indentPos;
 }
 
-Line far *advance_n_lines(Line far *line, long numLinesForward)
+Line far *advance_n_lines(Line far *line, line_num numLinesForward)
 {
   assert(line);
   while(line->nextLine && numLinesForward-- > 0)
@@ -24,14 +24,14 @@ Line far *advance_n_lines(Line far *line, long numLinesForward)
   return line;
 }
 
-Line far *get_nth_line_of_document(long lineNumber)
+Line far *get_nth_line_of_document(line_num lineNumber)
 {
   assert(currentFile);
   assert(currentFile->firstLine);
   return advance_n_lines(currentFile->firstLine, lineNumber - 1);
 }
 
-Line far *get_nth_line_on_screen(long screenY)
+Line far *get_nth_line_on_screen(cursor_pos screenY)
 {
   assert(firstDisplayedLine);
   Line *line = firstDisplayedLine;
@@ -42,7 +42,7 @@ Line far *get_nth_line_on_screen(long screenY)
 //  return advance_n_lines(firstDisplayedLine, screenY);
 }
 
-long screen_end_y_of_last_line_on_screen(Line far *startingLine, int startingScreenY)
+cursor_pos screen_end_y_of_last_line_on_screen(Line far *startingLine, cursor_pos startingScreenY)
 {
   while(startingLine->nextLine && startingScreenY < SCREEN_HEIGHT)
   {
@@ -52,10 +52,10 @@ long screen_end_y_of_last_line_on_screen(Line far *startingLine, int startingScr
   return startingScreenY;
 }
 
-long get_line_number(Line far *line)
+line_num get_line_number(Line far *line)
 {
   assert(line);
-  long curLineNumber = 1;
+  line_num curLineNumber = 1;
   while(line->prevLine)
   {
     line = line->prevLine;
@@ -64,7 +64,7 @@ long get_line_number(Line far *line)
   return curLineNumber;
 }
 
-long get_current_line_number()
+line_num get_current_line_number()
 {
   assert(currentLine);
   return get_line_number(currentLine);
@@ -82,7 +82,7 @@ void delete_line(Line far *line)
   Farfree(line, sizeof(Line));
 }
 
-int increase_capacity(Line far *line, long newCapacity)
+bool increase_capacity(Line far *line, line_xpos newCapacity)
 {
   assert(line);
   if (line->capacity >= newCapacity)
@@ -91,7 +91,7 @@ int increase_capacity(Line far *line, long newCapacity)
   char huge *newText = (char huge*)Farmalloc(newCapacity);
   if (!newText)
     return 0;
-  for(long i = 0; i < line->length; ++i)
+  for(line_xpos i = 0; i < line->length; ++i)
     newText[i] = line->text[i];
 #ifdef ENABLE_SYNTAX_HIGHLIGHTING
   if (line->colors)
@@ -112,20 +112,20 @@ int increase_capacity(Line far *line, long newCapacity)
   return 1;
 }
 
-char last_nonws_char_on_line(Line far *line, long fromPosition)
+char last_nonws_char_on_line(Line far *line, line_xpos fromPosition)
 {
   assert(line);
-  for(long i = MIN(fromPosition, line->length-1); i >= 0; --i)
-    if (line->text[i] > 32 && line->text[i] != CHAR_MIDDLE_DOT && line->text[i] != CHAR_RIGHT_ARROW)
+  for(line_xpos i = MIN(fromPosition+1, line->length); i > 0;)
+    if (!is_whitespace(line->text[--i]))
       return line->text[i];
   return 0;
 }
 
-int calculate_line_delta(Line far *a, Line far *b)
+int16_t calculate_line_delta(Line far *a, Line far *b)
 {
   assert(a);
   assert(b);
-  int delta = 0;
+  int16_t delta = 0;
   while(a)
   {
     if (a == b)
@@ -136,27 +136,28 @@ int calculate_line_delta(Line far *a, Line far *b)
   return -1;
 }
 
-int line_comes_before(Line far *a, Line far *b)
+bool line_comes_before(Line far *a, Line far *b)
 {
   assert(a);
   assert(b);
   return calculate_line_delta(a, b) >= 0;
 }
 
-int cursor_pos_cmp(unsigned long line1, unsigned long col1, unsigned long line2, unsigned long col2)
+int8_t cursor_pos_cmp(line_num line1, line_xpos col1, line_num line2, line_xpos col2)
 {
-  if (line1 < line2)
-    return -1;
-  if (line1 > line2)
-    return 1;
-  if (col1 < col2)
-    return -1;
-  if (col1 > col2)
-    return 1;
+  if (line1 < line2) return -1;
+  if (line1 > line2) return 1;
+  if (col1 < col2) return -1;
+  if (col1 > col2) return 1;
   return 0;
 }
 
-bool is_whitespace(unsigned char ch)
+bool is_whitespace(char ch)
 {
-  return ch <= 32;
+  return ch <= 32 || ch == CHAR_MIDDLE_DOT || ch == CHAR_RIGHT_ARROW;
+}
+
+bool is_tab(char ch)
+{
+  return ch == '\t' || ch == CHAR_RIGHT_ARROW;
 }

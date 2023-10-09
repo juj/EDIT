@@ -3,6 +3,10 @@
 
 #include <stdint.h>
 
+// Maximum type size to hold all allocated dynamic memory
+#define MAX_DYNAMIC_ALLOCATED_MEMORY 65534
+typedef uint16_t allocated_mem_size_t;
+
 // Maximum length of a filename (excluding null terminator)
 #ifdef __C64__
 #define MAX_FILENAME_LEN 16

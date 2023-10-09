@@ -108,7 +108,7 @@ void repaint_screen_lines(cursor_pos yStart, cursor_pos yEnd)
 void print_line_column_info()
 {
   assert(get_current_line_number() == current_line_number());
-  //  long curLineNumber = get_current_line_number();
+  //  line_num curLineNumber = get_current_line_number();
   char str[64];
   /*
   sprintf(str, " %lub near/%lub far mem used    %ld:%d",
@@ -151,7 +151,7 @@ void repaint_current_line_from_offset(int xOffset, int xEnd)
 void insert_character(char ch)
 {
   assert(currentLine);
-  int currentCharOffset = current_column();
+  line_xpos currentCharOffset = current_column();
 
   if (insertMode && currentCharOffset < currentLine->length)
   {
@@ -167,16 +167,16 @@ void insert_character(char ch)
     // If the current cursor position is outside the end of the line,
     // we may need to insert one or more whitespace as well to create
     // a properly indented text.
-    int numCharsToInsert = 1 + MAX(0, currentCharOffset - currentLine->length);
+    line_xpos numCharsToInsert = 1 + MAX(0, currentCharOffset - currentLine->length);
 
     if (currentLine->length + numCharsToInsert > currentLine->capacity)
     {
       if (!increase_capacity(currentLine, currentLine->capacity*2+numCharsToInsert))
-      return;
+        return;
     }
 
     // Shift existing characters up
-    for(long i = currentLine->length + numCharsToInsert - 1; i > currentCharOffset; --i)
+    for(line_xpos i = currentLine->length + numCharsToInsert - 1; i > currentCharOffset; --i)
     {
       assert(i < currentLine->capacity);
       assert(i-numCharsToInsert >= 0);
@@ -189,7 +189,7 @@ void insert_character(char ch)
     Line far *prevLine = currentLine->prevLine;
     if (prevLine)
     {
-      for(long j = 1; j < numCharsToInsert; ++j)
+      for(line_xpos j = 1; j < numCharsToInsert; ++j)
       {
         assert(currentCharOffset - j >= 0 && currentCharOffset - j < currentLine->length);
         assert(numCharsToInsert-1-j >= 0 && prevLine->length && numCharsToInsert-1-j < prevLine->length);
@@ -210,12 +210,12 @@ void insert_character(char ch)
     assert(currentLine->length <= currentLine->capacity);
     clear_highlight(currentLine);
     mark_current_file_modified();
-    int full_repaint = 0;
+    bool full_repaint = 0;
     if (++cursorX >= SCREEN_WIDTH)
     {
       --cursorX;
       ++viewportXOffset;
-      full_repaint = 1;
+      full_repaint = true;
     }
     virtualX = cursorX;
 
@@ -231,7 +231,7 @@ void insert_character(char ch)
 void delete_character()
 {
   assert(currentLine);
-  int currentCharOffset = current_column();
+  line_xpos currentCharOffset = current_column();
   if (currentCharOffset < currentLine->length)
   {
     while(currentCharOffset+1 < currentLine->length)
@@ -252,7 +252,7 @@ void delete_character()
       return;
     }
     increase_capacity(currentLine, currentLine->length + next->length);
-    for(long i = 0; i < next->length; ++i)
+    for(line_xpos i = 0; i < next->length; ++i)
       currentLine->text[currentLine->length + i] = next->text[i];
     currentLine->length += next->length;
     currentLine->nextLine = next->nextLine;
@@ -268,7 +268,7 @@ void delete_character()
     delete_line(next);
     clear_highlight(currentLine);
 
-    int endY = screen_end_y_of_last_line_on_screen(currentLine, cursorY)+2;
+    cursor_pos endY = screen_end_y_of_last_line_on_screen(currentLine, cursorY)+2;
     if (endY > SCREEN_HEIGHT) endY = SCREEN_HEIGHT;
     repaint_screen_lines(cursorY, endY);
   }
@@ -709,7 +709,7 @@ void insert_new_line(bool cursorMovesToNewline)
 
   Line *prevLine = currentLine->prevLine;
   assert(prevLine);
-  int endY = screen_end_y_of_last_line_on_screen(prevLine, cursorY-1)+1;
+  cursor_pos endY = screen_end_y_of_last_line_on_screen(prevLine, cursorY-1)+1;
   if (endY > SCREEN_HEIGHT) endY = SCREEN_HEIGHT;
   repaint_screen_lines(cursorY-1, endY);
 }
