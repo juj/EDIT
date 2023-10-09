@@ -10,15 +10,18 @@
 #define SAVE_PROMPT 
 
 #define TEXT_COLOR WHITE
-void ask_name_for_file(File *file)
+
+// if < 0, user cancelled
+int ask_name_for_file(File *file)
 {
-  char filename[16] = {};
-  if (!is_file_unnamed(file))
-    strncpy(filename, file->filename, sizeof(filename)-1);
-  int len = ask_string_prompt("SAVE TO FILE: ", filename, 15);
-  file->filename = (char*)realloc(file->filename, len+1);
-  strncpy(file->filename, filename, len);
-  file->filename[len] = 0;
+  char fn[MAX_FILENAME_LEN+1];
+  fn[MAX_FILENAME_LEN] = 0;
+  strcpy(fn, file->filename);
+  if (fn[0] == '<') fn[0] = 0;
+  int ret = ask_string_prompt("SAVE TO FILE: ", fn, MAX_FILENAME_LEN);
+  if (ret >= 0)
+    strcpy(file->filename, fn);
+  return ret;
 }
 
 #if defined(_MSC_VER) || defined(__TURBOC__)

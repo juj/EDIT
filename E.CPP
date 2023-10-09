@@ -157,7 +157,7 @@ void insert_character(char ch)
   {
     currentLine->text[currentCharOffset] = ch;
     clear_highlight(currentLine);
-    FILE_MODIFIED();
+    mark_current_file_modified();
     put_screen(cursorY*SCREEN_WIDTH+cursorX, ch);
     ++cursorX;
     virtualX = cursorX;
@@ -209,7 +209,7 @@ void insert_character(char ch)
     currentLine->length += numCharsToInsert;
     assert(currentLine->length <= currentLine->capacity);
     clear_highlight(currentLine);
-    FILE_MODIFIED();
+    mark_current_file_modified();
     int full_repaint = 0;
     if (++cursorX >= SCREEN_WIDTH)
     {
@@ -272,7 +272,7 @@ void delete_character()
     if (endY > SCREEN_HEIGHT) endY = SCREEN_HEIGHT;
     repaint_screen_lines(cursorY, endY);
   }
-  FILE_MODIFIED();
+  mark_current_file_modified();
   // TODO: only repaint the current line starting from currentCharOffset
   //if (full_repaint) repaint_screen();
   /*else*/// repaint_current_line_from_offset(cursorX-1);
@@ -705,7 +705,7 @@ void insert_new_line(int cursorMovesToNewline)
     currentLine = newLine;
   }
 
-  FILE_MODIFIED();
+  mark_current_file_modified();
 
   Line *prevLine = currentLine->prevLine;
   assert(prevLine);

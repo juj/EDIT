@@ -2,13 +2,14 @@
 #define _FILE_H
 
 #include "memory.h"
+#include "types.h"
 #include <stdio.h>
 
 struct Line;
 
 struct File
 {
-  char *filename;
+  char filename[MAX_FILENAME_LEN+1];
   char huge *fileData;
   long size;
   Line far *firstLine;
@@ -24,6 +25,8 @@ File *open_new_file();
 #ifdef __mos__
 struct FILE;
 #endif
+
+void mark_current_file_modified();
 
 bool is_file_unnamed(File *f);
 

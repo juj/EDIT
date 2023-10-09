@@ -188,7 +188,7 @@ void unindent()
     currentLine->text[i] = currentLine->text[i + numCharsToUnindent];
   currentLine->length -= numCharsToUnindent;
   clear_highlight(currentLine);
-  FILE_MODIFIED();
+  mark_current_file_modified();
 
   int oldCursorPos = cursorX + viewportXOffset;
   int newCursorPos = MAX(oldCursorPos - numCharsToUnindent, curIndentAmount);

@@ -110,6 +110,17 @@ int find_lines(File *f)
   return 1;
 }
 
+void repaint_open_files_list(File *highlightFilename);
+
+void mark_current_file_modified()
+{
+  if (!currentFile->hasUnsavedChanges)
+  {
+    currentFile->hasUnsavedChanges = 1;
+    repaint_open_files_list(0);
+  }
+}
+
 File *open_new_file()
 {
   File *f = (File*)Malloc(sizeof(File));
@@ -123,13 +134,6 @@ File *open_new_file()
 #else
   const char *filename = "<untitled>";
 #endif
-  f->filename = (char*)Malloc(strlen(filename)+1);
-  if (!f->filename)
-  {
-    Free(f, sizeof(File));
-    return 0;
-  }
-
   strcpy(f->filename, filename);
   f->fileData = 0;
   f->size = 0;
@@ -205,12 +209,7 @@ File *load_file(const char *filename)
   }
   f->nextFile = f->prevFile = 0;
   f->hasUnsavedChanges = 0;
-  f->filename = (char*)Malloc(strlen(filename)+1);
-  if (!f->filename)
-  {
-    fclose(handle);
-    return 0;
-  }
+  memset(f->filename, 0, MAX_FILENAME_LEN);
   strcpy(f->filename, filename);
   f->fileData = (char huge *)Farmalloc(size);
   if (!f->fileData)
@@ -243,7 +242,7 @@ File *load_file(const char *filename)
 
 bool is_file_unnamed(File *f)
 {
-  return !f->filename || f->filename[0] == '<';
+  return f->filename[0] == 0 || f->filename[0] == '<';
 }
 
 long calculate_file_byte_size(File *f)

@@ -39,8 +39,6 @@ extern char tabChar;
 // number of chars for indentation.
 extern int indentSize;
 
-#define FILE_MODIFIED() currentFile->hasUnsavedChanges = 1
-
 extern unsigned char editorTextColor;
 
 void clear_selection();

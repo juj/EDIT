@@ -143,6 +143,7 @@
     <ClInclude Include="..\SCREEN.H" />
     <ClInclude Include="..\SMINDENT.H" />
     <ClInclude Include="..\STATE.H" />
+    <ClInclude Include="..\TYPES.H" />
     <ClInclude Include="..\UTIL.H" />
     <ClInclude Include="..\VGA.H" />
     <ClInclude Include="..\VIEWPORT.H" />
