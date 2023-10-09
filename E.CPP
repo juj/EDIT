@@ -559,22 +559,17 @@ void move_cursor_to_line_end()
 
 void move_cursor_to_prev_word()
 {
+  line_xpos currentCharOffset = current_column();
   Line far *line = currentLine;
-  long currentCharOffset = current_column()-1;
 
-  for(; currentCharOffset >= 0; --currentCharOffset)
-    if (is_alphanum(line->text[currentCharOffset])
-  && (currentCharOffset == 0 || !is_alphanum(line->text[currentCharOffset-1])))
-    break;
-
-  if (currentCharOffset < 0)
+  if (currentCharOffset == 0) // If cursor is at beginning of a line, move it to the end of the previous line
   {
     if (!line->prevLine)
     {
       ERROR_BEEP();
       return;
     }
-    currentLine = line->prevLine;
+    currentLine = currentLine->prevLine;
     if (cursorY > 0)
       --cursorY;
     else
@@ -586,7 +581,14 @@ void move_cursor_to_prev_word()
   }
   else
   {
-    long oldXOffset = viewportXOffset;
+    while(currentCharOffset > 0)
+    {
+      --currentCharOffset;
+      if (is_alphanum(line->text[currentCharOffset])
+        && (currentCharOffset == 0 || !is_alphanum(line->text[currentCharOffset-1])))
+        break;
+    }
+    line_xpos oldXOffset = viewportXOffset;
     viewportXOffset = MIN(viewportXOffset, currentCharOffset);
     cursorX = virtualX = currentCharOffset - viewportXOffset;
     if (oldXOffset != viewportXOffset)
@@ -596,22 +598,17 @@ void move_cursor_to_prev_word()
 
 void move_cursor_to_next_word()
 {
+  line_xpos currentCharOffset = current_column()+1;
   Line far *line = currentLine;
-  long currentCharOffset = current_column()+1;
 
-  for(; currentCharOffset < line->length; ++currentCharOffset)
-    if (is_alphanum(line->text[currentCharOffset])
-      && !is_alphanum(line->text[currentCharOffset-1]))
-    break;
-
-  if (currentCharOffset >= line->length)
+  if (currentCharOffset >= line->length) // If cursor is at end of a line, move it to the start of the next line
   {
     if (!line->nextLine)
     {
       ERROR_BEEP();
       return;
     }
-    currentLine = line->nextLine;
+    currentLine = currentLine->nextLine;
     if (cursorY < SCREEN_HEIGHT-1)
       ++cursorY;
     else
@@ -624,7 +621,12 @@ void move_cursor_to_next_word()
   }
   else
   {
-    long oldXOffset = viewportXOffset;
+    for(; currentCharOffset < line->length; ++currentCharOffset)
+      if (is_alphanum(line->text[currentCharOffset])
+        && !is_alphanum(line->text[currentCharOffset-1]))
+      break;
+
+    line_xpos oldXOffset = viewportXOffset;
     viewportXOffset = MIN(viewportXOffset, currentCharOffset);
     cursorX = virtualX = currentCharOffset - viewportXOffset;
     if (oldXOffset != viewportXOffset)
