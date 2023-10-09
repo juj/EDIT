@@ -11,18 +11,18 @@
 #include <string.h>
 
 char huge *copyBuffer = 0;
-long copyBufferLength = 0;
-long copyBufferCapacity = 0;
+file_idx copyBufferLength = 0;
+file_idx copyBufferCapacity = 0;
 
 void repaint_screen_lines(int yStart, int yEnd); // TODO proper declaration location
 
-void calculate_num_lines_and_chars_selected(long *lines, long *chars)
+void calculate_num_lines_and_chars_selected(line_num *lines, file_idx *chars)
 {
   assert(lines);
   assert(chars);
 
-  long numLinesSelected = 0;
-  long numCharsSelected = 0;
+  line_num numLinesSelected = 0;
+  file_idx numCharsSelected = 0;
   if (selectionStartLine && selectionEndLine)
   {
     assert(selectionStartColumn <= selectionStartLine->length);
@@ -50,7 +50,7 @@ void calculate_num_lines_and_chars_selected(long *lines, long *chars)
   *chars = numCharsSelected;
 }
 
-static void copy_buffer_reserve(long newCap)
+static void copy_buffer_reserve(file_idx newCap)
 {
   if (copyBufferCapacity < newCap)
   {
@@ -64,8 +64,8 @@ void repaint_screen(); // TODO REMOVE
 
 void copy_selection()
 {
-  long numLinesSelected;
-  long numCharsSelected;
+  line_num numLinesSelected;
+  file_idx numCharsSelected;
   calculate_num_lines_and_chars_selected(&numLinesSelected, &numCharsSelected);
   if (numCharsSelected == 0)
   {
@@ -77,18 +77,18 @@ void copy_selection()
     return;
 
   // Copy text to copy buffer
-  long offset = selectionStartColumn;
-  long dstOfs = 0;
+  line_xpos offset = selectionStartColumn;
+  file_idx dstOfs = 0;
   Line far *l = selectionStartLine;
-  for(long lineNum = selectionStartLineNum; lineNum <= selectionEndLineNum;
+  for(line_num lineNum = selectionStartLineNum; lineNum <= selectionEndLineNum;
     ++lineNum, l = l->nextLine)
   {
     if (!l)
       break;
 
-    long end = (lineNum == selectionEndLineNum) ? selectionEndColumn : l->length;
+    line_xpos end = (lineNum == selectionEndLineNum) ? selectionEndColumn : l->length;
     assert(offset <= end);
-    long len = end - offset;
+    line_xpos len = end - offset;
 //    printf("dstOfs: %lu, len: %lu, copybufferCapacity: %lu, lineNum: %lu, selectionEndLineNum: %lu\n",
  //     dstOfs, len, copyBufferCapacity, lineNum, selectionEndLineNum);
     assert(dstOfs + len <= copyBufferCapacity);
@@ -117,7 +117,7 @@ void erase_selected_text()
   assert(selectionEndLine);
   if (selectionStartLineNum == selectionEndLineNum) // Only a single line of selected text?
   {
-    unsigned long newLineLength = selectionStartLine->length - (selectionEndColumn - selectionStartColumn);
+    line_xpos newLineLength = selectionStartLine->length - (selectionEndColumn - selectionStartColumn);
     for(size_t i = 0; i < selectionStartLine->length - selectionEndColumn; ++i)
       selectionStartLine->text[selectionStartColumn+i] = selectionStartLine->text[selectionEndColumn+i];
     selectionStartLine->length = newLineLength;
@@ -128,8 +128,8 @@ void erase_selected_text()
   }
 
   // Join end line to start line
-  unsigned long endLenRemain = selectionEndLine->length - selectionEndColumn;
-  unsigned long newLen = selectionStartColumn + endLenRemain;
+  line_xpos endLenRemain = selectionEndLine->length - selectionEndColumn;
+  line_xpos newLen = selectionStartColumn + endLenRemain;
   if (!increase_capacity(selectionStartLine, newLen))
     return;
   selectionStartLine->length = newLen;
@@ -137,7 +137,7 @@ void erase_selected_text()
     selectionStartLine->text[selectionStartColumn+i] = selectionEndLine->text[selectionEndColumn+i];
 /*
   // Cut end line
-  unsigned long newEndLineLength = selectionEndLine->length - selectionEndColumn;
+  line_xpos newEndLineLength = selectionEndLine->length - selectionEndColumn;
   for(size_t i = 0; i < selectionEndLine->length - selectionEndColumn; ++i)
     selectionEndLine->text[i] = selectionEndLine->text[selectionEndColumn+i];
   selectionEndLine->length = newEndLineLength;
@@ -146,7 +146,7 @@ void erase_selected_text()
   Line far *l = selectionStartLine->nextLine;
   assert(l);
   Line far *endLine = selectionEndLine->nextLine;
-  for(long j = selectionStartLineNum+1; j <= selectionEndLineNum && l; ++j)
+  for(line_num j = selectionStartLineNum+1; j <= selectionEndLineNum && l; ++j)
   {
     Line far *next = l->nextLine;
     if (l == firstDisplayedLine)
@@ -174,9 +174,9 @@ void cut_selection()
   erase_selected_text();
 }
 
-void repaint_screen_lines(int yStart, int yEnd);
+void repaint_screen_lines(int8_t yStart, int8_t yEnd);
 void repaint_screen();
-void insert_new_line(int cursorMovesToNewline);
+void insert_new_line(bool cursorMovesToNewline);
 void restrict_cursor_on_line();
 
 void paste_selection()
@@ -185,7 +185,7 @@ void paste_selection()
 
   // Find the first line of content, and paste it on the
   // current cursor line
-  long i = 0;
+  file_idx i = 0;
   for(; i < copyBufferLength; ++i)
     if (copyBuffer[i] == '\n')
       break;
@@ -193,7 +193,7 @@ void paste_selection()
   if (!increase_capacity(currentLine, currentLine->length + i))
     return;
 
-  long pastePosition = current_column();
+  line_xpos pastePosition = current_column();
   if (i < copyBufferLength)// && pastePosition < currentLine->length) // if true, we will be pasting multiple lines
   {
     insert_new_line(0); // TODO: Disable indent generation here?
@@ -208,9 +208,9 @@ void paste_selection()
 
   if (i > 0)
   {
-    for(long k = currentLine->length + i - 1; k >= pastePosition + i; --k)
+    for(line_xpos k = currentLine->length + i - 1; k >= pastePosition + i; --k)
       currentLine->text[k] = currentLine->text[k - i];
-    for(size_t l = 0; l < i; ++l)
+    for(file_idx l = 0; l < i; ++l)
       currentLine->text[pastePosition+l] = copyBuffer[l];
     currentLine->length += i;
   }
@@ -226,10 +226,10 @@ void paste_selection()
   Line far *startLine = currentLine;
   Line far *endLine = currentLine->nextLine;
   // Generate new lines after the current line
-  unsigned long numPastedLines = 1;
+  line_num numPastedLines = 1;
   while (i < copyBufferLength) // multi-line pasting:
   {
-    long j;
+    file_idx j;
     for(j = i; j < copyBufferLength; ++j)
       if (copyBuffer[j] == '\n')
     break;
@@ -237,12 +237,12 @@ void paste_selection()
     if (j == copyBufferLength)// && j-i > 0) // last line?
     {
       // prepend the last block at the beginning of the last line
-      long pasteAmount = j-i;
+      line_xpos pasteAmount = (line_xpos)(j-i);
       if (!increase_capacity(endLine, endLine->length + pasteAmount))
         return;
-      for(long k = endLine->length + pasteAmount-1; k >= pasteAmount; --k)
+      for(line_xpos k = endLine->length + pasteAmount-1; k >= pasteAmount; --k)
         endLine->text[k] = endLine->text[k - pasteAmount];
-      for(size_t l = 0; l < pasteAmount; ++l)
+      for(line_xpos l = 0; l < pasteAmount; ++l)
         endLine->text[l] = copyBuffer[i+l];
       endLine->length += pasteAmount;
       clear_highlight(endLine);
@@ -265,7 +265,7 @@ void paste_selection()
       delete_line(newLine);
       return;
     }
-    for(size_t k = 0; k < j-i; ++k)
+    for(line_xpos k = 0; k < j-i; ++k)
       newLine->text[k] = copyBuffer[i+k];
     newLine->ownsPtr = 1;
     newLine->prevLine = startLine;

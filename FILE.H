@@ -11,7 +11,7 @@ struct File
 {
   char filename[MAX_FILENAME_LEN+1];
   char huge *fileData;
-  long size;
+  file_idx size;
   Line far *firstLine;
   Line far *lastLine;
   int hasUnsavedChanges;
@@ -30,10 +30,10 @@ void mark_current_file_modified();
 
 bool is_file_unnamed(File *f);
 
-long calculate_file_byte_size(File *f);
+file_idx calculate_file_byte_size(File *f);
 
-long huge_fread(char huge *dst, long numBytes, FILE *handle);
-long huge_fwrite(char huge *src, long numBytes, FILE *handle);
+file_idx huge_fread(char huge *dst, file_idx numBytes, FILE *handle);
+file_idx huge_fwrite(char huge *src, file_idx numBytes, FILE *handle);
 File *load_file(const char *filename);
 void save_file(File *file);
 void close_file(File *file);

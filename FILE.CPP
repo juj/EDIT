@@ -11,43 +11,42 @@
 #include <stdlib.h>
 #include <string.h>
 
-long huge_fread(char huge *dst, long numBytes, FILE *handle)
-{
-  long numSuccessfullyRead = 0;
 #if defined(_MSC_VER) || defined(__TURBOC__)
+
+static file_idx huge_fread(char huge *dst, file_idx numBytes, FILE *handle)
+{
+  file_idx numSuccessfullyRead = 0;
   while(numBytes > 0)
   {
-    long blockSize = MIN(numBytes, 1024);
+    file_idx blockSize = MIN(numBytes, 1024);
     size_t numRead = fread(dst, 1, blockSize, handle);
     dst = &dst[blockSize];
-    numSuccessfullyRead += (long)numRead;
+    numSuccessfullyRead += (file_idx)numRead;
     if (numRead != blockSize)
       break;
     numBytes -= blockSize;
   }
-#endif
   return numSuccessfullyRead;
 }
 
-long huge_fwrite(char huge *src, long numBytes, FILE *handle)
+file_idx huge_fwrite(char huge *src, file_idx numBytes, FILE *handle)
 {
-  long numWritten = 0;
-#if defined(_MSC_VER) || defined(__TURBOC__)
+  file_idx numWritten = 0;
   while(numBytes > 0)
   {
-    long blockSize = MIN(numBytes, 1024);
+    file_idx blockSize = MIN(numBytes, 1024);
     size_t nW = fwrite(src, 1, blockSize, handle);
     src = &src[blockSize];
-    numWritten += (long)nW;
+    numWritten += (file_idx)nW;
     if (numWritten != blockSize)
       break;
     numBytes -= blockSize;
   }
-#endif
   return numWritten;
 }
+#endif
 
-int find_lines(File *f)
+line_num find_lines(File *f)
 {
   char huge *data = f->fileData;
   assert(data);
@@ -58,7 +57,7 @@ int find_lines(File *f)
     // TODO: Deallocate file!?
     return 0;
   }
-  int numLines = 1;
+  line_num numLines = 1;
   curLine->ownsPtr = 0;
   curLine->prevLine = curLine->nextLine = 0;
   curLine->text = data;
@@ -69,8 +68,8 @@ int find_lines(File *f)
   f->firstLine = curLine;
 
   char huge *ch = data;
-  long prevLineStart = 0;
-  for(long i = 0; i < f->size; ++i)
+  file_idx prevLineStart = 0;
+  for(file_idx i = 0; i < f->size; ++i)
   {
     if (showWhitespace)
     {
@@ -142,7 +141,6 @@ File *open_new_file()
   if (!firstLine)
   {
     Free(f, sizeof(File));
-    Free(f->filename, strlen(filename)+1);
     return 0;
   }
 
@@ -184,7 +182,6 @@ void close_file(File *file)
   }
 
   Farfree(file->fileData, file->size);
-  Free(file->filename, strlen(file->filename)+1);
   Free(file, sizeof(File));
 }
 
@@ -218,7 +215,7 @@ File *load_file(const char *filename)
     return 0;
   }
   f->size = size;
-  size_t numRead = huge_fread(f->fileData, size, handle);
+  file_idx numRead = huge_fread(f->fileData, size, handle);
   if (numRead != size)
   {
     printf("Failed to read %ld bytes, only read %ld bytes!\n", size, (long)numRead);
@@ -245,9 +242,9 @@ bool is_file_unnamed(File *f)
   return f->filename[0] == 0 || f->filename[0] == '<';
 }
 
-long calculate_file_byte_size(File *f)
+file_idx calculate_file_byte_size(File *f)
 {
-  long size = 0;
+  file_idx size = 0;
   Line *l = f->firstLine;
   while(l)
   {

@@ -632,7 +632,7 @@ void move_cursor_to_next_word()
   }
 }
 
-void insert_new_line(int cursorMovesToNewline)
+void insert_new_line(bool cursorMovesToNewline)
 {
   long currentCharOffset = current_column();
 
@@ -863,8 +863,8 @@ void print_textsel_info()
     return;
 
   assert(selectionStartLineNum <= selectionEndLineNum);
-  long numLinesSelected;
-  long numCharsSelected;
+  line_num numLinesSelected;
+  file_idx numCharsSelected;
   calculate_num_lines_and_chars_selected(&numLinesSelected, &numCharsSelected);
 
   char str[64];
@@ -874,10 +874,10 @@ void print_textsel_info()
     else str[0] = 0;
   }
   else if (numLinesSelected == 1)
-    sprintf(str, "%ld chars selected.", numCharsSelected);
+    sprintf(str, FILE_IDX_PRINTF_MOD " chars selected.", numCharsSelected);
   else
-    sprintf(str, "%ld lines, %ld chars selected.", numLinesSelected, numCharsSelected);
-  put_string_on_screen(str, (SCREEN_WIDTH-(int)strlen(str))>>1, SCREEN_HEIGHT-1, LTBLUE);
+    sprintf(str, LINE_NUM_PRINTF_MOD " lines, " FILE_IDX_PRINTF_MOD " chars selected.", numLinesSelected, numCharsSelected);
+  put_string_on_screen(str, (SCREEN_WIDTH-(line_xpos)strlen(str))>>1, SCREEN_HEIGHT-1, LTBLUE);
 }
 
 void select_all()
