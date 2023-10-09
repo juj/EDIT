@@ -8,7 +8,7 @@
 #include "../iassert.h"
 #include "../screen.h"
 
-void set_cursor_style(int style)
+void set_cursor_style(uint8_t style)
 {
 }
 
@@ -112,7 +112,7 @@ void save_screen()
   memcpy(saved_screen_buffer, screen_buffer, sizeof(ScreenChar)*screen_buffer_size);
 }
 
-int saved_screen_matches_current_screen()
+bool saved_screen_matches_current_screen()
 {
   for(int y = 0; y < screen_buffer_height; ++y)
     for(int x = 0; x < screen_buffer_width; ++x)
@@ -142,7 +142,7 @@ int saved_screen_matches_current_screen()
   return 1;
 }
 
-void put_screen(int linearPos, char ch, unsigned char color)
+void put_screen(uint16_t linearPos, char ch, unsigned char color)
 {
   init_screen_buffer();
   int x = linearPos % get_text_width();
@@ -152,12 +152,12 @@ void put_screen(int linearPos, char ch, unsigned char color)
   screen_buffer[linearPos].color = color;
 }
 
-void put_screen(int linearPos, char ch)
+void put_screen(uint16_t linearPos, char ch)
 {
   put_screen(linearPos, ch, current_color);
 }
 
-char get_screen(int linearPos)
+char get_screen(uint16_t linearPos)
 {
   init_screen_buffer();
   assert(linearPos >= 0);
@@ -165,12 +165,12 @@ char get_screen(int linearPos)
   return screen_buffer[linearPos].ch;
 }
 
-void put_screen_color(int linearPos, unsigned color)
+void put_screen_color(uint16_t linearPos, unsigned char color)
 {
   put_screen(linearPos, get_screen(linearPos), current_color);
 }
 
-unsigned char get_screen_color(int linearPos)
+unsigned char get_screen_color(uint16_t linearPos)
 {
   init_screen_buffer();
   assert(linearPos >= 0);
@@ -178,7 +178,7 @@ unsigned char get_screen_color(int linearPos)
   return screen_buffer[linearPos].color;
 }
 
-int init_screen()
+bool init_screen()
 {
   // Set output mode to handle virtual terminal sequences
   HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);

@@ -69,7 +69,7 @@ bool init_screen();
 void deinit_screen();
 
 void put_screen(uint16_t linearPos, char ch);
-void put_screen_color(uint16_t linearPos, unsigned color);
+void put_screen_color(uint16_t linearPos, unsigned char color);
 void put_screen(uint16_t linearPos, char ch, unsigned char color);
 char get_screen(uint16_t linearPos);
 unsigned char get_screen_color(uint16_t linearPos);

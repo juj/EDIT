@@ -68,7 +68,7 @@ char get_screen(uint16_t linearPos)
   return screen_mem[linearPos]; // TODO: screen code to PETSCII
 }
 
-void put_screen_color(uint16_t linearPos, unsigned color)
+void put_screen_color(uint16_t linearPos, unsigned char color)
 {
   put_screen(linearPos, get_screen(linearPos), 7);
 }

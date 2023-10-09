@@ -385,7 +385,7 @@ void move_viewport_vertically(cursor_pos lines, bool cursor_moves_along)
 
 void move_cursor_vertically(cursor_pos lines)
 {
-  bool makeSound = 0;
+  int8_t makeSound = 0;
 
   while(lines < 0)
   {
@@ -794,7 +794,7 @@ void run_goto_line_menu()
       else if (inputLen < 8)
         targetLineNumberStr[inputLen++] = (char)key;
 
-      line_num targetLineNumber = (inputLen == 0) ? origLineNumber : MIN(documentLengthLines, atol(targetLineNumberStr));
+      line_num targetLineNumber = (inputLen == 0) ? origLineNumber : MIN(documentLengthLines, (line_num)atol(targetLineNumberStr));
 
       if (targetLineNumber < viewportPos || targetLineNumber >= viewportPos + SCREEN_HEIGHT-1)
       {
