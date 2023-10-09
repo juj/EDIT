@@ -1,7 +1,8 @@
+/*
 TODO:
- - ctrl-f: find
- - ctrl-r: search-replace
- - ctrl-shift-f: find-in-files, find-in-project
+ - ctrl-F: find
+ - ctrl-R/ctrl-H: search-replace
+ - ctrl-shift-F: find-in-files, find-in-project
    - case-sensitive vs insensitive, find/replace in selection
    - find forward, backward, wrap-around
    - whole word only
@@ -15,41 +16,59 @@ TODO:
     - mouse right drag: scroll viewport?
     - right click on include: popup include destination path
     - double right click on include: open destination file?
- - multi-file editing support
- - ctrl-o: openfiledialog-based open
-    - ctrl-shift-o: Open directory? Pass include/exclude wildcards e.g. *.cpp,*.h
- - ctrl-w and ctrl-f4: close file
-    - File x has unsaved modifications (Save yes/no/cancel?)
- - ctrl-q and alt-f4: close editor (remember which files were open in view)
+ - ctrl-shift-o: Open directory? Pass include/exclude wildcards e.g. *.cpp,*.h
+ - File x has unsaved modifications (Save yes/no/cancel?)
+ - with Ctrl-Q and Alt-f4, remember which files were open in view
     - File x (and %d other files) has unsaved changes (save yes/no/cancel?)
  - ctrl-p: open any file | show all open files, all in project dir?
- - alt-tab: cycle MRU open file, alt-shift-tab cycle prev MRU open file
  - C/C++ syntax highlighting
    - syntax highlight multiline #if/#endifs
+   - syntax highlight trailing whitespace
    - automatically delete trailing whitespace from lines
  - options menu:
    - tabs vs spaces control, show whitespace control, line endings mode control
+   - video mode control
+   - smart tab indenting control
+   - syntax highlighting, color scheme control
  - ctrl-enter: quick go to any function (tab: toggle between decl and impl?)
- - shift-left/shift-right: text selection support
-    - ctrl-c, ctrl-ins: copy selection
-    - ctrl-v, shift-ins: paste selection
-    - ctrl-x, shift-del: cut selection
-    - ctrl-a: select everything
+ - shift-ins: paste selection
+    - ctrl-b: paste older copy? (store old copy-paste buffers, open dialog to choose)
     - ctrl-d: deselect
  - undo stack:
     - ctrl-z: undo
     - ctrl-y: redo
+ - bookmarks: ctrl-<N>: add a bookmark, show it at right end as white (bookmark 1)
+ -                    show a sticky line of each bookmark at bottom
+ -            alt-<N>:  go to bookmark
  - esc: open File|Edit|View|Options|Help toolbar
- - ctrl-n: New file
  - ctrl-shift-s: Save As...
+ - tab ja shift-tab simultaneously indent multiple lines
+ - save old screen buffer when program start, and restore on exit
+
+   - (regex search)
 
  - backup save functionality?
     - ctrl-alt-s: Save All?
  
- - 40x25 mode support, 80x40(?) mode support
-
+ - TODO: Ctrl-G Goto line menu: show "(1-5345)" for possible line numbers
+ - TODO BUGFIX: Ctrl-right does not work proper with past the screen
  - DOS shell support?
  - Compile/Make support?
+
+ - DONE: C/C++ syntax highlighting
+ - DONE: multi-file editing support
+ - V1DONE: ctrl-o: openfiledialog-based open
+ - V1DONE: ctrl-w and ctrl-f4: close file
+ - DONE: ctrl-q and alt-f4: close editor 
+ - DONE: ctrl-n: New file
+ - DONE: 40x25 mode support, 80x50 mode support
+ - DONE: shift-left/shift-right: text selection support
+ - DONE: ctrl-c, ctrl-ins: copy selection
+ - DONE: ctrl-v: paste selection
+ - DONE: ctrl-x: cut selection
+ - DONE: ctrl-a: select everything
+ - DONE: shift-del: cut selection
+ - DONE: ctrl-tab tekee saman ku alt-tab
 
  - collapse hide all function definitions??
 
@@ -60,3 +79,38 @@ TODO:
    - fadein/out quit, matrix scroll open?
  - windows+linux+macos+emscripten support
  -
+
+
+ - alt-tabilla muista edellisen tiedoston viewportti
+*/
+
+#include <stdio.h>
+// this is a comment!
+
+#include "bar.h"
+
+/* this is a 
+fgdfgd
+multiline comment */
+
+int main()
+{
+  int x = 235;
+  printf("%d: %c\n", x, 'y');
+  int decimal_number = 9989;
+  int octal_number = 023;
+  int hex_number = 0x20;
+  int invalid_number = 342a33;
+  int invalid_hex_number = 0x2g;
+  int invalid_octal_number = 0348;
+}
+
+int main()
+{
+  foo();
+  bar();
+  baz();
+  if (x) {
+    etc();
+  }
+}
