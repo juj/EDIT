@@ -176,7 +176,7 @@ void syntax_highlight(Line far *line)
 
   for(; i < line->length; ++i)
   {                                      //   % 'asdfasd'
-    if (line->text[i] <= 32)             // !     ! () 0        :;<=>? @ |
+    if (is_whitespace(line->text[i]))    // !     ! () 0        :;<=>? @ |
       line->colors[i] = editorTextColor; // &  *+,-./  01 0x23 [ ~ \ ^ _ ` { }
     else if (is_alphanum(line->text[i]) || line->text[i] == '_')
     {

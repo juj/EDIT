@@ -8,9 +8,8 @@
 #include "audio.h"
 #include "memory.h"
 #include "iassert.h"
+#include "line.h"
 #include <string.h>
-
-#include <stdio.h> // todo remove
 
 #if defined(__TURBOC__) && defined(__MSDOS__)
 int currentVideoMode = TEXT_MODE_80x25;
@@ -130,7 +129,7 @@ void get_string_on_screen(int x, int y, int maxLength, char *dst)
   int screenPos = y*SCREEN_WIDTH+x;
 //  char far *screenPtr = &screen[()<<1];
   int i = 0;
-  for(; i < maxLength && get_screen(screenPos + i) <= 32; ++i)
+  for(; i < maxLength && is_whitespace(get_screen(screenPos + i)); ++i)
     ;
   int len = 0;
   for(; i < maxLength && get_screen(screenPos + i) >= 32; ++i)
