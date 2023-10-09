@@ -76,7 +76,7 @@ void show_line_with_colors_with_sel(uint16_t screenPos, char huge *text, line_xp
   selEnd -= viewportXOffset;
   textLen = MIN(SUB_U8_SAT(textLen, viewportXOffset), drawEndX); // Calculate how many chars of this line are visible if viewport is scrolled to right
   line_xpos x = drawStartX;
-  for(x; x < textLen; ++x)
+  for(; x < textLen; ++x)
   {
 #ifdef ENABLE_SYNTAX_HIGHLIGHTING
     unsigned char color = (x < selStart || x >= selEnd) ? (colors ? colors[x + viewportXOffset] : editorTextColor) : selectionColor;
