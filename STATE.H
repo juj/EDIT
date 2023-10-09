@@ -24,7 +24,7 @@ extern int cursorX;
 extern int cursorY;
 
 // If true, character insert mode is enabled.
-extern int insertMode;
+extern bool insertMode;
 
 // If true, text selection mode is active, so cursor keys select text as the cursor is moved.
 // This is used on platforms that don't have Shift-text select support.

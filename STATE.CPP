@@ -15,7 +15,7 @@ int virtualX = 0;
 
 int cursorX = 0, cursorY = 0;
 
-int insertMode = 0;
+bool insertMode = 0;
 
 uint8_t textSelectionModeActive = 0;
 
