@@ -155,12 +155,13 @@ void insert_character(char ch)
 
   if (insertMode && currentCharOffset < currentLine->length)
   {
+    // in insert mode, the length of the text stays put, and we only replace existing
+    // characters.
     currentLine->text[currentCharOffset] = ch;
     clear_highlight(currentLine);
     mark_current_file_modified();
     put_screen(cursorY*SCREEN_WIDTH+cursorX, ch);
-    ++cursorX;
-    virtualX = cursorX;
+    virtualX = ++cursorX;
   }
   else
   {
@@ -169,11 +170,16 @@ void insert_character(char ch)
     // a properly indented text.
     line_xpos numCharsToInsert = 1 + MAX(0, currentCharOffset - currentLine->length);
 
-    if (currentLine->length + numCharsToInsert > currentLine->capacity)
+    // Check if the current line has too many characters already.
+    line_xpos newLineLength = ADD_U8_SAT(currentLine->length, numCharsToInsert);
+    if (newLineLength > MAX_CHARS_PER_LINE)
     {
-      if (!increase_capacity(currentLine, currentLine->capacity*2+numCharsToInsert))
-        return;
+      ERROR_BEEP();
+      return;
     }
+
+    if (!increase_capacity(currentLine, ADD_U8_SAT(newLineLength, currentLine->capacity)))
+      return;
 
     // Shift existing characters up
     for(line_xpos i = currentLine->length + numCharsToInsert - 1; i > currentCharOffset; --i)
@@ -206,7 +212,7 @@ void insert_character(char ch)
     assert(currentCharOffset < currentLine->capacity);
     assert(currentLine->text);
     currentLine->text[currentCharOffset] = ch;
-    currentLine->length += numCharsToInsert;
+    currentLine->length = newLineLength;
     assert(currentLine->length <= currentLine->capacity);
     clear_highlight(currentLine);
     mark_current_file_modified();
@@ -251,7 +257,13 @@ void delete_character()
       ERROR_BEEP();
       return;
     }
-    increase_capacity(currentLine, currentLine->length + next->length);
+    line_xpos newLineLength = ADD_U8_SAT(currentLine->length, next->length);
+    if (newLineLength > MAX_CHARS_PER_LINE)
+    {
+      ERROR_BEEP();
+      return;
+    }
+    increase_capacity(currentLine, newLineLength);
     for(line_xpos i = 0; i < next->length; ++i)
       currentLine->text[currentLine->length + i] = next->text[i];
     currentLine->length += next->length;

@@ -118,7 +118,7 @@ void erase_selected_text()
 {
   assert(selectionStartLine);
   assert(selectionEndLine);
-  if (selectionStartLineNum == selectionEndLineNum) // Only a single line of selected text?
+  if (selectionStartLineNum == selectionEndLineNum) // Only a single line of selected text to erase?
   {
     line_xpos newLineLength = selectionStartLine->length - (selectionEndColumn - selectionStartColumn);
     for(size_t i = 0; i < selectionStartLine->length - selectionEndColumn; ++i)
@@ -132,7 +132,12 @@ void erase_selected_text()
 
   // Join end line to start line
   line_xpos endLenRemain = selectionEndLine->length - selectionEndColumn;
-  line_xpos newLen = selectionStartColumn + endLenRemain;
+  line_xpos newLen = ADD_U8_SAT(selectionStartColumn, endLenRemain);
+  if (newLen > MAX_CHARS_PER_LINE)
+  {
+    ERROR_BEEP();
+    return;
+  }
   if (!increase_capacity(selectionStartLine, newLen))
     return;
   selectionStartLine->length = newLen;
@@ -188,7 +193,15 @@ void paste_selection()
     if (copyBuffer[i] == '\n')
       break;
 
-  if (!increase_capacity(currentLine, currentLine->length + i))
+  assert(i <= MAX_CHARS_PER_LINE); // It should not be possible to get too long line in the paste buffer.
+
+  line_xpos newCurLineLength = ADD_U8_SAT(currentLine->length, (line_xpos)i);
+  if (newCurLineLength > MAX_CHARS_PER_LINE)
+  {
+    ERROR_BEEP();
+    return;
+  }
+  if (!increase_capacity(currentLine, newCurLineLength))
     return;
 
   line_xpos pastePosition = current_column();
@@ -236,7 +249,13 @@ void paste_selection()
     {
       // prepend the last block at the beginning of the last line
       line_xpos pasteAmount = (line_xpos)(j-i);
-      if (!increase_capacity(endLine, endLine->length + pasteAmount))
+      line_xpos newEndLineLength = ADD_U8_SAT(endLine->length, pasteAmount);
+      if (newEndLineLength > MAX_CHARS_PER_LINE)
+      {
+        ERROR_BEEP();
+        return;
+      }
+      if (!increase_capacity(endLine, newEndLineLength))
         return;
       for(line_xpos k = endLine->length + pasteAmount-1; k >= pasteAmount; --k)
         endLine->text[k] = endLine->text[k - pasteAmount];

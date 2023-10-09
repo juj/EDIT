@@ -15,3 +15,11 @@ void NOTIMPL(const char *x)
   get_key();
   repaint_screen();
 }
+
+uint8_t ADD_U8_SAT(uint8_t a, uint8_t b)
+{
+  // TODO OPTIMIZE with ASM!
+  uint16_t result = (uint16_t)a + b;
+  if (result >= 0xFF) return 0xFF;
+  else return (uint8_t)result;
+}
