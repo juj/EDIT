@@ -51,7 +51,9 @@ extern Line far *selectionEndLine;
 extern long selectionStartColumn, selectionEndColumn;
 
 long current_line_number();
+
+// Returns zero-based current coordinate of the cursor on current line.
+// If 0, cursor is at start of line. Max value == line->length.
 long current_column();
-long char_position_on_current_line();
 
 #endif

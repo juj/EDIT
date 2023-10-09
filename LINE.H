@@ -50,4 +50,6 @@ int find_line_indent_position(Line far *line);
 // Returns -1 if before, +1 if after and 0 if they are equal.
 int cursor_pos_cmp(unsigned long line1, unsigned long col1, unsigned long line2, unsigned long col2);
 
+bool is_whitespace(unsigned char ch);
+
 #endif

@@ -71,7 +71,7 @@ void insert_indent()
 {
   assert(currentLine);
 
-  long currentCharOffset = char_position_on_current_line();
+  long currentCharOffset = current_column();
 
   // Guess indentation from previous line
   char guessedIndentChar = 0;
@@ -197,4 +197,13 @@ void unindent()
 
   repaint_current_line_from_offset(cursorX, currentLine->length + numCharsToUnindent);
   verify_screen_is_painted_correctly();
+}
+
+bool all_chars_left_of_cursor_are_whitespace()
+{
+  int x = current_column();
+  for(int i = 0; i < x; ++i)
+    if (!is_whitespace(currentLine->text[i]))
+      return false;
+  return true;
 }

@@ -113,7 +113,7 @@ void print_line_column_info()
   /*
   sprintf(str, " %lub near/%lub far mem used    %ld:%d",
   allocatedNearMemory, allocatedFarMemory,
-  curLineNumber, char_position_on_current_line()+1);
+  curLineNumber, current_column()+1);
   */
 
   sprintf(str, " %ld:%ld", current_line_number(), current_column()+1);
@@ -151,7 +151,7 @@ void repaint_current_line_from_offset(int xOffset, int xEnd)
 void insert_character(char ch)
 {
   assert(currentLine);
-  int currentCharOffset = char_position_on_current_line();
+  int currentCharOffset = current_column();
 
   if (insertMode && currentCharOffset < currentLine->length)
   {
@@ -231,7 +231,7 @@ void insert_character(char ch)
 void delete_character()
 {
   assert(currentLine);
-  int currentCharOffset = char_position_on_current_line();
+  int currentCharOffset = current_column();
   if (currentCharOffset < currentLine->length)
   {
     while(currentCharOffset+1 < currentLine->length)
@@ -281,7 +281,7 @@ void delete_character()
 
 void backspace_character()
 {
-  int currentCharOffset = char_position_on_current_line();
+  int currentCharOffset = current_column();
   if (currentCharOffset > 0)
   {
     if (currentCharOffset == find_line_indent_position(currentLine))
@@ -560,7 +560,7 @@ void move_cursor_to_line_end()
 void move_cursor_to_prev_word()
 {
   Line far *line = currentLine;
-  long currentCharOffset = char_position_on_current_line()-1;
+  long currentCharOffset = current_column()-1;
 
   for(; currentCharOffset >= 0; --currentCharOffset)
     if (isalnum((unsigned char)line->text[currentCharOffset])
@@ -597,7 +597,7 @@ void move_cursor_to_prev_word()
 void move_cursor_to_next_word()
 {
   Line far *line = currentLine;
-  long currentCharOffset = char_position_on_current_line()+1;
+  long currentCharOffset = current_column()+1;
 
   for(; currentCharOffset < line->length; ++currentCharOffset)
     if (isalnum((unsigned char)line->text[currentCharOffset])
@@ -634,7 +634,7 @@ void move_cursor_to_next_word()
 
 void insert_new_line(int cursorMovesToNewline)
 {
-  long currentCharOffset = char_position_on_current_line();
+  long currentCharOffset = current_column();
 
   // TODO: Also guess indent here
   long newIndent = (last_nonws_char_on_line(currentLine, currentCharOffset-1) == LEFT_CURLY_BRACE) ? indentSize : 0;
@@ -1089,7 +1089,7 @@ void main_loop()
       default:
 //        if ((key >= 0x20 && key < 127) ||
         {
-          if (key == RIGHT_CURLY_BRACE) unindent();
+          if (key == RIGHT_CURLY_BRACE && all_chars_left_of_cursor_are_whitespace()) unindent();
           if (showWhitespace && key == ' ') key = CHAR_MIDDLE_DOT;
           insert_character(key);
         }

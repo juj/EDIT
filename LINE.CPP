@@ -156,3 +156,7 @@ int cursor_pos_cmp(unsigned long line1, unsigned long col1, unsigned long line2,
   return 0;
 }
 
+bool is_whitespace(unsigned char ch)
+{
+  return ch <= 32;
+}

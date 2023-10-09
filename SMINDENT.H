@@ -14,4 +14,6 @@ int infer_indent_gcd(Line far *line);
 void insert_indent();
 void unindent();
 
+bool all_chars_left_of_cursor_are_whitespace();
+
 #endif

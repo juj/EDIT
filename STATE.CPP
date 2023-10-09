@@ -49,8 +49,3 @@ void clear_selection()
   selectionStartLineNum = selectionEndLineNum = -1;
   selectionStartLine = 0;
 }
-
-long char_position_on_current_line()
-{
-  return viewportXOffset + cursorX;
-}
