@@ -196,8 +196,8 @@ void insert_character(char ch)
 
         assert(currentLine->text);
         currentLine->text[currentCharOffset - j] =
-            (prevLine->text[numCharsToInsert-1-j] <= 32)
-           ? prevLine->text[numCharsToInsert-1-j] : tabChar;
+          is_whitespace(prevLine->text[numCharsToInsert-1-j])
+          ? prevLine->text[numCharsToInsert-1-j] : tabChar;
       }
     }
 

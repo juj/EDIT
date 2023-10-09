@@ -8,7 +8,7 @@
 struct File;
 struct Line;
 
-extern long allocatedMemory;
+extern allocated_mem_size_t allocatedMemory;
 
 // Global editor state
 extern File *currentFile;
@@ -33,7 +33,7 @@ extern bool textSelectionModeActive;
 extern bool showWhitespace;
 
 // 32: spaces as indentation, 9: tab chars as indentation
-extern char tabMode;
+extern bool tabModeIsSpaces;
 extern char tabChar;
 
 // number of chars for indentation.

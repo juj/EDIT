@@ -1,7 +1,7 @@
 #include "state.h"
 #include "screen.h"
 
-long allocatedMemory = 0;
+allocated_mem_size_t allocatedMemory = 0;
 
 File *currentFile = 0;
 Line far *firstDisplayedLine = 0; // the topmost line that the view is scrolled to
@@ -22,11 +22,12 @@ bool textSelectionModeActive = 0;
 
 bool showWhitespace = 0;
 
-char tabMode = ' ';
+// If true, tab mode is set to spaces, if false, to tabs.
+bool tabModeIsSpaces = 1;
 
 line_xpos indentSize = 2;
 
-char tabChar = showWhitespace ? (tabMode == ' ' ? CHAR_MIDDLE_DOT : CHAR_RIGHT_ARROW) : tabMode;
+char tabChar = showWhitespace ? (tabModeIsSpaces ? CHAR_MIDDLE_DOT : CHAR_RIGHT_ARROW) : (tabModeIsSpaces ? ' ' : (char)9);
 
 unsigned char editorTextColor = LTGREEN | BGCOLOR(BLUE);
 
