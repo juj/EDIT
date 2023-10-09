@@ -20,19 +20,21 @@ static void SETLFS(unsigned char logicalFileNum, unsigned char deviceNum, unsign
                 : "a", "x", "y");
 }
 
-static volatile unsigned char * const tmp = (unsigned char *)0x0002; // arbitrary safe temporary memory address for getting data out of inline assembly
+// https://www.c64-wiki.com/wiki/Zeropage: $0002 is unused so safe to access.
+//static volatile unsigned char * const tmp = (unsigned char *)0x0002; // arbitrary safe temporary memory address for getting data out of inline assembly
 
 static uint8_t OPEN()
 {
+  unsigned char errorCode;
   asm volatile("JSR $FFC0\n" // FFC0 = OPEN
 //               "BCS .return\n"
   //             "LDA #0\n"
     //           ".return\n"
-               "STA $0002\n"
-                : // outputs
+//               "STA $0002\n"
+                : "=a" (errorCode) // outputs
                 : // inputs
-                : "a", "x", "y", "c");  
-  return *tmp;
+                : "x", "y", "c");  
+  return errorCode;
 }
 
 static void CLOSE(unsigned char logicalFileNum)
@@ -53,24 +55,26 @@ static void CHKOUT(unsigned char logicalFileNum)
 
 static uint8_t READST()
 {
+  unsigned char statusByte;
   asm volatile("JSR $FFB7\n" // FFB7 = READST Read I/O status byte
-               "STA $0002\n"
-                : // outputs
+//               "STA $0002\n"
+                : "=a" (statusByte) // outputs
                 : // inputs
                 : "a");
-  return *tmp;
+  return statusByte;
 }
 
 static uint8_t CHROUT(uint8_t byteToWrite)
 {
+  unsigned char error;
   asm volatile("JSR $FFD2\n" // FFD2 = CHROUT
                "LDA #0\n"
                "ROL\n"
-               "STA $0002\n"
-                : // outputs
+//               "STA $0002\n"
+                : "=a"(error) // outputs
                 : "a"(byteToWrite)
                 : "a", "c");  
-  return *tmp;
+  return error;
 }
 
 static void CLRCHN()

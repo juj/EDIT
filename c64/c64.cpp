@@ -35,9 +35,9 @@ void set_cursor_pos(int x, int y)
   // https://sta.c64.org/cbm64krnfunc.html:
   // $E50A == Save (get) or restore (set) cursor position.
   // Disassembly at https://skoolkid.github.io/sk6502/c64rom/asm/E50A.html
-  asm volatile("CLC\n" // Clear Carry: Carry flag 0 signals to the KERNAL subroutine that it should set the cursor position
-               "JSR $E50A\n"
-              :: "x"((unsigned char)y), "y"((unsigned char)x) : "a", "x", "y", "c", "memory");
+  asm volatile(R"(CLC // Clear Carry: Carry flag 0 signals to the KERNAL subroutine that it should set the cursor position
+                  JSR $E50A)"
+              :: "x"((unsigned char)y), "y"((unsigned char)x) : "a", "c", "memory");
 
   // After changing cursor position, we need to clean up the old character, which
   // might have been left inverted by the blinking cursor in the old location

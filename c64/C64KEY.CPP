@@ -6,9 +6,6 @@ void put_screen(int linearPos, char ch); // TODO REMOVE
 static volatile unsigned char * const key_address = (unsigned char *)0x00CB;
 static volatile unsigned char * const key_modifiers = (unsigned char *)0x028D;
 
-// https://www.c64-wiki.com/wiki/Zeropage: $0002 is unused so safe to access.
-static volatile unsigned char * const tmp = (unsigned char *)0x0002; // arbitrary safe temporary memory address for getting data out of inline assembly
-
 static volatile unsigned char * const jiffy_lsb = (unsigned char*)0xA2;
 
 static void delay(int num_frames)
@@ -30,13 +27,11 @@ int get_key()
     // https://sta.c64.org/cbm64krnfunc.html:
     // $FF9F == SCNKEY: "Query keyboard; put current matrix code into memory address $00CB, current status of shift keys into
     //                   memory address $028D and PETSCII code into keyboard buffer."
-    asm volatile("JSR $FF9F\n"
     // $FFE4 == GETIN. Read byte from default input. (If not keyboard, must call OPEN and CHKIN beforehands.)
     //                 PETSCII code of read character will be in register A.
-                 "JSR $FFE4\n"
-                 "STA $0002\n"
-                ::: "a", "x", "y", "c", "v", "memory");
-    keyCode = *tmp;
+    asm volatile(R"(JSR 0xFF9F
+                    JSR 0xFFE4)"
+                : "=a"(keyCode) :: "x", "y", "c", "v", "memory");
 
     unsigned char repeat_delay = (key_is_repeating ? 10 : 15);
     if ((unsigned char)(*jiffy_lsb - last_key_time) >= repeat_delay) lastKeyCode = 0;
