@@ -25,6 +25,8 @@ File *open_new_file();
 struct FILE;
 #endif
 
+bool is_file_unnamed(File *f);
+
 long calculate_file_byte_size(File *f);
 
 long huge_fread(char huge *dst, long numBytes, FILE *handle);

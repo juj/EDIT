@@ -83,7 +83,13 @@
 #define KEY_ALT_TAB    0x1A5
 #define KEY_SHIFT_TAB  0x10F
 
+bool is_shift_key_currently_down();
+bool is_ctrl_key_currently_down();
+bool is_alt_key_currently_down();
+
+bool is_get_key_pending();
 int get_key();
+
 bool is_shift_key_held(int key);
 int is_shift_aware_key(int key);
 int is_navigation_action_key(int key);

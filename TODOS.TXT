@@ -1,0 +1,62 @@
+TODO:
+ - ctrl-f: find
+ - ctrl-r: search-replace
+ - ctrl-shift-f: find-in-files, find-in-project
+   - case-sensitive vs insensitive, find/replace in selection
+   - find forward, backward, wrap-around
+   - whole word only
+   - (regex search)
+ - mouse support
+    - mouse left click: move cursor
+    - mouse left double click: select word
+    - mouse left triple click: select line
+    - mouse left drag: select text (support pgdn/pgup while dragging)
+    - mouse right click: intellisense search? search help? search func impl?
+    - mouse right drag: scroll viewport?
+    - right click on include: popup include destination path
+    - double right click on include: open destination file?
+ - multi-file editing support
+ - ctrl-o: openfiledialog-based open
+    - ctrl-shift-o: Open directory? Pass include/exclude wildcards e.g. *.cpp,*.h
+ - ctrl-w and ctrl-f4: close file
+    - File x has unsaved modifications (Save yes/no/cancel?)
+ - ctrl-q and alt-f4: close editor (remember which files were open in view)
+    - File x (and %d other files) has unsaved changes (save yes/no/cancel?)
+ - ctrl-p: open any file | show all open files, all in project dir?
+ - alt-tab: cycle MRU open file, alt-shift-tab cycle prev MRU open file
+ - C/C++ syntax highlighting
+   - syntax highlight multiline #if/#endifs
+   - automatically delete trailing whitespace from lines
+ - options menu:
+   - tabs vs spaces control, show whitespace control, line endings mode control
+ - ctrl-enter: quick go to any function (tab: toggle between decl and impl?)
+ - shift-left/shift-right: text selection support
+    - ctrl-c, ctrl-ins: copy selection
+    - ctrl-v, shift-ins: paste selection
+    - ctrl-x, shift-del: cut selection
+    - ctrl-a: select everything
+    - ctrl-d: deselect
+ - undo stack:
+    - ctrl-z: undo
+    - ctrl-y: redo
+ - esc: open File|Edit|View|Options|Help toolbar
+ - ctrl-n: New file
+ - ctrl-shift-s: Save As...
+
+ - backup save functionality?
+    - ctrl-alt-s: Save All?
+ 
+ - 40x25 mode support, 80x40(?) mode support
+
+ - DOS shell support?
+ - Compile/Make support?
+
+ - collapse hide all function definitions??
+
+ - bling bling:
+   - VGA smooth vertical scrolling support
+   - smooth mouse cursor support with vga sprites
+   - VGA palette based color scheme editing
+   - fadein/out quit, matrix scroll open?
+ - windows+linux+macos+emscripten support
+ -

@@ -241,6 +241,11 @@ File *load_file(const char *filename)
 #endif
 }
 
+bool is_file_unnamed(File *f)
+{
+  return !f->filename || f->filename[0] == '<';
+}
+
 long calculate_file_byte_size(File *f)
 {
   long size = 0;

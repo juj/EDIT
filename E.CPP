@@ -53,7 +53,7 @@ void repaint_line(int screenY, Line *line, int startX, int endX)
 {
   if (line)
   {
-    if (!line->colors)
+    //if (!line->colors) // XXXX TODO Want this, but syntax highlighting of multiline comments doesn't work then
     {
       startX = 0;
       syntax_highlight(line);
@@ -1035,10 +1035,13 @@ void main_loop()
         break;
       case KEY_CTRL_S:
       case KEY_F2:
-        ask_name_for_file(currentFile);
-        save_file(currentFile);
-        save_file_to_network(currentFile);
-        repaint_screen();
+        if (currentFile->hasUnsavedChanges)
+        {
+          if (is_file_unnamed(currentFile) || is_shift_key_held(key)) ask_name_for_file(currentFile);
+          save_file(currentFile);
+          save_file_to_network(currentFile);
+          repaint_screen();
+        }
         break;
       case KEY_CTRL_G: run_goto_line_menu(); break;
       case KEY_CTRL_O:

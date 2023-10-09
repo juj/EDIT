@@ -77,14 +77,38 @@ void unregister_keyboard_interrupt()
 #if defined(__TURBOC__) && defined(__MSDOS__)
 // 'getch': The POSIX name for this item is deprecated. Instead, use the ISO C and C++ conformant name: _getch.
 #define getch _getch
+#define kbhit _kbhit
 #endif
 
-static bool is_shift_key_currently_down()
+bool is_shift_key_currently_down()
 {
 #if defined(__TURBOC__) && defined(__MSDOS__)
   return leftShiftDown || rightShiftDown;
 #elif defined(_MSC_VER)
   return GetAsyncKeyState(VK_SHIFT) || GetAsyncKeyState(VK_LSHIFT) || GetAsyncKeyState(VK_RSHIFT);
+#else
+  return 0; // XXX TODO
+#endif
+}
+
+bool is_ctrl_key_currently_down()
+{
+#if defined(__TURBOC__) && defined(__MSDOS__)
+  return leftCtrlDown || rightCtrlDown;
+#elif defined(_MSC_VER)
+  return GetAsyncKeyState(VK_CONTROL) || GetAsyncKeyState(VK_LCONTROL) || GetAsyncKeyState(VK_RCONTROL);
+#else
+  return 0; // XXX TODO
+#endif
+}
+
+bool is_alt_key_currently_down()
+{
+#if defined(__TURBOC__) && defined(__MSDOS__)
+  return leftAltDown || rightAltDown;
+#elif defined(_MSC_VER)
+  return 0; // XXX TODO
+//  return GetAsyncKeyState(VK_CONTROL) || GetAsyncKeyState(VK_LCONTROL) || GetAsyncKeyState(VK_RCONTROL);
 #else
   return 0; // XXX TODO
 #endif
@@ -141,6 +165,11 @@ int is_shift_aware_key(int key)
 }
 
 #if defined(_MSC_VER) || defined(__TURBOC__)
+bool is_get_key_pending()
+{
+  return _kbhit();
+}
+
 int get_key()
 {
   int key = _getch();

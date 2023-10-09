@@ -13,7 +13,7 @@
 void ask_name_for_file(File *file)
 {
   char filename[16] = {};
-  if (file->filename && file->filename[0] != '<')
+  if (!is_file_unnamed(file))
     strncpy(filename, file->filename, sizeof(filename)-1);
   int len = ask_string_prompt("SAVE TO FILE: ", filename, 15);
   file->filename = (char*)realloc(file->filename, len+1);
