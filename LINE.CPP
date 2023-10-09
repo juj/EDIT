@@ -5,6 +5,7 @@
 #include "file.h"
 #include "memory.h"
 #include "iassert.h"
+#include <ctype.h>
 
 line_xpos find_line_indent_position(Line far *line)
 {
@@ -152,9 +153,14 @@ int8_t cursor_pos_cmp(line_num line1, line_xpos col1, line_num line2, line_xpos 
   return 0;
 }
 
+bool is_alphanum(char ch)
+{
+  return isalnum((unsigned char)ch);
+}
+
 bool is_whitespace(char ch)
 {
-  return ch <= 32 || ch == CHAR_MIDDLE_DOT || ch == CHAR_RIGHT_ARROW;
+  return (unsigned char)ch <= 32 || ch == CHAR_MIDDLE_DOT || ch == CHAR_RIGHT_ARROW;
 }
 
 bool is_tab(char ch)

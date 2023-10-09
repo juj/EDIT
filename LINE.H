@@ -51,6 +51,7 @@ line_xpos find_line_indent_position(Line far *line);
 // Returns -1 if before, +1 if after and 0 if they are equal.
 int8_t cursor_pos_cmp(line_num line1, line_xpos col1, line_num line2, line_xpos col2);
 
+bool is_alphanum(char ch);
 bool is_whitespace(char ch);
 bool is_tab(char ch);
 

@@ -178,10 +178,10 @@ void syntax_highlight(Line far *line)
   {                                      //   % 'asdfasd'
     if (line->text[i] <= 32)             // !     ! () 0        :;<=>? @ |
       line->colors[i] = editorTextColor; // &  *+,-./  01 0x23 [ ~ \ ^ _ ` { }
-    else if (isalnum((unsigned char)line->text[i]) || line->text[i] == '_')
+    else if (is_alphanum(line->text[i]) || line->text[i] == '_')
     {
       size_t j = i+1;
-      while(j < line->length && (isalnum((unsigned char)line->text[j]) || line->text[j] == '_'))
+      while(j < line->length && (is_alphanum(line->text[j]) || line->text[j] == '_'))
 	      ++j;
       unsigned char color = LTGREEN | bg;
       if (line->text[i] == '0' && j-i>1)

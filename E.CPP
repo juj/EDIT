@@ -563,8 +563,8 @@ void move_cursor_to_prev_word()
   long currentCharOffset = current_column()-1;
 
   for(; currentCharOffset >= 0; --currentCharOffset)
-    if (isalnum((unsigned char)line->text[currentCharOffset])
-  && (currentCharOffset == 0 || !isalnum((unsigned char)line->text[currentCharOffset-1])))
+    if (is_alphanum(line->text[currentCharOffset])
+  && (currentCharOffset == 0 || !is_alphanum(line->text[currentCharOffset-1])))
     break;
 
   if (currentCharOffset < 0)
@@ -600,8 +600,8 @@ void move_cursor_to_next_word()
   long currentCharOffset = current_column()+1;
 
   for(; currentCharOffset < line->length; ++currentCharOffset)
-    if (isalnum((unsigned char)line->text[currentCharOffset])
-      && !isalnum((unsigned char)line->text[currentCharOffset-1]))
+    if (is_alphanum(line->text[currentCharOffset])
+      && !is_alphanum(line->text[currentCharOffset-1]))
     break;
 
   if (currentCharOffset >= line->length)
