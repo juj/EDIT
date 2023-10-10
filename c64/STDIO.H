@@ -1,3 +1,5 @@
+#pragma once
+
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -96,16 +98,12 @@ static uint8_t CHRIN()
   return chrin;
 }
 
-static uint8_t CHROUT(uint8_t byteToWrite)
+static void CHROUT(uint8_t byteToWrite)
 {
-  unsigned char error;
   asm volatile("JSR $FFD2\n" // FFD2 = CHROUT
-               "LDA #0\n"
-               "ROL\n"
-                : "=a"(error) // outputs
+                :
                 : "a"(byteToWrite) // inputs
-                : "c"); // clobbers
-  return error;
+                : ); // clobbers
 }
 
 static void CLRCHN()
@@ -126,7 +124,7 @@ static bool string_contains_char(const char *str, char ch)
 
 FILE *fopen(const char *filename, const char *mode)
 {
-  static uint8_t fileHandleCounter = 2;
+  static uint8_t fileHandleCounter = 3;
 
   char fn[MAX_FILENAME_LEN+1+3+4]; // Add +1 for null, +3 for "@0:" prefix and +4 for ",U,W" suffix.
   // Prepend "@0:" to the filename to have any existing filename be replaced.
@@ -146,19 +144,30 @@ FILE *fopen(const char *filename, const char *mode)
   SETNAM(fn, i);
   SETLFS(fileHandleCounter, 8, fileHandleCounter); // todo file ID
   uint8_t error = OPEN();
-  if (error >= 20 && error <= 74) return 0;
+  if (error >= 20 && error <= 74)
+  {
+    printf("FOPEN FAILED, ERROR %d\n", (int)error);
+    return 0;
+  }
 
   if (readingFile) CHKIN(fileHandleCounter);
   else CHKOUT(fileHandleCounter);
 
-  if (READST())
+  if ((error = READST()))
   {
     CLOSE(fileHandleCounter);
     CLRCHN();
+    printf("READST AFTER FOPEN FAILED, ERROR %d\n", (int)error);
     return 0;
   }
 
   FILE *f = (FILE*)malloc(sizeof(FILE));
+  if (!f)
+  {
+    CLRCHN();
+    printf("FOPEN-MALLOC FAILED!\n");
+    return 0;
+  }
   if (readingFile) f->nextChar = CHRIN(); // read first char in advance
   f->handle = fileHandleCounter++; // TODO multiple handles
   if (fileHandleCounter == 255) fileHandleCounter = 2;
@@ -179,7 +188,7 @@ static void consume_read_whitespace(FILE *f)
 {
   while(isspace(f->nextChar))
   {
-    if (READST()) return;
+    if (READST()) return;// { CLRCHN(); printf("CONSUMEWS READST ERROR!\n"); return; }
     f->nextChar = CHRIN();
   }
 }
@@ -187,12 +196,13 @@ static void consume_read_whitespace(FILE *f)
 static int read_int_from_file(FILE *f)
 {
   assert(isdigit(f->nextChar));
-  char intstr[6] = { f->nextChar }; // max length 65536
-  uint8_t i = 1;
+  char intstr[6] = { 0, 0, 0, 0, 0, 0 }; // max length 65536
+  uint8_t i = 0;
   while(isdigit(f->nextChar))
   {
-    if (READST()) break; // error?
-    f->nextChar = intstr[i++] = CHRIN();
+    intstr[i++] = f->nextChar;
+    if (READST()) break;//{ CLRCHN(); printf("READINT READST ERROR!\n"); break; }
+    f->nextChar = CHRIN();
     if (i >= 5) i = 0; // if i gets this large, read will overflow (will read garbage)
   }
   return atoi(intstr);
@@ -202,7 +212,10 @@ static void read_string_from_file(FILE *f, char *dst)
 {
   assert(!isspace(f->nextChar));
   while(!isspace(f->nextChar) && !READST())
-    f->nextChar = *dst++ = CHRIN();
+  {
+    *dst++ = f->nextChar;
+    f->nextChar = CHRIN();
+  }
 }
 
 static int fscanf(FILE *f, const char *format, ...)
@@ -213,7 +226,7 @@ static int fscanf(FILE *f, const char *format, ...)
   va_start(args, format);
   // consume any initial whitespace in input
   int8_t num_parsed = 0;
-  uint8_t ch, error;
+  uint8_t ch, error = 0;
   consume_read_whitespace(f);
 
   while(*format)
@@ -258,28 +271,42 @@ static int fscanf(FILE *f, const char *format, ...)
 end:
   va_end(args);
   CLRCHN();
+  if (error) printf("FSCANF ERROR %d\n", (int)error);
   return num_parsed;
+}
+
+size_t fread(void *buffer, size_t size, size_t count, FILE *f)
+{
+  CHKIN(f->handle);  
+  uint8_t error = 0;
+  uint8_t *ptr = (uint8_t*)buffer;
+  for(size_t i = 0; i < size; ++i)
+    for(size_t j = 0; j < count; ++j)
+    {
+      *ptr++ = f->nextChar;
+      if ((error = READST())) break;
+      f->nextChar = CHRIN();
+    }
+  CLRCHN();
+//////  if (error) printf("FREAD ERROR %d\n", (int)error);
+  return (uintptr_t)ptr - (uintptr_t)buffer;
 }
 
 size_t fwrite(const void *buffer, size_t size, size_t count, FILE *f)
 {
   CHKOUT(f->handle);
-  size_t n = 0;
+  uint8_t error = 0;
   const uint8_t *ptr = (const uint8_t*)buffer;
   for(size_t i = 0; i < size; ++i)
     for(size_t j = 0; j < count; ++j)
     {
-      if (READST()) break;
-      if (CHROUT(*ptr++)) break;
-      ++n;
+      if ((error = READST())) break;
+      CHROUT(*ptr++);
     }
   CLRCHN();
-  return n;
+  if (error) printf("FWRITE ERROR %d\n", (int)error);
+  return (uintptr_t)ptr - (uintptr_t)buffer;
 }
-
-#include <stdio.h>
-#include <string.h>
-#include <stdint.h>
 
 static volatile uint8_t * const rrnet_ctl      = (uint8_t *)0xDE01;
 static volatile uint8_t * const cs_packet_page = (uint8_t *)0xDE02;
@@ -369,7 +396,7 @@ struct udp_header
 struct recv_file_datagram_header
 {
   uint32_t magic_header; // 0x25291423
-  char filename[MAX_C64_FILENAME_LEN+1];
+  char filename[20];
 };
 
 static void read_struct(void *dst, uint16_t numBytes)
@@ -530,6 +557,7 @@ bool poll_for_receive_file()
 
   rx_data_hi_lo(); // dummy read to flush status word (ignored)
   uint16_t bytes_left = rx_data_hi_lo();
+//  printf("A %d BYTES LEFT\n", (int)bytes_left);
 
   union
   {
@@ -545,17 +573,23 @@ bool poll_for_receive_file()
   read_struct(&s, sizeof(s));
 
   READ_STRUCT(net.frame);
+//  printf("B %d BYTES LEFT\n", (int)bytes_left);
   if (net.frame.etherType != 0x0008/*IPV4*/) goto end;
 
   READ_STRUCT(net.ip);
+//  printf("C %d BYTES LEFT\n", (int)bytes_left);
   if (net.ip.protocol != 0x11/*UDP*/) goto end;
 
   READ_STRUCT(net.udp);
+  /*
   net.udp.src_port = ntohs(net.udp.src_port);
   net.udp.dst_port = ntohs(net.udp.dst_port);
   net.udp.length = ntohs(net.udp.length);
+  */
+//  printf("D %d BYTES LEFT\n", (int)bytes_left);
 
   READ_STRUCT(net.recv_header);
+//  printf("E %d BYTES LEFT\n", (int)bytes_left);
   if (net.recv_header.magic_header != 0x25291423) goto end;
 
   net.recv_header.filename[MAX_C64_FILENAME_LEN] = 0;
@@ -565,8 +599,8 @@ bool poll_for_receive_file()
     printf("FAILED TO OPEN FILE \"%s\"\n", net.recv_header.filename);
     goto end;
   }
-
   uint16_t size;
+//  printf("%d BYTES LEFT\n", (int)bytes_left);
   size = bytes_left;
   clear_screen();
   uint8_t origScreenFrameColor;
@@ -586,7 +620,8 @@ bool poll_for_receive_file()
     for(uint8_t i = 0; i < n; ++i)
     {
       put_screen(ch[i]);
-      if (READST() || CHROUT(ch[i])) { close_file(); error = true; goto end; }
+      if (READST()) { close_file(); error = true; goto end; }
+      CHROUT(ch[i]);
     }
   }
 
@@ -601,9 +636,11 @@ end:
   }
   else
   {
-    printf("\nWROTE %u BYTES TO FILE \"%s\"\n", size, net.recv_header.filename);
+//    printf("\nWROTE %u BYTES TO FILE \"%s\"\n", size, net.recv_header.filename);
     received_file = true;
   }
+
+//  printf("%d BYTES LEFT\n", (int)bytes_left);
 
   // Flush rest of the received bytes from the receive buffer
   discard_rx_bytes(bytes_left);
@@ -612,6 +649,11 @@ end:
 
 void rrnet_wait_to_receive_file()
 {
-  rrnet_init();
+  if (!rrnet_init())
+  {
+    printf("NETWORK ADAPTER NOT FOUND!\n");
+    return;
+  }
+  printf("WAITING FOR FILE...\n");
   while(!poll_for_receive_file()) ;
 }
