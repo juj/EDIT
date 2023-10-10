@@ -393,10 +393,26 @@ struct udp_header
 
 #define MAX_C64_FILENAME_LEN 16
 
+struct udp_magic
+{
+  uint32_t magic_header;
+};
+
+#define RECV_FILE_DATAGRAM_MAGIC 0x25291423
 struct recv_file_datagram_header
 {
-  uint32_t magic_header; // 0x25291423
+//  uint32_t magic_header;
   char filename[20];
+  uint16_t file_id;
+  uint16_t num_fragments;
+} __attribute__((packed));
+
+#define RECV_FILE_DATAGRAM_FRAGMENT_MAGIC 0x53915315
+struct recv_file_datagram_fragment_header
+{
+//  uint32_t magic_header;
+  uint16_t file_id;
+  uint16_t fragment_index;
 } __attribute__((packed));
 
 static void read_struct(void *dst, uint16_t numBytes)
@@ -546,25 +562,21 @@ end:
   return true;
 }
 
-bool poll_for_receive_file()
+uint16_t poll_for_udp_file_transfer_fragment(bool first_fragment)
 {
-  bool received_file = false;
-  bool error = false;
-
   // Poll if there is an Ethernet frame ready for processing
   cs_set_page(0x0124);
   if ((cs_read_page_data() & 0x0D00) == 0) return false;
 
   rx_data_hi_lo(); // dummy read to flush status word (ignored)
   uint16_t bytes_left = rx_data_hi_lo();
-//  printf("A %d BYTES LEFT\n", (int)bytes_left);
 
   union
   {
     eth_frame frame;
     ip_frame ip;
     udp_header udp;
-    recv_file_datagram_header recv_header;
+    udp_magic magic;
   } net;
 
 #define READ_STRUCT(s) \
@@ -573,78 +585,92 @@ bool poll_for_receive_file()
   read_struct(&s, sizeof(s));
 
   READ_STRUCT(net.frame);
-//  printf("B %d BYTES LEFT\n", (int)bytes_left);
   if (net.frame.etherType != 0x0008/*IPV4*/) goto end;
 
   READ_STRUCT(net.ip);
-//  printf("C %d BYTES LEFT\n", (int)bytes_left);
   if (net.ip.protocol != 0x11/*UDP*/) goto end;
 
   READ_STRUCT(net.udp);
-  /*
-  net.udp.src_port = ntohs(net.udp.src_port);
-  net.udp.dst_port = ntohs(net.udp.dst_port);
-  net.udp.length = ntohs(net.udp.length);
-  */
-//  printf("D %d BYTES LEFT\n", (int)bytes_left);
 
-  READ_STRUCT(net.recv_header);
-//  printf("E %d BYTES LEFT\n", (int)bytes_left);
-  if (net.recv_header.magic_header != 0x25291423) goto end;
+  READ_STRUCT(net.magic);
+  if ((first_fragment && net.magic.magic_header == RECV_FILE_DATAGRAM_MAGIC && bytes_left == sizeof(recv_file_datagram_header))
+    || (!first_fragment && net.magic.magic_header == RECV_FILE_DATAGRAM_FRAGMENT_MAGIC && bytes_left > sizeof(recv_file_datagram_fragment_header)))
+    return bytes_left; // this is interesting data, return it for processing
 
-  net.recv_header.filename[MAX_C64_FILENAME_LEN] = 0;
+end:
+  discard_rx_bytes(bytes_left);
+  return 0;
+}
 
-  if (!open_file_for_saving(net.recv_header.filename))
+bool receive_file()
+{
+  uint16_t bytes_left = 0;
+  while(!bytes_left)
+    bytes_left = poll_for_udp_file_transfer_fragment(true);
+
+  recv_file_datagram_header header;
+  read_struct(&header, sizeof(header));
+  assert(bytes_left == sizeof(header));
+
+  header.filename[MAX_C64_FILENAME_LEN] = 0;
+  if (!open_file_for_saving(header.filename))
   {
-    printf("FAILED TO OPEN FILE \"%s\"\n", net.recv_header.filename);
-    goto end;
+    printf("FAILED TO OPEN FILE \"%s\"\n", header.filename);
+    return false;
   }
-  uint16_t size;
-//  printf("%d BYTES LEFT\n", (int)bytes_left);
-  size = bytes_left;
   clear_screen();
   uint8_t origScreenFrameColor;
   origScreenFrameColor = *screen_frame;
-  while(bytes_left > 0)
-  {
-    uint16_t data = rx_data_lo_hi();
-    --bytes_left;
-    uint8_t n = 1;
-    if (bytes_left)
-    {
-      ++n;
-      --bytes_left;
-    }
-    uint8_t ch[2] = { (char)(data), (char)(data >> 8) };
 
-    for(uint8_t i = 0; i < n; ++i)
+  uint32_t totalBytesWritten = 0;
+  bool error = false;
+  uint16_t next_fragment_index = 0;
+  while(next_fragment_index != header.num_fragments)
+  {
+    uint16_t data_left = poll_for_udp_file_transfer_fragment(false);
+
+    recv_file_datagram_fragment_header frag;
+    read_struct(&frag, sizeof(frag));
+    data_left -= sizeof(frag);
+
+    if (frag.file_id == header.file_id)
     {
-      put_screen(ch[i]);
-      if (READST()) { close_file(); error = true; goto end; }
-      CHROUT(ch[i]);
+      if (frag.fragment_index != next_fragment_index) { error = true; goto end; }
+
+      while(data_left > 0)
+      {
+        uint16_t data = rx_data_lo_hi();
+        --data_left;
+        uint8_t n = 1;
+        if (data_left)
+        {
+          ++n;
+          --data_left;
+        }
+        uint8_t ch[2] = { (char)(data), (char)(data >> 8) };
+
+        for(uint8_t i = 0; i < n; ++i)
+        {
+          put_screen(ch[i]);
+          if (READST()) { error = true; goto end; }
+          CHROUT(ch[i]);
+          ++totalBytesWritten;
+        }
+      }
+      ++next_fragment_index;
     }
+    else
+      discard_rx_bytes(data_left);
   }
 
-  close_file();
 end:
+  close_file();
   *screen_frame = origScreenFrameColor;
   set_cursor_pos(0, 0);
   clear_screen();
-  if (error)
-  {
-    printf("\nFAILED TO WRITE FILE!\n");
-  }
-  else
-  {
-//    printf("\nWROTE %u BYTES TO FILE \"%s\"\n", size, net.recv_header.filename);
-    received_file = true;
-  }
-
-//  printf("%d BYTES LEFT\n", (int)bytes_left);
-
-  // Flush rest of the received bytes from the receive buffer
-  discard_rx_bytes(bytes_left);
-  return received_file;
+  if (error) printf("\nFAILED TO WRITE FILE!\n");
+  else printf("\nWROTE %lu BYTES TO FILE \"%s\"\n", totalBytesWritten, header.filename);
+  return !error;
 }
 
 void rrnet_wait_to_receive_file()
@@ -655,5 +681,5 @@ void rrnet_wait_to_receive_file()
     return;
   }
   printf("WAITING FOR FILE...\n");
-  while(!poll_for_receive_file()) ;
+  receive_file();
 }
