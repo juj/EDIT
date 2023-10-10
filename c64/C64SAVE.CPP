@@ -9,7 +9,7 @@ static void SETNAM(const char *filename, uint8_t filenameLength)
   asm volatile("JSR $FFBD\n" // FFBD = SETNAM
                 : // outputs
                 : "a"(filenameLength), "x"((unsigned char)(uintptr_t)filename), "y"((unsigned char)((uintptr_t)filename>>8))
-                : "a", "x", "y");
+                :);
 }
 
 static void SETLFS(unsigned char logicalFileNum, unsigned char deviceNum, unsigned char secondaryAddr)
@@ -63,7 +63,7 @@ static uint8_t READST()
   asm volatile("JSR $FFB7\n" // FFB7 = READST Read I/O status byte
                 : "=a" (statusByte) // outputs
                 : // inputs
-                : ); // clobbers
+                :); // clobbers
   return statusByte;
 }
 
