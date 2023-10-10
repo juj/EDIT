@@ -720,6 +720,8 @@ void insert_new_line(bool cursorMovesToNewline)
 
   if (cursorMovesToNewline)
   {
+    bool needRepaint = (viewportXOffset != 0);
+
     // MIN(cursorX, find_line_indent_position(currentLine));
     cursorX = virtualX = curLineIndent + newIndent;//find_line_indent_position(currentLine);
     if (cursorY < SCREEN_HEIGHT-1)
@@ -728,8 +730,8 @@ void insert_new_line(bool cursorMovesToNewline)
     {
       firstDisplayedLine = firstDisplayedLine->nextLine;
       ++firstDisplayedLineNumber;
+      needRepaint = true;
     }
-    bool needRepaint = (viewportXOffset != 0);
     viewportXOffset = 0;
     currentLine = newLine;
     if (needRepaint) repaint_screen();
