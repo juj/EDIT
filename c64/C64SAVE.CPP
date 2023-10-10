@@ -16,8 +16,8 @@ static void SETLFS(unsigned char logicalFileNum, unsigned char deviceNum, unsign
 {
   asm volatile("JSR $FFBA\n" // FFBA = SETLFS
                 : // outputs
-                : "a"(logicalFileNum), "x"(deviceNum), "y"(secondaryAddr)
-                : "a", "x", "y");
+                : "a"(logicalFileNum), "x"(deviceNum), "y"(secondaryAddr) // inputs
+                :); // clobbers
 }
 
 // https://www.c64-wiki.com/wiki/Zeropage: $0002 is unused so safe to access.
@@ -27,13 +27,9 @@ static uint8_t OPEN()
 {
   unsigned char errorCode;
   asm volatile("JSR $FFC0\n" // FFC0 = OPEN
-//               "BCS .return\n"
-  //             "LDA #0\n"
-    //           ".return\n"
-//               "STA $0002\n"
                 : "=a" (errorCode) // outputs
                 : // inputs
-                : "x", "y", "c");  
+                : "x", "y", "c"); // clobbers
   return errorCode;
 }
 
@@ -42,26 +38,43 @@ static void CLOSE(unsigned char logicalFileNum)
   asm volatile("JSR $FFC3\n" // FFC3 = CLOSE
                 : // outputs
                 : "a"(logicalFileNum) // inputs
-                : "a", "x", "y");
+                : "x", "y"); // clobbers
+}
+
+static void CHKIN(unsigned char logicalFileNum)
+{
+  asm volatile("JSR $FFC6\n" // FFC6 = CHKIN
+                : // outputs
+                : "x"(logicalFileNum) // inputs
+                : "a"); // clobbers
 }
 
 static void CHKOUT(unsigned char logicalFileNum)
 {
   asm volatile("JSR $FFC9\n" // FFC9 = CHKOUT
                 : // outputs
-                : "x"(logicalFileNum)
-                : "x");
+                : "x"(logicalFileNum) // inputs
+                : "a"); // clobbers
 }
 
 static uint8_t READST()
 {
   unsigned char statusByte;
   asm volatile("JSR $FFB7\n" // FFB7 = READST Read I/O status byte
-//               "STA $0002\n"
                 : "=a" (statusByte) // outputs
                 : // inputs
-                : "a");
+                : ); // clobbers
   return statusByte;
+}
+
+static uint8_t CHRIN()
+{
+  unsigned char chrin;
+  asm volatile("JSR $FFCF\n" // FFCF = CHRIN
+                : "=a"(chrin) // outputs
+                : // inputs
+                : "y"); // clobbers
+  return chrin;
 }
 
 static uint8_t CHROUT(uint8_t byteToWrite)
@@ -70,10 +83,9 @@ static uint8_t CHROUT(uint8_t byteToWrite)
   asm volatile("JSR $FFD2\n" // FFD2 = CHROUT
                "LDA #0\n"
                "ROL\n"
-//               "STA $0002\n"
                 : "=a"(error) // outputs
-                : "a"(byteToWrite)
-                : "a", "c");  
+                : "a"(byteToWrite) // inputs
+                : "c"); // clobbers
   return error;
 }
 
@@ -82,7 +94,7 @@ static void CLRCHN()
   asm volatile("JSR $FFCC\n" // FFCC = CLRCHN - Restore default I/O channels
                 : // outputs
                 : // inputs
-                : "a", "x");
+                : "a", "x"); // clobbers
 }
 
 void save_file(File *file)
@@ -93,7 +105,7 @@ void save_file(File *file)
   fn[1] = '0';
   fn[2] = ':';
   uint8_t i = 3;
-  while(file->filename[i]) { fn[i] = file->filename[i]; ++i; }
+  for(uint8_t j = 0; filename[j]; ++j) { fn[i++] = filename[j]; }
   // Append ",S,W" to filename to tell that the file type is Sequential, and that
   // we are Writing to the file.
   fn[i++] = ',';
