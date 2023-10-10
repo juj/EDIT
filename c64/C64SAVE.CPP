@@ -105,7 +105,7 @@ void save_file(File *file)
   fn[1] = '0';
   fn[2] = ':';
   uint8_t i = 3;
-  for(uint8_t j = 0; filename[j]; ++j) { fn[i++] = filename[j]; }
+  for(uint8_t j = 0; file->filename[j]; ++j) { fn[i++] = file->filename[j]; }
   // Append ",S,W" to filename to tell that the file type is Sequential, and that
   // we are Writing to the file.
   fn[i++] = ',';
