@@ -78,9 +78,14 @@ void run_open_file_menu()
 
 void run_open_file_menu()
 {
-  char filename[16] = {};
-  ask_string_prompt("OPEN FILE: ", filename, 15);
+  char filename[MAX_FILENAME_LEN+1] = {};
+  int len = ask_string_prompt("OPEN FILE: ", filename, MAX_FILENAME_LEN);
+  if (len < 0) return; // user cancelled?
+  File *maybeDummyFile = currentFile;
+  bool isOnlyEmptyFile = (maybeDummyFile->nextFile == 0 && maybeDummyFile->prevFile == 0 && calculate_file_byte_size(maybeDummyFile) <= 1);
   open_file(filename);
+  if (isOnlyEmptyFile) // Close dummy initial "<untitled>" file if user opens a new file to replace that
+    close_file(maybeDummyFile);
 }
 
 #endif

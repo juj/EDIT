@@ -1054,14 +1054,22 @@ void main_loop()
         break;
       case KEY_CTRL_S:
       case KEY_F2:
-        if (currentFile->hasUnsavedChanges)
+      {
+        bool userCancelled = false;
+//        if (is_file_unnamed(currentFile) || is_shift_key_held(key))
+        if (is_file_unnamed(currentFile) || is_shift_key_currently_down()) // TODO: Replace with is_shift_key_held(key), but doesn't quite work now
         {
-          if (is_file_unnamed(currentFile) || is_shift_key_held(key)) ask_name_for_file(currentFile);
+          userCancelled = ask_name_for_file(currentFile);
+          if (!userCancelled) currentFile->hasUnsavedChanges = 1;
+        }
+        if (!userCancelled && currentFile->hasUnsavedChanges)
+        {
           save_file(currentFile);
           save_file_to_network(currentFile);
           repaint_screen();
         }
         break;
+      }
       case KEY_CTRL_G: run_goto_line_menu(); break;
       case KEY_CTRL_O:
       case KEY_F3:
@@ -1106,7 +1114,14 @@ void main_loop()
 #endif
 
       default:
-        if (key == RIGHT_CURLY_BRACE && all_chars_left_of_cursor_are_whitespace()) unindent();
+        // Autocomplete: when typing a '}' character, automatically unindent the curly brace
+        // to one indent level lower.
+        if (key == RIGHT_CURLY_BRACE && all_chars_left_of_cursor_are_whitespace())
+        {
+          // .. but only unindent if cursor is at least the x level of previous indentation.
+          if (currentLine->prevLine && find_line_indent_position(currentLine->prevLine) <= current_column())
+            unindent();
+        }
         if (showWhitespace && key == ' ') key = CHAR_MIDDLE_DOT;
         insert_character(key);
         break;

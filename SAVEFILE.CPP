@@ -11,17 +11,17 @@
 
 #define TEXT_COLOR WHITE
 
-// if < 0, user cancelled
-int ask_name_for_file(File *file)
+// if true, user cancelled
+bool ask_name_for_file(File *file)
 {
   char fn[MAX_FILENAME_LEN+1];
   fn[MAX_FILENAME_LEN] = 0;
   strcpy(fn, file->filename);
   if (fn[0] == '<') fn[0] = 0;
   int ret = ask_string_prompt("SAVE TO FILE: ", fn, MAX_FILENAME_LEN);
-  if (ret >= 0)
-    strcpy(file->filename, fn);
-  return ret;
+  if (ret < 0) return true; // user cancelled
+  strcpy(file->filename, fn);
+  return false;
 }
 
 #if defined(_MSC_VER) || defined(__TURBOC__)
