@@ -94,10 +94,10 @@ void save_file(File *file)
   fn[2] = ':';
   uint8_t i = 3;
   while(file->filename[i]) { fn[i] = file->filename[i]; ++i; }
-  // Append ",U,W" to filename to tell that the file type is USER, and that
+  // Append ",S,W" to filename to tell that the file type is Sequential, and that
   // we are Writing to the file.
   fn[i++] = ',';
-  fn[i++] = 'U';
+  fn[i++] = 'S';
   fn[i++] = ',';
   fn[i++] = 'W';
   fn[i] = 0;
