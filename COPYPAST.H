@@ -7,8 +7,7 @@ void calculate_num_lines_and_chars_selected(line_num *lines, file_idx *chars);
 
 void erase_selected_text();
 
-void copy_selection();
-void cut_selection();
+void copy_selection(bool cutSelection);
 void paste_selection();
 
 #endif

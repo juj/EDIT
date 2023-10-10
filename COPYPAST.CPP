@@ -65,7 +65,8 @@ static void copy_buffer_reserve(file_idx newCap)
 
 void repaint_screen(); // TODO REMOVE
 
-void copy_selection()
+// cutSelection: if true, text is erased (cut) from the document after placing it in copy buffer
+void copy_selection(bool cutSelection)
 {
   line_num numLinesSelected;
   file_idx numCharsSelected;
@@ -106,11 +107,14 @@ void copy_selection()
   }
   assert(dstOfs <= copyBufferCapacity);
   copyBufferLength = dstOfs;
+
+  if (cutSelection) erase_selected_text();
+
   if (textSelectionModeActive)
   {
     textSelectionModeActive = 0;
     clear_selection();
-    repaint_screen();
+    repaint_screen(); // TODO optimize smarter repaint
   }
 }
 
@@ -118,6 +122,8 @@ void erase_selected_text()
 {
   assert(selectionStartLine);
   assert(selectionEndLine);
+  clear_highlight(selectionStartLine);
+  clear_highlight(selectionEndLine);
   if (selectionStartLineNum == selectionEndLineNum) // Only a single line of selected text to erase?
   {
     line_xpos newLineLength = selectionStartLine->length - (selectionEndColumn - selectionStartColumn);
@@ -174,12 +180,6 @@ void erase_selected_text()
   cursorY = get_line_number(currentLine) - firstDisplayedLineNumber;
   clear_selection();
   repaint_screen(); // TODO: optimize smarter repaint
-}
-
-void cut_selection()
-{
-  copy_selection();
-  erase_selected_text();
 }
 
 void paste_selection()

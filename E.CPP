@@ -1003,7 +1003,7 @@ void main_loop()
         break;
       case KEY_DELETE:
         if (key == KEY_SHIFT_DELETE)
-          cut_selection();
+          copy_selection(/*cut_selection=*/true);
         else if (selectionStartLine)
         {
           erase_selected_text();
@@ -1013,10 +1013,8 @@ void main_loop()
           delete_character();
         break;
       case KEY_CTRL_DELETE:
-        if (selectionStartLine)
-          erase_selected_text();
-        else
-          erase_current_line();
+        if (selectionStartLine) erase_selected_text();
+        else                    erase_current_line();
         break;
       case KEY_CTRL_K:
         erase_current_line(); break; // TODO: optimize to repaint only from given line forward
@@ -1040,10 +1038,10 @@ void main_loop()
         break;
       case KEY_CTRL_C:
       case KEY_CTRL_INSERT:
-        copy_selection();
+        copy_selection(/*cutSelection=*/false);
         break;
       case KEY_CTRL_X:
-        cut_selection();
+        copy_selection(/*cutSelection=*/true);
         break;
       case KEY_CTRL_V:
         paste_selection();
