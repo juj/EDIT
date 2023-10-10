@@ -397,7 +397,7 @@ struct recv_file_datagram_header
 {
   uint32_t magic_header; // 0x25291423
   char filename[20];
-};
+} __attribute__((packed));
 
 static void read_struct(void *dst, uint16_t numBytes)
 {
