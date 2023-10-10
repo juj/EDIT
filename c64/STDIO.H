@@ -602,7 +602,9 @@ end:
   return 0;
 }
 
-bool receive_file()
+char rrnet_recv_filename[MAX_FILENAME_LEN+1];
+
+const char *receive_file()
 {
   uint16_t bytes_left = 0;
   while(!bytes_left)
@@ -613,10 +615,11 @@ bool receive_file()
   assert(bytes_left == sizeof(header));
 
   header.filename[MAX_C64_FILENAME_LEN] = 0;
+  strcpy(rrnet_recv_filename, header.filename);
   if (!open_file_for_saving(header.filename))
   {
     printf("FAILED TO OPEN FILE \"%s\"\n", header.filename);
-    return false;
+    return 0;
   }
   clear_screen();
   uint8_t origScreenFrameColor;
@@ -670,16 +673,16 @@ end:
   clear_screen();
   if (error) printf("\nFAILED TO WRITE FILE!\n");
   else printf("\nWROTE %lu BYTES TO FILE \"%s\"\n", totalBytesWritten, header.filename);
-  return !error;
+  return error ? 0 : rrnet_recv_filename;
 }
 
-void rrnet_wait_to_receive_file()
+const char *receive_network_file()
 {
   if (!rrnet_init())
   {
     printf("NETWORK ADAPTER NOT FOUND!\n");
-    return;
+    return 0;
   }
   printf("WAITING FOR FILE...\n");
-  receive_file();
+  return receive_file();
 }
