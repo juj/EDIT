@@ -31,6 +31,7 @@
 //#define LTCYAN   
 //#define LTMAGENTA
 
+#define STR_PIPE "\xa7"
 
 #else
 #define ATTR_BLINK 0x80
@@ -50,6 +51,9 @@
 //#define LTMAGENTA 13   // No C64 counterpart
 #define YELLOW    14
 #define WHITE     15
+
+#define STR_PIPE "|"
+
 #endif
 
 #define BGCOLOR(x) ((x) << 4)
@@ -60,7 +64,6 @@ extern unsigned char SCREEN_HEIGHT;
 
 #define CHAR_RIGHT_ARROW ((char)0x1A)
 #define CHAR_MIDDLE_DOT ((char)0xFA)
-
 //extern char far *screen;
 
 void save_screen();

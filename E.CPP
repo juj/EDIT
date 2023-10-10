@@ -26,28 +26,38 @@
 
 void scroll_viewport_horizontally_to_display_cursor();
 
+#ifdef __C64__
+#define COLOR_UNSAVED_CURRENT LTRED
+#define COLOR_UNSAVED_BG LTBLUE
+#define COLOR_CURRENT_FILE LTGRAY
+#define COLOR_BG_FILE LTBLUE
+#else
+#define COLOR_UNSAVED_CURRENT (LTRED | BGCOLOR(BLACK))
+#define COLOR_UNSAVED_BG (LTGRAY | BGCOLOR(BLACK))
+#define COLOR_CURRENT_FILE (LTGRAY | BGCOLOR(LTGRAY))
+#define COLOR_BG_FILE (LTBLUE | BGCOLOR(BLACK))
+#endif
+
 void repaint_open_files_list(File *highlightFilename)
 {
   File *f = currentFile;
   while(f->prevFile)
     f = f->prevFile;
-  int x = SCREEN_WIDTH;
+  cursor_pos x = SCREEN_WIDTH;
   while(f)
   {
     char fname[16];
     assert(f->filename);
     sprintf(fname, f->hasUnsavedChanges ? "%s*" : "%s", f->filename);
-    x -= (int)strlen(fname);
-    unsigned char foreColor = (f->hasUnsavedChanges ? LTRED :
-       (f == currentFile ? LTBLUE : LTGRAY));
-    unsigned char bgColor = (f == highlightFilename) ? BGCOLOR(LTGRAY) : BGCOLOR(BLACK);
+    x -= (cursor_pos)strlen(fname);
+    unsigned char color = (f->hasUnsavedChanges ? 
+       (f == currentFile ? COLOR_UNSAVED_CURRENT : COLOR_UNSAVED_BG) :
+       (f == currentFile ? COLOR_CURRENT_FILE : COLOR_BG_FILE));
 
-    put_string_on_screen(fname, x, 0, foreColor | bgColor);
+    put_string_on_screen(fname, x, 0, color);
     f = f->nextFile;
     if (f)
-    {
-      put_string_on_screen("|", --x, 0, LTGRAY);
-    }
+      put_string_on_screen(STR_PIPE, --x, 0, LTGRAY);
   }
 }
 
@@ -1052,6 +1062,8 @@ void main_loop()
       case KEY_SHIFT_TAB: unindent(); break;
       case KEY_CTRL_TAB:
       case KEY_ALT_TAB: run_alt_tab_menu(); repaint_screen(); break;
+      case KEY_F7: switch_to_next_file(false); break;
+      case KEY_F8: switch_to_next_file(true); break;
       case KEY_CTRL_N:
       {
         File *f = open_new_file();

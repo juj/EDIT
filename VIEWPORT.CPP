@@ -83,3 +83,30 @@ void run_alt_tab_menu()
   }
   bring_to_front_in_mru_order(f);
 }
+
+void switch_to_next_file(bool nextOrPrev)
+{
+  File *next;
+
+  if (nextOrPrev)
+  {
+    next = currentFile->nextFile;
+    if (!next)
+    {
+      next = currentFile;
+      while(next->prevFile) next = next->prevFile;
+    }
+  }
+  else
+  {
+    next = currentFile->prevFile;
+    if (!next)
+    {
+      next = currentFile;
+      while(next->nextFile) next = next->nextFile;
+    }
+  }
+  if (next)
+    open_file_in_viewport(next, /*bringToMruFront:*/0);
+  repaint_open_files_list(0);
+}
