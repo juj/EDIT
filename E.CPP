@@ -24,6 +24,8 @@
 #include "smindent.h"
 #include "network.h"
 
+void scroll_viewport_horizontally_to_display_cursor();
+
 void repaint_open_files_list(File *highlightFilename)
 {
   File *f = currentFile;
@@ -71,7 +73,7 @@ void repaint_line(int screenY, Line *line, int startX, int endX)
     if (screenY > 0 && screenY < SCREEN_HEIGHT-1)
     {
       unsigned char existingColor = get_screen_color(screenY*SCREEN_WIDTH+SCREEN_WIDTH-1);
-      if (line->length > SCREEN_WIDTH + viewportXOffset)
+      if (line->length > ADD_U8_SAT(SCREEN_WIDTH, viewportXOffset))
         put_screen_color(screenY*SCREEN_WIDTH+SCREEN_WIDTH-1, existingColor | BGCOLOR(BROWN));
       else
         put_screen_color(screenY*SCREEN_WIDTH+SCREEN_WIDTH-1, existingColor & ~BGCOLOR(BROWN));
@@ -309,18 +311,20 @@ void backspace_character()
   {
     currentLine = currentLine->prevLine;
     --cursorY;
-    viewportXOffset = 0; // TODO: Calculate this correctly.
     cursorX = virtualX = currentLine->length;
     delete_character();
+    scroll_viewport_horizontally_to_display_cursor();
   }
 }
 
-void restrict_cursor_on_line()
+// If current cursor X coordinate is too far to the right so that
+// it is outside the display, we must scroll the viewport by
+// adjusting viewportXOffset and repaint the screen.
+void scroll_viewport_horizontally_to_display_cursor()
 {
-  cursorX = MIN(virtualX, currentLine->length - viewportXOffset);
-  if (cursorX < 0)
+  if (currentLine->length < viewportXOffset)
   {
-    viewportXOffset += cursorX;
+    viewportXOffset = currentLine->length;
     cursorX = 0;
     repaint_screen();
   }
@@ -330,6 +334,14 @@ void restrict_cursor_on_line()
     cursorX = SCREEN_WIDTH - 1;
     repaint_screen();
   }
+}
+
+// Adjust real cursor X based on the virtual cursor X of where it
+// would want to be.
+void restrict_cursor_on_line()
+{
+  cursorX = MIN(virtualX, currentLine->length - viewportXOffset);
+  scroll_viewport_horizontally_to_display_cursor();
 }
 
 Line far *find_last_viewport_start_line(cursor_pos *linesInView);
@@ -466,6 +478,7 @@ void move_cursor_horizontally(cursor_pos chars)
     chars += left;
 
     left = MIN(viewportXOffset, -chars);
+    assert(viewportXOffset >= left);
     viewportXOffset -= left;
     chars += left;
 
@@ -476,6 +489,7 @@ void move_cursor_horizontally(cursor_pos chars)
         move_cursor_vertically(-1);
         cursorX = virtualX = currentLine->length;
         left = MAX(0, cursorX - (SCREEN_WIDTH-1));
+        assert(cursorX >= left);
         cursorX -= left;
         viewportXOffset += left;
 
@@ -715,8 +729,10 @@ void insert_new_line(bool cursorMovesToNewline)
       firstDisplayedLine = firstDisplayedLine->nextLine;
       ++firstDisplayedLineNumber;
     }
+    bool needRepaint = (viewportXOffset != 0);
     viewportXOffset = 0;
     currentLine = newLine;
+    if (needRepaint) repaint_screen();
   }
 
   mark_current_file_modified();
@@ -921,6 +937,8 @@ void clear_currently_selected_text()
   }
 }
 
+void highlight_scroll_to_right(bool scrolled);
+
 void main_loop()
 {
   clear_screen(' ', editorTextColor);
@@ -941,6 +959,9 @@ void main_loop()
     assert(currentLine);
     assert(get_line_number(currentLine) == current_line_number());
 //    repaint_screen();
+#ifdef __C64__
+    highlight_scroll_to_right(viewportXOffset != 0);
+#endif
     int key = get_key();
 
     // Doing text selection?

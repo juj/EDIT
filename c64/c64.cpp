@@ -98,3 +98,10 @@ bool init_screen()
 void deinit_screen()
 {
 }
+
+static volatile unsigned char * const screen_frame = (unsigned char *)0xD020;
+
+void highlight_scroll_to_right(bool scrolled)
+{
+  *screen_frame = scrolled ? 6 : 14;
+}
