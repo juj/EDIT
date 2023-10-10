@@ -28,14 +28,16 @@ void scroll_viewport_horizontally_to_display_cursor();
 
 #ifdef __C64__
 #define COLOR_UNSAVED_CURRENT LTRED
-#define COLOR_UNSAVED_BG LTBLUE
-#define COLOR_CURRENT_FILE LTGRAY
-#define COLOR_BG_FILE LTBLUE
+#define COLOR_UNSAVED_BG      LTBLUE
+#define COLOR_CURRENT_FILE    LTGRAY
+#define COLOR_BG_FILE         LTBLUE
+#define COLOR_HIGHLIGHT       0x80
 #else
-#define COLOR_UNSAVED_CURRENT (LTRED | BGCOLOR(BLACK))
-#define COLOR_UNSAVED_BG (LTGRAY | BGCOLOR(BLACK))
-#define COLOR_CURRENT_FILE (LTGRAY | BGCOLOR(LTGRAY))
-#define COLOR_BG_FILE (LTBLUE | BGCOLOR(BLACK))
+#define COLOR_UNSAVED_CURRENT (LTRED  | BGCOLOR(BLACK))
+#define COLOR_UNSAVED_BG      (DKGRAY | BGCOLOR(BLACK))
+#define COLOR_CURRENT_FILE    (LTBLUE | BGCOLOR(BLACK))
+#define COLOR_BG_FILE         (DKGRAY | BGCOLOR(BLACK))
+#define COLOR_HIGHLIGHT       BGCOLOR(LTGRAY)
 #endif
 
 void repaint_open_files_list(File *highlightFilename)
@@ -43,20 +45,24 @@ void repaint_open_files_list(File *highlightFilename)
   File *f = currentFile;
   while(f->prevFile)
     f = f->prevFile;
-  cursor_pos x = SCREEN_WIDTH;
+  uint8_t x = SCREEN_WIDTH;
   while(f)
   {
-    char fname[16];
+    char fname[MAX_FILENAME_LEN+2]; // todo optimize away this temp copy
     assert(f->filename);
     sprintf(fname, f->hasUnsavedChanges ? "%s*" : "%s", f->filename);
-    x -= (cursor_pos)strlen(fname);
+    uint8_t len = (uint8_t)strlen(fname);
+    if (x < len) break;
+    x -= len;
     unsigned char color = (f->hasUnsavedChanges ? 
        (f == currentFile ? COLOR_UNSAVED_CURRENT : COLOR_UNSAVED_BG) :
        (f == currentFile ? COLOR_CURRENT_FILE : COLOR_BG_FILE));
+    if (f == highlightFilename)
+      color |= COLOR_HIGHLIGHT;
 
     put_string_on_screen(fname, x, 0, color);
     f = f->nextFile;
-    if (f)
+    if (f && x > 0)
       put_string_on_screen(STR_PIPE, --x, 0, LTGRAY);
   }
 }

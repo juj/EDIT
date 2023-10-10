@@ -13,7 +13,8 @@ typedef uint16_t allocated_mem_size_t;
 #elif defined(__MSDOS__)
 #define MAX_FILENAME_LEN 12 // 8.3
 #else
-#define MAX_FILENAME_LEN 256
+#define MAX_FILENAME_LEN 20
+//#define MAX_FILENAME_LEN 256
 #endif
 
 // Maximum # of characters in a single file

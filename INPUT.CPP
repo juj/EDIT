@@ -208,11 +208,11 @@ void deinit_keyboard()
 int ask_string_prompt(const char *prompt, char *dst, int maxLen)
 {
   put_string_on_screen(prompt, 0, SCREEN_HEIGHT-1, WHITE);
-  int prompt_len = (int)strlen(prompt);
-  int x = (int)strlen(dst);
+  uint8_t prompt_len = (uint8_t)strlen(prompt);
+  uint8_t x = (uint8_t)strlen(dst);
   put_string_on_screen(dst, prompt_len, SCREEN_HEIGHT-1, LTGRAY);
-  const int pos = (SCREEN_HEIGHT-1)*SCREEN_WIDTH+prompt_len;
-  int result = 0;
+  const uint16_t pos = (uint16_t)(SCREEN_HEIGHT-1)*SCREEN_WIDTH+prompt_len;
+  int8_t result = 0;
   while(result == 0)
   {
     set_cursor_pos(prompt_len+x, SCREEN_HEIGHT-1);
@@ -231,7 +231,7 @@ int ask_string_prompt(const char *prompt, char *dst, int maxLen)
       }
       break;
     default:
-      if (x < maxLen && key >= 0x20 && key < 127)
+      if (x < maxLen /*&& prompt_len + x + 1 < SCREEN_WIDTH*/ && key >= 0x20 && key < 127)
       {
         if (maxLen > 1 || key == 'y' || key == 'Y' || key == 'n' || key == 'N')
         {

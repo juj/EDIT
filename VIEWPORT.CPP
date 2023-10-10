@@ -11,15 +11,27 @@
 void repaint_open_files_list(File *highlightFilename);
 void repaint_screen();
 
+File *first_in_file_list(File *f)
+{
+  while(f->prevFile)
+    f = f->prevFile;
+  return f;
+}
+
+File *last_in_file_list(File *f)
+{
+  while(f->nextFile)
+    f = f->nextFile;
+  return f;
+}
+
 void bring_to_front_in_mru_order(File *file)
 {
-  if (!currentFile)
+  if (!currentFile) // todo remove
     return;
 
   // Find the frontmost file in MRU order
-  File *firstFile = currentFile;
-  while(firstFile->prevFile)
-    firstFile = firstFile->prevFile;
+  File *firstFile = first_in_file_list(currentFile);
 
   if (firstFile == file)
     return;
@@ -86,27 +98,32 @@ void run_alt_tab_menu()
 
 void switch_to_next_file(bool nextOrPrev)
 {
+  // currentFile should always be the first in the list
+  assert(!currentFile->prevFile);
   File *next;
 
   if (nextOrPrev)
   {
     next = currentFile->nextFile;
-    if (!next)
-    {
-      next = currentFile;
-      while(next->prevFile) next = next->prevFile;
-    }
   }
   else
   {
-    next = currentFile->prevFile;
-    if (!next)
-    {
-      next = currentFile;
-      while(next->nextFile) next = next->nextFile;
-    }
+    next = currentFile;
+    while(next->nextFile) next = next->nextFile;
   }
   if (next)
+  {
+    File *pf = next->prevFile;
+    if (pf)
+    {
+      next->prevFile = 0;
+      pf->nextFile = 0;
+      File *lastFile = last_in_file_list(next);
+      File *firstFile = first_in_file_list(pf);
+      lastFile->nextFile = firstFile;
+      firstFile->prevFile = lastFile;
+    }
     open_file_in_viewport(next, /*bringToMruFront:*/0);
-  repaint_open_files_list(0);
+    repaint_open_files_list(0);
+  }
 }

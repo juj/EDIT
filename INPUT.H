@@ -47,6 +47,12 @@
 #define KEY_F1         0x13B
 #define KEY_F2         0x13C
 #define KEY_F3         0x13D
+#define KEY_F4         0x13E
+#define KEY_F5         0x13F
+#define KEY_F6         0x140
+#define KEY_F7         0x141
+#define KEY_F8         0x142
+#define KEY_F9         0x143
 #define KEY_F10        0x144
 #define KEY_ESC        0x1B
 #define KEY_BACKSPACE  0x08
