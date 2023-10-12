@@ -1,7 +1,5 @@
 #include "../input.h"
-
-#include <stdio.h> /// TODO REMOVE
-void put_screen(int linearPos, char ch); // TODO REMOVE
+#include "c64_kernal.h"
 
 static volatile unsigned char * const queued_key_buffer_length = (unsigned char *)0x00C6;
 
@@ -47,14 +45,7 @@ int get_key()
   unsigned char keyCode = 0, ch;
   while(!keyCode)
   {
-    // https://sta.c64.org/cbm64krnfunc.html:
-    // $FF9F == SCNKEY: "Query keyboard; put current matrix code into memory address $00CB, current status of shift keys into
-    //                   memory address $028D and PETSCII code into keyboard buffer."
-    // $FFE4 == GETIN. Read byte from default input. (If not keyboard, must call OPEN and CHKIN beforehands.)
-    //                 PETSCII code of read character will be in register A.
-    asm volatile(R"(JSR 0xFF9F
-                    JSR 0xFFE4)"
-                : "=a"(keyCode) :: "x", "y", "c", "v", "memory");
+    keyCode = _GETIN();
 
     unsigned char repeat_delay = (key_is_repeating ? 10 : 15);
     if ((unsigned char)(*jiffy_lsb - last_key_time) >= repeat_delay) lastKeyCode = 0;
