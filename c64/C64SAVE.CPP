@@ -1,101 +1,9 @@
 #include "../file.h"
 #include "../line.h"
 #include "../input.h"
+#include "c64_kernal.h"
 #include <string.h>
 #include <stdint.h>
-
-static void SETNAM(const char *filename, uint8_t filenameLength)
-{
-  asm volatile("JSR $FFBD\n" // FFBD = SETNAM
-                : // outputs
-                : "a"(filenameLength), "x"((unsigned char)(uintptr_t)filename), "y"((unsigned char)((uintptr_t)filename>>8))
-                :);
-}
-
-static void SETLFS(unsigned char logicalFileNum, unsigned char deviceNum, unsigned char secondaryAddr)
-{
-  asm volatile("JSR $FFBA\n" // FFBA = SETLFS
-                : // outputs
-                : "a"(logicalFileNum), "x"(deviceNum), "y"(secondaryAddr) // inputs
-                :); // clobbers
-}
-
-// https://www.c64-wiki.com/wiki/Zeropage: $0002 is unused so safe to access.
-//static volatile unsigned char * const tmp = (unsigned char *)0x0002; // arbitrary safe temporary memory address for getting data out of inline assembly
-
-static uint8_t OPEN()
-{
-  unsigned char errorCode;
-  asm volatile("JSR $FFC0\n" // FFC0 = OPEN
-                : "=a" (errorCode) // outputs
-                : // inputs
-                : "x", "y", "c"); // clobbers
-  return errorCode;
-}
-
-static void CLOSE(unsigned char logicalFileNum)
-{
-  asm volatile("JSR $FFC3\n" // FFC3 = CLOSE
-                : // outputs
-                : "a"(logicalFileNum) // inputs
-                : "x", "y"); // clobbers
-}
-
-static void CHKIN(unsigned char logicalFileNum)
-{
-  asm volatile("JSR $FFC6\n" // FFC6 = CHKIN
-                : // outputs
-                : "x"(logicalFileNum) // inputs
-                : "a"); // clobbers
-}
-
-static void CHKOUT(unsigned char logicalFileNum)
-{
-  asm volatile("JSR $FFC9\n" // FFC9 = CHKOUT
-                : // outputs
-                : "x"(logicalFileNum) // inputs
-                : "a"); // clobbers
-}
-
-static uint8_t READST()
-{
-  unsigned char statusByte;
-  asm volatile("JSR $FFB7\n" // FFB7 = READST Read I/O status byte
-                : "=a" (statusByte) // outputs
-                : // inputs
-                :); // clobbers
-  return statusByte;
-}
-
-static uint8_t CHRIN()
-{
-  unsigned char chrin;
-  asm volatile("JSR $FFCF\n" // FFCF = CHRIN
-                : "=a"(chrin) // outputs
-                : // inputs
-                : "y"); // clobbers
-  return chrin;
-}
-
-static uint8_t CHROUT(uint8_t byteToWrite)
-{
-  unsigned char error;
-  asm volatile("JSR $FFD2\n" // FFD2 = CHROUT
-               "LDA #0\n"
-               "ROL\n"
-                : "=a"(error) // outputs
-                : "a"(byteToWrite) // inputs
-                : "c"); // clobbers
-  return error;
-}
-
-static void CLRCHN()
-{
-  asm volatile("JSR $FFCC\n" // FFCC = CLRCHN - Restore default I/O channels
-                : // outputs
-                : // inputs
-                : "a", "x"); // clobbers
-}
 
 void save_file(File *file)
 {
@@ -113,9 +21,9 @@ void save_file(File *file)
   fn[i++] = ',';
   fn[i++] = 'W';
   fn[i] = 0;
-  SETNAM(fn, i);
-  SETLFS(2, 8, 2);
-  uint8_t error = OPEN();
+  _SETNAM(fn, i);
+  _SETLFS(2, 8, 2);
+  uint8_t error = _OPEN();
   // 1541 documentation: https://archive.org/details/Commodore_1541_Disk_Drive_Users_Guide_1982-09_Commodore/page/n57/mode/2up
   // "Error message numbers less than 20 should be ignored with the exception of 01 which gives information about the number of
   // "files scratched" (we are not calling the SCRATCH command here)
@@ -129,23 +37,23 @@ void save_file(File *file)
     get_key();
     return;
   }
-  CHKOUT(2);  
+  _CHKOUT(2);
 
   Line *l = file->firstLine;
   while(l)
   {
     for(uint16_t i = 0; i < (uint16_t)l->length; ++i)
     {
-      if ((error = READST())) goto end;
-      if ((error = CHROUT(l->text[i]))) goto end;
+      if ((error = _READST())) goto end;
+      _CHROUT(l->text[i]);
     }
-    if ((error = READST())) goto end;
-    if ((error = CHROUT('\n'))) goto end;
+    if ((error = _READST())) goto end;
+    _CHROUT('\n');
     l = l->nextLine;
   }
 end:
-  CLOSE(2);
-  CLRCHN();
+  _CLOSE(2);
+  _CLRCHN();
 
   if (error)
   {
