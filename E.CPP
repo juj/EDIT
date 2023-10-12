@@ -196,7 +196,12 @@ void insert_character(char ch)
       return;
     }
 
-    if (!increase_capacity(currentLine, ADD_U8_SAT(newLineLength, currentLine->capacity)))
+#ifdef __C64__
+    // Don't do geometric vector increases on C64, it seems to be wasteful in tight memory situation
+    if (!increase_capacity(currentLine, ADD_U8_SAT(currentLine->length, 4)))
+#else
+    if (newLineLength > currentLine->capacity && !increase_capacity(currentLine, ADD_U8_SAT(newLineLength, currentLine->capacity)))
+#endif
       return;
 
     // Shift existing characters up
