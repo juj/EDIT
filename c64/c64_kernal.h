@@ -120,23 +120,10 @@ _KERNAL uint8_t _SAVE(const void *start, const void *end)
   // Outputs:
   //   A: error code
   // Clobbers: X, Y, C
-
-  // Problem: How to safely reference a temporary 16-bit quantity in zero page?
-  // As a workaround, we take a constant memory address 0xFC,0xFD as our temp memory location.
-  // But since I don't know how to correctly declare a 16-bit temp zero page quantity into
-  // inline asm and register a clobber for it, instead the asm code below will save and restore
-  // the contents of 0xFC,0xFD as a workaround. TODO: Figure out how to do this with better
-  // efficiency.
-  volatile uint16_t * const __zero_page_tmp = (volatile uint16_t *)0xFC;
-  *__zero_page_tmp = (uint16_t)start;
   __asm__ volatile(
-    "LDA $FC\nPHA\n" // Save old value from 0xFC to stack
-    "LDA $FD\nPHA\n" // Save old value from 0xFD to stack
+    "LDA #%[zp]\n"
     "JSR $FFD8\n" // Call the 'SAVE' KERNAL ROM routine
-    "TAX\n" // Move return value A (error code) out of the way to be able to use A
-    "PLA\nSTA $FD\n" // Restore old value from stack to 0xFD
-    "PLA\nSTA $FC\n" // Restore old value from stack to 0xFC
-    :"=x"(error):"a"(_LO(__zero_page_tmp)),"x"(_LO(end)),"y"(_HI(end)):"a","y","c");
+    :"=a"(error):[zp]"r"((uint16_t)start),"x"(_LO(end)),"y"(_HI(end)):"x","y","c");
   return error;
 }
 
