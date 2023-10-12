@@ -1,5 +1,6 @@
 #include "../iassert.h"
 #include "../screen.h"
+#include "c64_kernal.h"
 #include <stdio.h>
 #include <stdint.h>
 
@@ -22,13 +23,7 @@ static unsigned char cx, cy;
 unsigned char colorUnderCursor = 7;
 void set_cursor_pos(uint8_t x, uint8_t y)
 {
-  // https://sta.c64.org/cbm64krnfunc.html:
-  // $E50A == Save (get) or restore (set) cursor position.
-  // Disassembly at https://skoolkid.github.io/sk6502/c64rom/asm/E50A.html
-  asm volatile(R"(CLC // Clear Carry: Carry flag 0 signals to the KERNAL subroutine that it should set the cursor position
-                  JSR $E50A)"
-              :: "x"(y), "y"(x) : "a", "c", "memory");
-
+  _PLOT_SET(x, y);
   // After changing cursor position, we need to clean up the old character, which
   // might have been left inverted by the blinking cursor in the old location
   uint16_t pos = (uint16_t)cy*SCREEN_WIDTH+cx;
@@ -82,11 +77,7 @@ static volatile unsigned char * const mem_setup_register = (unsigned char *)0xD0
 
 bool init_screen()
 {
-  uint8_t w,h;
-  asm("JSR 0xE505"
-    :"=x"(w), "=y"(h));
-  SCREEN_WIDTH = w;
-  SCREEN_HEIGHT = h;
+  _SCREEN(&SCREEN_WIDTH, &SCREEN_HEIGHT);
 
   // Switch charset into text mode, where both lower case and upper case characters
   // are available. Default register value at boot is 0x15.
