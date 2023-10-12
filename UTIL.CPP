@@ -18,15 +18,38 @@ void NOTIMPL(const char *x)
 
 uint8_t ADD_U8_SAT(uint8_t a, uint8_t b)
 {
-  // TODO OPTIMIZE with ASM!
-  uint16_t result = (uint16_t)a + b;
-  if (result >= 0xFF) return 0xFF;
-  else return (uint8_t)result;
+  /*
+  uint8_t tmp, result;
+  __asm__(R"(
+    STX %[zp]
+    CLC
+    ADC %[zp]
+    BCC good
+    LDA #255
+  good:
+  )":"=a"(result):[zp]"r"(tmp),"a"(a),"x"(b):"c");
+  return result;
+  */
+// This C code is verified to essentially emit
+// the above assembly code.
+  uint8_t result = a + b;
+  if (result < a) return 0xFF;
+  else return result;
 }
 
 uint8_t SUB_U8_SAT(uint8_t a, uint8_t b)
 {
-  // TODO OPTIMIZE with ASM!
-  if (a <= b) return 0;
-  return a - b;
+  uint8_t tmp, result;
+  __asm__(R"(
+    STX %[zp]
+    SEC
+    SBC %[zp]
+    BCS good
+    LDA #0
+  good:
+  )":"=a"(result):[zp]"r"(tmp),"a"(a),"x"(b):"c");
+  return result;
+// The above code is an optimized form of this code:
+//  if (a < b) return 0;
+//  return a - b;
 }
