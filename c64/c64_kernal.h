@@ -106,16 +106,22 @@ _KERNAL uint8_t _CHRIN()                   { uint8_t byte;  __asm__ volatile("JS
 // Output a character to the current Output Channel
 _KERNAL void _CHROUT(uint8_t byte)         {                __asm__ volatile("JSR $FFD2"::"a"(byte):"c"); }
 
-// Load file to RAM, or verify (compare) file contents against RAM
-_KERNAL uint8_t _LOAD(uint8_t verify, uint16_t *dst, uint16_t **dst_end)
+// Load file to RAM, or verify (compare) file contents against RAM. To use, call SETNAM+SETLFS+LOAD. This function
+// does not open a file handle, so no call to CLOSE is needed afterwards.
+// Note: Only files stored with the SAVE function may be loaded in this way. Files stored with the character-based
+// OPEN+CHKOUT+CHROUT+CLOSE method can not be loaded with this function.
+_KERNAL uint8_t _LOAD(uint8_t verify, void *dst, void **dst_end)
 {
   uint8_t error, lo, hi;
   __asm__ volatile("JSR $FFD5":"=a"(error), "=x"(lo), "=y"(hi):"a"(verify),"x"(_LO(dst)),"y"(_HI(dst)):"c","memory");
-  if (dst_end) *dst_end = (uint16_t*)_U16(lo, hi);
+  if (dst_end) *dst_end = (void*)_U16(lo, hi);
   return error;
 }
 
-// Save contiguous section [start, end[ from memory to the current Output Channel
+// Save contiguous section [start, end[ from memory to a file specified by previous call to SETNAM+SETLFS.
+// This function does not open a file handle, so no call to CLOSE is needed afterwards.
+// Note: When a file is written this way, it is only possible to load it using the LOAD function afterwards.
+// The character-based OPEN+CHKIN+CHRIN+CLOSE method cannot be used to load a file that was written with SAVE.
 _KERNAL uint8_t _SAVE(const void *start, const void *end)
 {
   uint8_t error,x,y;
