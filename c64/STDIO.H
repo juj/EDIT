@@ -8,6 +8,8 @@
 
 #include_next <stdio.h>
 
+#include "c64_kernal.h"
+
 struct FILE
 {
   uint8_t nextChar; // for read streams, the next character to come out from the file.
@@ -24,95 +26,6 @@ static void _assert(bool condition, const char *str)
 }
 
 #define assert(x) _assert((x), #x);
-
-static void SETNAM(const char *filename, uint8_t filenameLength)
-{
-  asm volatile("JSR $FFBD\n" // FFBD = SETNAM
-                : // outputs
-                : "a"(filenameLength), "x"((unsigned char)(uintptr_t)filename), "y"((unsigned char)((uintptr_t)filename>>8))
-                :);
-}
-
-static void SETLFS(unsigned char logicalFileNum, unsigned char deviceNum, unsigned char secondaryAddr)
-{
-  asm volatile("JSR $FFBA\n" // FFBA = SETLFS
-                : // outputs
-                : "a"(logicalFileNum), "x"(deviceNum), "y"(secondaryAddr) // inputs
-                :); // clobbers
-}
-
-// https://www.c64-wiki.com/wiki/Zeropage: $0002 is unused so safe to access.
-//static volatile unsigned char * const tmp = (unsigned char *)0x0002; // arbitrary safe temporary memory address for getting data out of inline assembly
-
-static uint8_t OPEN()
-{
-  unsigned char errorCode;
-  asm volatile("JSR $FFC0\n" // FFC0 = OPEN
-                : "=a" (errorCode) // outputs
-                : // inputs
-                : "x", "y", "c"); // clobbers
-  return errorCode;
-}
-
-static void CLOSE(unsigned char logicalFileNum)
-{
-  asm volatile("JSR $FFC3\n" // FFC3 = CLOSE
-                : // outputs
-                : "a"(logicalFileNum) // inputs
-                : "x", "y"); // clobbers
-}
-
-static void CHKIN(unsigned char logicalFileNum)
-{
-  asm volatile("JSR $FFC6\n" // FFC6 = CHKIN
-                : // outputs
-                : "x"(logicalFileNum) // inputs
-                : "a"); // clobbers
-}
-
-static void CHKOUT(unsigned char logicalFileNum)
-{
-  asm volatile("JSR $FFC9\n" // FFC9 = CHKOUT
-                : // outputs
-                : "x"(logicalFileNum) // inputs
-                : "a"); // clobbers
-}
-
-static uint8_t READST()
-{
-  unsigned char statusByte;
-  asm volatile("JSR $FFB7\n" // FFB7 = READST Read I/O status byte
-                : "=a" (statusByte) // outputs
-                : // inputs
-                :); // clobbers
-  return statusByte;
-}
-
-static uint8_t CHRIN()
-{
-  unsigned char chrin;
-  asm volatile("JSR $FFCF\n" // FFCF = CHRIN
-                : "=a"(chrin) // outputs
-                : // inputs
-                : "y"); // clobbers
-  return chrin;
-}
-
-static void CHROUT(uint8_t byteToWrite)
-{
-  asm volatile("JSR $FFD2\n" // FFD2 = CHROUT
-                :
-                : "a"(byteToWrite) // inputs
-                : ); // clobbers
-}
-
-static void CLRCHN()
-{
-  asm volatile("JSR $FFCC\n" // FFCC = CLRCHN - Restore default I/O channels
-                : // outputs
-                : // inputs
-                : "a", "x"); // clobbers
-}
 
 #define MAX_FILENAME_LEN 16
 
@@ -141,8 +54,8 @@ FILE *fopen(const char *filename, const char *mode)
   bool readingFile = string_contains_char(mode, 'r');
   fn[i++] = readingFile ? 'R' : 'W';
   fn[i] = 0;
-  SETNAM(fn, i);
-  SETLFS(fileHandleCounter, 8, fileHandleCounter); // todo file ID
+  _SETNAM(fn, i);
+  _SETLFS(fileHandleCounter, 8, fileHandleCounter); // todo file ID
   uint8_t error = OPEN();
   if (error >= 20 && error <= 74)
   {
@@ -150,13 +63,13 @@ FILE *fopen(const char *filename, const char *mode)
     return 0;
   }
 
-  if (readingFile) CHKIN(fileHandleCounter);
-  else CHKOUT(fileHandleCounter);
+  if (readingFile) _CHKIN(fileHandleCounter);
+  else _CHKOUT(fileHandleCounter);
 
-  if ((error = READST()))
+  if ((error = _READST()))
   {
-    CLOSE(fileHandleCounter);
-    CLRCHN();
+    _CLOSE(fileHandleCounter);
+    _CLRCHN();
     printf("READST AFTER FOPEN FAILED, ERROR %d\n", (int)error);
     return 0;
   }
@@ -164,11 +77,11 @@ FILE *fopen(const char *filename, const char *mode)
   FILE *f = (FILE*)malloc(sizeof(FILE));
   if (!f)
   {
-    CLRCHN();
+    _CLRCHN();
     printf("FOPEN-MALLOC FAILED!\n");
     return 0;
   }
-  if (readingFile) f->nextChar = CHRIN(); // read first char in advance
+  if (readingFile) f->nextChar = _CHRIN(); // read first char in advance
   f->handle = fileHandleCounter++; // TODO multiple handles
   if (fileHandleCounter == 255) fileHandleCounter = 2;
 
@@ -178,8 +91,8 @@ FILE *fopen(const char *filename, const char *mode)
 int fclose(FILE *f)
 {
   assert(f); // The behavior is undefined if the value of the pointer stream is used after fclose returns.
-  CLOSE(f->handle);
-  CLRCHN();
+  _CLOSE(f->handle);
+  _CLRCHN();
   free(f);
   return 0;
 }
@@ -188,8 +101,8 @@ static void consume_read_whitespace(FILE *f)
 {
   while(isspace(f->nextChar))
   {
-    if (READST()) return;// { CLRCHN(); printf("CONSUMEWS READST ERROR!\n"); return; }
-    f->nextChar = CHRIN();
+    if (_READST()) return;// { CLRCHN(); printf("CONSUMEWS READST ERROR!\n"); return; }
+    f->nextChar = _CHRIN();
   }
 }
 
@@ -201,8 +114,8 @@ static int read_int_from_file(FILE *f)
   while(isdigit(f->nextChar))
   {
     intstr[i++] = f->nextChar;
-    if (READST()) break;//{ CLRCHN(); printf("READINT READST ERROR!\n"); break; }
-    f->nextChar = CHRIN();
+    if (_READST()) break;//{ CLRCHN(); printf("READINT READST ERROR!\n"); break; }
+    f->nextChar = _CHRIN();
     if (i >= 5) i = 0; // if i gets this large, read will overflow (will read garbage)
   }
   return atoi(intstr);
@@ -211,16 +124,16 @@ static int read_int_from_file(FILE *f)
 static void read_string_from_file(FILE *f, char *dst)
 {
   assert(!isspace(f->nextChar));
-  while(!isspace(f->nextChar) && !READST())
+  while(!isspace(f->nextChar) && !_READST())
   {
     *dst++ = f->nextChar;
-    f->nextChar = CHRIN();
+    f->nextChar = _CHRIN();
   }
 }
 
 static int fscanf(FILE *f, const char *format, ...)
 {
-  CHKIN(f->handle);
+  _CHKIN(f->handle);
 
   va_list args;
   va_start(args, format);
@@ -239,8 +152,8 @@ static int fscanf(FILE *f, const char *format, ...)
     else if (*format != '%')
     {
       if (f->nextChar != *format) goto end;
-      if ((error = READST())) goto end;
-      f->nextChar = CHRIN();
+      if ((error = _READST())) goto end;
+      f->nextChar = _CHRIN();
     }
     else
     {
@@ -270,40 +183,40 @@ static int fscanf(FILE *f, const char *format, ...)
   }
 end:
   va_end(args);
-  CLRCHN();
+  _CLRCHN();
   if (error) printf("FSCANF ERROR %d\n", (int)error);
   return num_parsed;
 }
 
 size_t fread(void *buffer, size_t size, size_t count, FILE *f)
 {
-  CHKIN(f->handle);  
+  _CHKIN(f->handle);  
   uint8_t error = 0;
   uint8_t *ptr = (uint8_t*)buffer;
   for(size_t i = 0; i < size; ++i)
     for(size_t j = 0; j < count; ++j)
     {
       *ptr++ = f->nextChar;
-      if ((error = READST())) break;
-      f->nextChar = CHRIN();
+      if ((error = _READST())) break;
+      f->nextChar = _CHRIN();
     }
-  CLRCHN();
-//////  if (error) printf("FREAD ERROR %d\n", (int)error);
+  _CLRCHN();
+  if (error) printf("FREAD ERROR %d\n", (int)error);
   return (uintptr_t)ptr - (uintptr_t)buffer;
 }
 
 size_t fwrite(const void *buffer, size_t size, size_t count, FILE *f)
 {
-  CHKOUT(f->handle);
+  _CHKOUT(f->handle);
   uint8_t error = 0;
   const uint8_t *ptr = (const uint8_t*)buffer;
   for(size_t i = 0; i < size; ++i)
     for(size_t j = 0; j < count; ++j)
     {
-      if ((error = READST())) break;
-      CHROUT(*ptr++);
+      if ((error = _READST())) break;
+      _CHROUT(*ptr++);
     }
-  CLRCHN();
+  _CLRCHN();
   if (error) printf("FWRITE ERROR %d\n", (int)error);
   return (uintptr_t)ptr - (uintptr_t)buffer;
 }
@@ -345,7 +258,7 @@ static void cs_write_page_data(uint16_t page, uint16_t data)
   write_u16_lo_hi(cs_packet_data, data);
 }
 
-int rrnet_init()
+static int rrnet_init()
 {
   *rrnet_ctl |= 1; // enable clock port
   // Detect RR-Net
@@ -438,7 +351,7 @@ static void debug_dump_rx_bytes(unsigned int numBytes)
   printf("\n");
 }
 
-void start_tx(uint16_t numBytes)
+static void start_tx(uint16_t numBytes)
 {
   write_u16_lo_hi(cs_tx_cmd, 0x00C0); // Send Transmit command 00C0h
   write_u16_lo_hi(cs_tx_len, numBytes);
@@ -447,7 +360,7 @@ void start_tx(uint16_t numBytes)
     ; // Wait until we are ready to transmit
 }
 
-void tx_bytes(const void *msg, uint16_t numBytes)
+static void tx_bytes(const void *msg, uint16_t numBytes)
 {
   numBytes = (numBytes+1)>>1;
   const uint16_t *m16 = (const uint16_t*)msg;
@@ -458,7 +371,7 @@ void tx_bytes(const void *msg, uint16_t numBytes)
 static volatile unsigned char * const screen_mem = (unsigned char*)0x0400;
 static volatile unsigned char * const screen_frame = (unsigned char *)0xD020;
 
-unsigned char ascii_to_petscii(unsigned char ch)
+static unsigned char ascii_to_petscii(unsigned char ch)
 {
   if (ch == 0x08) return 0x14; // Backspace character
   if (ch == 0x0A) return 0x0D; // NL line feed, new line
@@ -476,7 +389,7 @@ unsigned char ascii_to_petscii(unsigned char ch)
   return ch - 0x60;
 }
 
-unsigned char petscii_to_screen_code(unsigned char petscii)
+static unsigned char petscii_to_screen_code(unsigned char petscii)
 {
   if (petscii <= 31) return 32;//petscii + 128;
   if (petscii <= 63) return petscii;
@@ -489,32 +402,22 @@ unsigned char petscii_to_screen_code(unsigned char petscii)
 }
 
 uint16_t screen_pos = 0;
-void put_screen(char ch)
+static void put_screen(char ch)
 {
   screen_mem[screen_pos++] = petscii_to_screen_code(ascii_to_petscii(ch));
   if (screen_pos >= 40*25) screen_pos = 0;
   *screen_frame = ch;
 }
 
-void clear_screen()
+static void clear_screen()
 {
   memset((void*)screen_mem, 0x20, 40*25);
 }
 
-void set_cursor_pos(uint8_t x, uint8_t y)
+static void close_file()
 {
-  // https://sta.c64.org/cbm64krnfunc.html:
-  // $E50A == Save (get) or restore (set) cursor position.
-  // Disassembly at https://skoolkid.github.io/sk6502/c64rom/asm/E50A.html
-  asm volatile(R"(CLC // Clear Carry: Carry flag 0 signals to the KERNAL subroutine that it should set the cursor position
-                  JSR $E50A)"
-              :: "x"(y), "y"(x) : "a", "c", "memory");
-}
-
-void close_file()
-{
-  CLOSE(2);
-  CLRCHN();
+  _CLOSE(2);
+  _CLRCHN();
 }
 
 // return true on success
@@ -534,9 +437,9 @@ bool open_file_for_saving(const char *filename)
   fn[i++] = ',';
   fn[i++] = 'W';
   fn[i] = 0;
-  SETNAM(fn, i);
-  SETLFS(2, 8, 2);
-  uint8_t error = OPEN();
+  _SETNAM(fn, i);
+  _SETLFS(2, 8, 2);
+  uint8_t error = _OPEN();
   // 1541 documentation: https://archive.org/details/Commodore_1541_Disk_Drive_Users_Guide_1982-09_Commodore/page/n57/mode/2up
   // "Error message numbers less than 20 should be ignored with the exception of 01 which gives information about the number of
   // "files scratched" (we are not calling the SCRATCH command here)
@@ -549,8 +452,8 @@ bool open_file_for_saving(const char *filename)
 //        ; FILE EXISTS error etc.
     return false;
   }
-  CHKOUT(2);  
-  error = READST();
+  _CHKOUT(2);  
+  error = _READST();
 
 end:
   if (error)
@@ -655,8 +558,8 @@ const char *receive_file()
         for(uint8_t i = 0; i < n; ++i)
         {
           put_screen(ch[i]);
-          if (READST()) { error = true; goto end; }
-          CHROUT(ch[i]);
+          if (_READST()) { error = true; goto end; }
+          _CHROUT(ch[i]);
           ++totalBytesWritten;
         }
       }
@@ -669,7 +572,7 @@ const char *receive_file()
 end:
   close_file();
   *screen_frame = origScreenFrameColor;
-  set_cursor_pos(0, 0);
+  _PLOT_SET(0, 0);
   clear_screen();
   if (error) printf("\nFAILED TO WRITE FILE!\n");
   else printf("\nWROTE %lu BYTES TO FILE \"%s\"\n", totalBytesWritten, header.filename);
