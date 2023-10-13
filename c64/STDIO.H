@@ -91,7 +91,7 @@ FILE *fopen(const char *filename, const char *mode)
 {
   static uint8_t fileHandleCounter = 3;
 
-  char fn[MAX_FILENAME_LEN+1+3+4]; // Add +1 for null, +3 for "@0:" prefix and +4 for ",U,W" suffix.
+  char fn[MAX_FILENAME_LEN+3+4]; // Add +3 for "@0:" prefix and +4 for ",U,W" suffix.
   // Prepend "@0:" to the filename to have any existing filename be replaced.
   fn[0] = 64; // '@' in PETSCII
   fn[1] = '0';
