@@ -1,6 +1,6 @@
 #pragma once
 
-// C64 KERNAL ROM functions, from https://www.pagetable.com/c64ref/kernal/
+// C64 KERNAL ROM functions
 
 #include <stdint.h>
 
@@ -10,6 +10,14 @@
 #define _HI(x) ((uint8_t)((uint16_t)(x)>>8))
 #define _LO(x) ((uint8_t)(uint16_t)(x))
 #define _U16(lo, hi) (((uint16_t)(hi) << 8) | (lo))
+// Inline GCC asm syntax has a weird way of requiring different syntax to be used to declare
+// clobbered registers, depending on whether those registers are, or are not used as inputs.
+// Use the following macros to better declare intent in the output blocks that a specific
+// output directive is used to denote a clobber rather than a real output.
+// See https://github.com/llvm-mos/llvm-mos/issues/385
+#define CLOB_A "=a"(a)
+#define CLOB_X "=x"(x)
+#define CLOB_Y "=y"(y)
 
 // Initialize screen editor & 6567 video chip
 _KERNAL void _CINT()   { __asm__ volatile("JSR $FF81":::"a","x","y","memory"); }
@@ -24,49 +32,49 @@ _KERNAL void _RAMTAS() { __asm__ volatile("JSR $FF87":::"a","x","y","memory"); }
 _KERNAL void _RESTOR() { __asm__ volatile("JSR $FF8A":::"a","x","y"); }
 
 // Read/Set KERNAL indirect vector table
-_KERNAL void _VECTOR_READ(uintptr_t vec[16])      { __asm__("SEC\nJSR $FF8D"::"x"(_LO(vec)),"y"(_HI(vec)):"a","c","memory"); }
-_KERNAL void _VECTOR_SET(const uintptr_t vec[16]) { __asm__ volatile("CLC\nJSR $FF8D"::"x"(_LO(vec)),"y"(_HI(vec)):"a","y","c"); }
+_KERNAL void _VECTOR_READ(uintptr_t vec[16])      { uint8_t x,y; __asm__("SEC\nJSR $FF8D":CLOB_X,CLOB_Y:"x"(_LO(vec)),"y"(_HI(vec)):"a","c","memory"); }
+_KERNAL void _VECTOR_SET(const uintptr_t vec[16]) { uint8_t x,y; __asm__ volatile("CLC\nJSR $FF8D":CLOB_X,CLOB_Y:"x"(_LO(vec)),"y"(_HI(vec)):"a","c"); }
 
 // Enable or mute printing of system error and control messages. If bit 7 is set in flags, error messages are enabled. If bit 6 is set in flags, control messages are enabled.
 _KERNAL void _SETMSG(uint8_t flags) { __asm__ volatile("JSR $FF90"::"a"(flags):); }
 
 // Send a Secondary Address to a Device on the Serial Bus after LISTEN
-_KERNAL void _SECOND(uint8_t addr)  { __asm__ volatile("JSR $FF93"::"a"(addr):"a"); }
+_KERNAL void _SECOND(uint8_t addr)  { uint8_t a; __asm__ volatile("JSR $FF93":CLOB_A:"a"(addr):); }
 
 // Send a Secondary Address to a Device on the Serial Bus after TALK
-_KERNAL void _TKSA(uint8_t addr)    { __asm__ volatile("JSR $FF96"::"a"(addr):"a"); }
+_KERNAL void _TKSA(uint8_t addr)    { uint8_t a; __asm__ volatile("JSR $FF96":CLOB_A:"a"(addr):); }
 
 // Read/Set Top of RAM Pointer
 _KERNAL uint16_t _MEMTOP_READ() { uint8_t lo, hi; __asm__("SEC\nJSR $FF99":"=x"(lo),"=y"(hi)::"c"); return _U16(lo, hi); }
-_KERNAL void _MEMTOP_SET(uint16_t membot)       { __asm__ volatile("CLC\nJSR $FF99"::"x"(_LO(membot)),"y"(_HI(membot)):"c"); }
+_KERNAL void _MEMTOP_SET(uint16_t membot) { uint8_t x,y; __asm__ volatile("CLC\nJSR $FF99":CLOB_X,CLOB_Y:"x"(_LO(membot)),"y"(_HI(membot)):"c"); }
 
 // Read/Set Bottom of RAM Pointer
 _KERNAL uint16_t _MEMBOT_READ() { uint8_t lo, hi; __asm__("SEC\nJSR $FF9C":"=x"(lo),"=y"(hi)::"c"); return _U16(lo, hi); }
-_KERNAL void _MEMBOT_SET(uint16_t membot)       { __asm__ volatile("CLC\nJSR $FF9C"::"x"(_LO(membot)),"y"(_HI(membot)):"c"); }
+_KERNAL void _MEMBOT_SET(uint16_t membot) { uint8_t x,y; __asm__ volatile("CLC\nJSR $FF9C":CLOB_X,CLOB_Y:"x"(_LO(membot)),"y"(_HI(membot)):"c"); }
 
 // Scan keyboard
-_KERNAL void _SCNKEY()                 { __asm__ volatile("JSR $FF9F":::"a","x","y"); }
+_KERNAL void _SCNKEY()                       { __asm__ volatile("JSR $FF9F":::"a","x","y"); }
 
 // Set time-out flag on serial bus
-_KERNAL void _SETTMO(uint8_t flag)     { __asm__ volatile("JSR $FFA2"::"a"(flag):); }
+_KERNAL void _SETTMO(uint8_t flag)           { __asm__ volatile("JSR $FFA2"::"a"(flag):); }
 
 // Input byte from serial port
-_KERNAL uint8_t _ACPTR() { uint8_t byte; __asm__ volatile("JSR $FFA5":"=a"(byte)::"x"); return byte; }
+_KERNAL uint8_t _ACPTR()       { uint8_t byte; __asm__ volatile("JSR $FFA5":"=a"(byte)::"x"); return byte; }
 
 // Output byte to serial port
-_KERNAL void _CIOUT(uint8_t byte)      { __asm__ volatile("JSR $FFA8"::"a"(byte):"a"); }
+_KERNAL void _CIOUT(uint8_t byte) { uint8_t a; __asm__ volatile("JSR $FFA8":CLOB_A:"a"(byte):); }
 
 // Send UNTALK command to serial bus
-_KERNAL void _UNTLK()                  { __asm__ volatile("JSR $FFAB":::"a"); }
+_KERNAL void _UNTLK()                        { __asm__ volatile("JSR $FFAB":::"a"); }
 
 // Send UNLISTEN command to serial bus
-_KERNAL void _UNLSN()                  { __asm__ volatile("JSR $FFAE":::"a"); }
+_KERNAL void _UNLSN()                        { __asm__ volatile("JSR $FFAE":::"a"); }
 
 // Send LISTEN command to serial bus
-_KERNAL void _LISTEN(uint8_t device)   { __asm__ volatile("JSR $FFB1"::"a"(device):"a"); }
+_KERNAL void _LISTEN(uint8_t device) { uint8_t a; __asm__ volatile("JSR $FFB1":CLOB_A:"a"(device):); }
 
 // Send TALK command to serial bus
-_KERNAL void _TALK(uint8_t device)     { __asm__ volatile("JSR $FFB4"::"a"(device):"a"); }
+_KERNAL void _TALK(uint8_t device)   { uint8_t a; __asm__ volatile("JSR $FFB4":CLOB_A:"a"(device):); }
 
 // Return I/O status byte
 _KERNAL uint8_t _READST() { uint8_t status; __asm__("JSR $FFB7":"=a"(status)::); return status; }
@@ -84,19 +92,19 @@ _KERNAL uint8_t _OPEN() { uint8_t error; __asm__ volatile("JSR $FFC0":"=a"(error
 _KERNAL uint8_t _CLOSE(uint8_t file_no)  { uint8_t error; __asm__ volatile("JSR $FFC3":"=a"(error):"a"(file_no):"x","y","c"); return error; }
 
 // Designate a Logical File as the current Input Channel
-_KERNAL uint8_t _CHKIN(uint8_t file_no)  { uint8_t error; __asm__ volatile("JSR $FFC6":"=a"(error):"x"(file_no):"x","y","c"); return error; }
+_KERNAL uint8_t _CHKIN(uint8_t file_no)  { uint8_t error,x; __asm__ volatile("JSR $FFC6":"=a"(error),CLOB_X:"x"(file_no):"y","c"); return error; }
 
 // Designate a Logical File As the current Output Channel
-_KERNAL uint8_t _CHKOUT(uint8_t file_no) { uint8_t error; __asm__ volatile("JSR $FFC9":"=a"(error):"x"(file_no):"x","y","c"); return error; }
+_KERNAL uint8_t _CHKOUT(uint8_t file_no) { uint8_t error,x; __asm__ volatile("JSR $FFC9":"=a"(error),CLOB_X:"x"(file_no):"y","c"); return error; }
 
 // Restore current Input and Output Devices to the Default Devices
-_KERNAL void _CLRCHN()                   {                __asm__ volatile("JSR $FFCC":::"a","x"); }
+_KERNAL void _CLRCHN()                     {                __asm__ volatile("JSR $FFCC":::"a","x"); }
 
 // Input a character from the current Input Channel
-_KERNAL uint8_t _CHRIN()                 { uint8_t byte;  __asm__ volatile("JSR $FFCF":"=a"(byte)::"y","c"); return byte; }
+_KERNAL uint8_t _CHRIN()                   { uint8_t byte;  __asm__ volatile("JSR $FFCF":"=a"(byte)::"c"); return byte; }
 
 // Output a character to the current Output Channel
-_KERNAL void _CHROUT(uint8_t byte)       {                __asm__ volatile("JSR $FFD2"::"a"(byte):"c"); }
+_KERNAL void _CHROUT(uint8_t byte)         {                __asm__ volatile("JSR $FFD2"::"a"(byte):"c"); }
 
 // Load file to RAM, or verify (compare) file contents against RAM
 _KERNAL uint8_t _LOAD(uint8_t verify, uint16_t *dst, uint16_t **dst_end)
@@ -110,7 +118,7 @@ _KERNAL uint8_t _LOAD(uint8_t verify, uint16_t *dst, uint16_t **dst_end)
 // Save contiguous section [start, end[ from memory to the current Output Channel
 _KERNAL uint8_t _SAVE(const void *start, const void *end)
 {
-  uint8_t error;
+  uint8_t error,x,y;
   // JSR $FFD8: KERNAL ROM 'SAVE' routine
   // Writes a contiguous region of bytes from memory at [start, end[ to disk.
   // Inputs:
@@ -118,12 +126,16 @@ _KERNAL uint8_t _SAVE(const void *start, const void *end)
   //   X: low 8 bits of 'end' address
   //   Y: high 8 bits of 'end' address
   // Outputs:
-  //   A: error code
-  // Clobbers: X, Y, C
+  //   C: If 1, error occurred. If 0, no error.
+  //   A: If error occurred, contains error code. If no error occurred, contains garbage
+  // Clobbers: X, Y
   __asm__ volatile(
     "LDA #%[zp]\n"
     "JSR $FFD8\n" // Call the 'SAVE' KERNAL ROM routine
-    :"=a"(error):[zp]"r"((uint16_t)start),"x"(_LO(end)),"y"(_HI(end)):"x","y","c");
+    "BCS error\n"
+    "LDA #0\n"
+    "error:\n"
+    :"=a"(error),CLOB_X,CLOB_Y:[zp]"r"(start),"x"(_LO(end)),"y"(_HI(end)):"c");
   return error;
 }
 
