@@ -44,38 +44,39 @@ static void print_dos_error(uint8_t error, const char *operation)
   const char *err;
   switch(error)
   {
-    case 20: err = "BLOCK HEADER NOT FOUND"; break;
-    case 21: err = "SYNC CHARACTER NOT FOUND"; break;
-    case 22: err = "DATA BLOCK NOT PRESENT"; break;
-    case 23: err = "CHECKSUM ERROR"; break;
-    case 24: err = "BYTE DECODING ERROR"; break;
-    case 25: err = "WRITE-VERIFY ERROR"; break;
-    case 26: err = "WRITE PROTECT ON"; break;
-    case 27: err = "HEADER CHECKSUM ERROR"; break;
-    case 28: err = "DATA EXTENDS INTO NEXT BLOCK"; break;
-    case 29: err = "DISK ID MISMATCH"; break;
-    case 30: err = "GENERAL SYNTAX ERROR"; break;
-    case 31: err = "INVALID COMMAND"; break;
-    case 32: err = "LONG LINE"; break;
-    case 33: err = "INVALID FILENAME"; break;
-    case 34: err = "NO FILE GIVEN"; break;
-    case 39: err = "COMMAND FILE NOT FOUND"; break;
-    case 50: err = "RECORD NOT PRESENT"; break;
-    case 51: err = "OVERFLOW"; break;
-    case 52: err = "FILE TOO LARGE"; break;
-    case 60: err = "FILE OPEN FOR WRITE"; break;
-    case 61: err = "FILE NOT OPEN"; break;
-    case 62: err = "FILE NOT FOUND"; break;
-    case 63: err = "FILE EXISTS"; break;
-    case 64: err = "FILE TYPE MISMATCH"; break;
-    case 65: err = "NO BLOCK"; break;
-    case 66: err = "ILLEGAL TRACK OR SECTOR"; break;
-    case 67: err = "ILLEGAL SYSTEM TRACK OR SECTOR"; break;
-    case 70: err = "NO CHANNELS AVAILABLE"; break;
-    case 71: err = "DIRECTORY ERROR"; break;
-    case 72: err = "DISK OR DIRECTORY FULL"; break;
-    case 73: err = "POWER UP MESSAGE; break; OR WRITE ATTEMPT WITH DOS MISMATCH"; break;
-    case 74: err = "DRIVE NOT READY"; break;
+    // From https://archive.org/details/Commodore_1541_Disk_Drive_Users_Guide_1982-09_Commodore/page/n59/mode/2up
+    case 20: err = "BLOCK HEADER NOT FOUND"; break; // The disk controUer is unable to locate the header of the requested data block. Caused by an illegal block number, or the header has been destroyed.
+    case 21: err = "SYNC CHARACTER NOT FOUND"; break; // The disk controller is unable to detect a sync mark on the desired track. Caused by misalignment of the read/ writer head, no diskette is present, or unformatted or improperly sealed diskette. Can also indicate a hardware failure.
+    case 22: err = "DATA BLOCK NOT PRESENT"; break; // The disk controller has been requested to read or verify a data block that was not properly written. This error message occurs in conjunction with the BLOCK commands and indicates an illegal track and/or block request.
+    case 23: err = "CHECKSUM ERROR"; break; // This error message indicates that there is an error in one or more of the data bytes. The data has been read into the DOS memory, but the checksum over the data is in error. This message may also indicate grounding problems.
+    case 24: err = "BYTE DECODING ERROR"; break; // The data or header as been read into the DOS memory, but a hardware error has been created due to an invalid bit pattern in the data byte. This message may also indicate grounding problems.
+    case 25: err = "WRITE-VERIFY ERROR"; break; // This message is generated if the controller detects a mismatch between the written data and the data in the DOS memory.
+    case 26: err = "WRITE PROTECT ON"; break; // This message is generated when the controller has been requested to write a data block while the write protect switch is depressed. Typically, this is caused by using a diskette with a write a protect tab over the notch.
+    case 27: err = "HEADER CHECKSUM ERROR"; break; // The controller has detected an error in the header of the requested data block. The block has not been read into the DOS memory. This message may also indicate grounding problems.
+    case 28: err = "DATA EXTENDS INTO NEXT BLOCK"; break; // The controller attempts to detect the sync mark of the next header after writing a data block. If the sync mark does not appear within a pre-determined time, the error message is generated. The error is caused by a bad diskette format (the data extends into the next block), or by hardware failure.
+    case 29: err = "DISK ID MISMATCH"; break; // This message is generated when the controller has been requested to access a diskette which has not been initialized. The message can also occur if a diskette has a bad header.
+    case 30: err = "GENERAL SYNTAX ERROR"; break; // The DOS cannot interpret the command sent to the command channel. Typically, this is caused by an illegal number of file names, or patterns are illegally used. For example, two file names may appear on the left side of the COPY command.
+    case 31: err = "INVALID COMMAND"; break; // The DOS does not recognize the command. The command must start in the first position,
+    case 32: err = "LONG LINE"; break; // The command sent is longer than 58 characters.
+    case 33: err = "INVALID FILENAME"; break; // Pattern matching is invalidly used in the OPEN or SAVE command.
+    case 34: err = "NO FILE GIVEN"; break; // The file name was left out of a command or the DOS does not recognize it as such. Typically, a colon (:) has been left out of the command.
+    case 39: err = "COMMAND FILE NOT FOUND"; break; // This error may result if the command sent to command channel (secondary address 15) is unrecognized by the DOS.
+    case 50: err = "RECORD NOT PRESENT"; break; // Result of disk reading past the last record through 1NPUT#, or GET# commands. This message will also occur after positioning to a record beyond end of file in a relative file. If the intent is to expand the file by adding the new record (with a PRINTS command), the error message may be ignored. INPUT or GET should not be attempted after this error is detected without first repositioning.
+    case 51: err = "OVERFLOW"; break; // PRINTS statement exceeds record boundary. Information is cut off. Since the carriage return is sent as a record terminator is counted in the record size. This message will occur if the total characters in the record (including the final carriage return) exceeds the defined size.
+    case 52: err = "FILE TOO LARGE"; break; // Record position within a relative file indicates that disk overflow will result.
+    case 60: err = "FILE OPEN FOR WRITE"; break; // This message is generated when a write file that has not been closed is being opened for reading.
+    case 61: err = "FILE NOT OPEN"; break; // This message is generated when a file is being accessed that has not been opened in the DOS. Sometimes, in this case, a message is not generated; the request is simply ignored.
+    case 62: err = "FILE NOT FOUND"; break; // The requested file does not exist on the indicated drive.
+    case 63: err = "FILE EXISTS"; break; // The file name of the file being created already exists on the diskette.
+    case 64: err = "FILE TYPE MISMATCH"; break; // The file type does not match the file type in the directory entry for the requested file.
+    case 65: err = "NO BLOCK"; break; // This message occurs in conjunction with the B-A command. It indicates that the block to be allocated has been previously allocated. The parameters indicate the track and sector available with the next highest number. If the parameters are zero (0), then all blocks higher in number arc in use.
+    case 66: err = "ILLEGAL TRACK OR SECTOR"; break; // The DOS has attempted to access a irack or block which does not e>dsi in die format being used. This may indicate a problem reading the pointer to the next block.
+    case 67: err = "ILLEGAL SYSTEM TRACK OR SECTOR"; break; // This special error message indicates an illegal system track or block.
+    case 70: err = "NO CHANNELS AVAILABLE"; break; // The requested channel is not available, or all channels are in use. A maximum of five sequential files may be opened at one time to the DOS, Direct access channels may have six opened files.
+    case 71: err = "DIRECTORY ERROR"; break; // The BAM docs not match the internal count. There is a problem in the BAM allocation or the BAM has been overwritten in DOS memory. To correct this problem, reinitialize the diskette to restore the BAM in memory. Some active files may be terminated by the corrective action. NOTE: BAM = Block Availability Map
+    case 72: err = "DISK OR DIRECTORY FULL"; break; // Either the blocks on the diskette are used or the directory is at its entry limit. DISK FULL is sent when two blocks are available on the 1541 to allow the current file to be closed.
+    case 73: err = "POWER UP MESSAGE; break; OR WRITE ATTEMPT WITH DOS MISMATCH"; break; // DOS I and 2 are read compatible but not write compatible. Disks may be interchangeably read with either DOS, but a disk formatted on one version cannot be written upon with the other version because the format is different. This error is displayed whenever an attempt is made to write upon a disk which has been formatted in a non-compatible format. (A utility routine is available to assist in converting from one format to another.) This message may also appear after power up.
+    case 74: err = "DRIVE NOT READY"; break; // An attempt has been made to access the 1541 Single Drive Floppy Disk without any diskettes present in either drive.
     default:
       printf("%s: ERROR %u\n", operation, (unsigned int)error);
       return;
