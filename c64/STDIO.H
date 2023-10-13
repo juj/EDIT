@@ -1,5 +1,9 @@
 #pragma once
 
+// Before including this file, call
+// #define _STDIO_DEBUG_LEVEL 2 to add verbose debugging support, or
+// #define _STDIO_DEBUG_LEVEL 1 to add more lightweight debugging support.
+// #define NDEBUG to disable assert() macro.
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -16,16 +20,29 @@ struct FILE
   uint8_t handle;
 };
 
-static void _assert(bool condition, const char *str)
+static void _assert(bool condition, const char *str, const char *file, int line, const char *func)
 {
+#ifndef NDEBUG
   if (!condition)
   {
-    printf("ASSERT FAILED!\n");
-    printf("%s", str);
+#if defined(_STDIO_DEBUG_LEVEL) && _STDIO_DEBUG_LEVEL >= 2
+    printf("%s:%d:%s: ASSERT \"%s\" FAILED!\n", file, line, func, str);
+#elif defined(_STDIO_DEBUG_LEVEL) && _STDIO_DEBUG_LEVEL >= 1
+    printf("%s:%d: ASSERT FAILED!\n", file, line);
+#else
+    printf("LINE %d: ASSERT FAILED!\n", line);
+#endif
+    volatile uint8_t * const border = (uint8_t*)0xD020;
+    for(;;) // Halt, and blink border red-black
+    {
+      *border = *border & 0xF ? 0 : 0x0A;
+      for(unsigned int i = 0; i < 65535; ++i) asm("NOP":::"memory");
+    }
   }
+#endif
 }
 
-#define assert(x) _assert((x), #x);
+#define assert(x) _assert((x), #x, __FILE__, __LINE__, __func__);
 
 #define MAX_FILENAME_LEN 16
 
@@ -56,7 +73,7 @@ FILE *fopen(const char *filename, const char *mode)
   fn[i] = 0;
   _SETNAM(fn, i);
   _SETLFS(fileHandleCounter, 8, fileHandleCounter); // todo file ID
-  uint8_t error = OPEN();
+  uint8_t error = _OPEN();
   if (error >= 20 && error <= 74)
   {
     printf("FOPEN FAILED, ERROR %d\n", (int)error);
@@ -186,6 +203,54 @@ end:
   _CLRCHN();
   if (error) printf("FSCANF ERROR %d\n", (int)error);
   return num_parsed;
+}
+
+static void print_dos_error(uint8_t error, const char *operation)
+{
+#if defined(_STDIO_DEBUG_LEVEL) && _STDIO_DEBUG_LEVEL >= 2
+  const char *err;
+  switch(error)
+  {
+    case 20: err = "BLOCK HEADER NOT FOUND"; break;
+    case 21: err = "SYNC CHARACTER NOT FOUND"; break;
+    case 22: err = "DATA BLOCK NOT PRESENT"; break;
+    case 23: err = "CHECKSUM ERROR"; break;
+    case 24: err = "BYTE DECODING ERROR"; break;
+    case 25: err = "WRITE-VERIFY ERROR"; break;
+    case 26: err = "WRITE PROTECT ON"; break;
+    case 27: err = "HEADER CHECKSUM ERROR"; break;
+    case 28: err = "DATA EXTENDS INTO NEXT BLOCK"; break;
+    case 29: err = "DISK ID MISMATCH"; break;
+    case 30: err = "GENERAL SYNTAX ERROR"; break;
+    case 31: err = "INVALID COMMAND"; break;
+    case 32: err = "LONG LINE"; break;
+    case 33: err = "INVALID FILENAME"; break;
+    case 34: err = "NO FILE GIVEN"; break;
+    case 39: err = "COMMAND FILE NOT FOUND"; break;
+    case 50: err = "RECORD NOT PRESENT"; break;
+    case 51: err = "OVERFLOW"; break;
+    case 52: err = "FILE TOO LARGE"; break;
+    case 60: err = "FILE OPEN FOR WRITE"; break;
+    case 61: err = "FILE NOT OPEN"; break;
+    case 62: err = "FILE NOT FOUND"; break;
+    case 63: err = "FILE EXISTS"; break;
+    case 64: err = "FILE TYPE MISMATCH"; break;
+    case 65: err = "NO BLOCK"; break;
+    case 66: err = "ILLEGAL TRACK OR SECTOR"; break;
+    case 67: err = "ILLEGAL SYSTEM TRACK OR SECTOR"; break;
+    case 70: err = "NO CHANNELS AVAILABLE"; break;
+    case 71: err = "DIRECTORY ERROR"; break;
+    case 72: err = "DISK OR DIRECTORY FULL"; break;
+    case 73: err = "POWER UP MESSAGE; break; OR WRITE ATTEMPT WITH DOS MISMATCH"; break;
+    case 74: err = "DRIVE NOT READY"; break;
+    default:
+      if (error > 19) printf("%s: ERROR %u\n", operation, (unsigned int)error);
+      return;
+  }
+  printf("%s: %s\n", operation, err);
+#elif defined(_STDIO_DEBUG_LEVEL) && _STDIO_DEBUG_LEVEL >= 1
+  if (error > 19) printf("%s: ERROR %u\n", operation, (unsigned int)error);
+#endif
 }
 
 size_t fread(void *buffer, size_t size, size_t count, FILE *f)
