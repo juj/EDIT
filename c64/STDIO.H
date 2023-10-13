@@ -208,7 +208,7 @@ static int fscanf(FILE *f, const char *format, ...)
   uint8_t ch, error = 0;
   consume_read_whitespace(f);
 
-  while(*format)
+  for(; *format; ++format)
   {
     if (isspace(*format))
     {
@@ -245,7 +245,6 @@ static int fscanf(FILE *f, const char *format, ...)
       break;
       }
     }
-    ++format;
   }
 end:
   va_end(args);
