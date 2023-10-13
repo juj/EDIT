@@ -37,7 +37,7 @@ uint8_t ADD_U8_SAT(uint8_t a, uint8_t b)
   else return result;
 }
 
-uint8_t SUB_U8_SAT(uint8_t a, uint8_t b)
+uint8_t __attribute__((leaf)) SUB_U8_SAT(uint8_t a, uint8_t b)
 {
   uint8_t tmp, result;
   __asm__(R"(

@@ -14,200 +14,33 @@
 
 #include "c64_kernal.h"
 
+#ifndef _STDIO_DEBUG_LEVEL
+#define _STDIO_DEBUG_LEVEL 0
+#endif
+
 struct FILE
 {
   uint8_t nextChar; // for read streams, the next character to come out from the file.
   uint8_t handle;
 };
 
-static void _assert(bool condition, const char *str, const char *file, int line, const char *func)
-{
-#ifndef NDEBUG
-  if (!condition)
-  {
-#if defined(_STDIO_DEBUG_LEVEL) && _STDIO_DEBUG_LEVEL >= 2
-    printf("%s:%d:%s: ASSERT \"%s\" FAILED!\n", file, line, func, str);
-#elif defined(_STDIO_DEBUG_LEVEL) && _STDIO_DEBUG_LEVEL >= 1
-    printf("%s:%d: ASSERT FAILED!\n", file, line);
-#else
-    printf("LINE %d: ASSERT FAILED!\n", line);
-#endif
-    volatile uint8_t * const border = (uint8_t*)0xD020;
-    for(;;) // Halt, and blink border red-black
-    {
-      *border = *border & 0xF ? 0 : 0x0A;
-      for(unsigned int i = 0; i < 65535; ++i) asm("NOP":::"memory");
-    }
-  }
-#endif
-}
-
-#define assert(x) _assert((x), #x, __FILE__, __LINE__, __func__);
-
 #define MAX_FILENAME_LEN 16
 
 static bool string_contains_char(const char *str, char ch)
 {
+  assert(str);
   while(*str) if (*str++ == ch) return true;
   return false;
 }
 
-FILE *fopen(const char *filename, const char *mode)
-{
-  static uint8_t fileHandleCounter = 3;
-
-  char fn[MAX_FILENAME_LEN+1+3+4]; // Add +1 for null, +3 for "@0:" prefix and +4 for ",U,W" suffix.
-  // Prepend "@0:" to the filename to have any existing filename be replaced.
-  fn[0] = 64; // '@' in PETSCII
-  fn[1] = '0';
-  fn[2] = ':';
-  uint8_t i = 3;
-  for(uint8_t j = 0; filename[j]; ++j) { fn[i++] = filename[j]; }
-  // Append ",S,R" or ",S,W" to filename to tell that the file type is Sequential, and that
-  // we are either reading or writing to the file.
-  fn[i++] = ',';
-  fn[i++] = 'S';
-  fn[i++] = ',';
-  bool readingFile = string_contains_char(mode, 'r');
-  fn[i++] = readingFile ? 'R' : 'W';
-  fn[i] = 0;
-  _SETNAM(fn, i);
-  _SETLFS(fileHandleCounter, 8, fileHandleCounter); // todo file ID
-  uint8_t error = _OPEN();
-  if (error >= 20 && error <= 74)
-  {
-    printf("FOPEN FAILED, ERROR %d\n", (int)error);
-    return 0;
-  }
-
-  if (readingFile) _CHKIN(fileHandleCounter);
-  else _CHKOUT(fileHandleCounter);
-
-  if ((error = _READST()))
-  {
-    _CLOSE(fileHandleCounter);
-    _CLRCHN();
-    printf("READST AFTER FOPEN FAILED, ERROR %d\n", (int)error);
-    return 0;
-  }
-
-  FILE *f = (FILE*)malloc(sizeof(FILE));
-  if (!f)
-  {
-    _CLRCHN();
-    printf("FOPEN-MALLOC FAILED!\n");
-    return 0;
-  }
-  if (readingFile) f->nextChar = _CHRIN(); // read first char in advance
-  f->handle = fileHandleCounter++; // TODO multiple handles
-  if (fileHandleCounter == 255) fileHandleCounter = 2;
-
-  return f;
-}
-
-int fclose(FILE *f)
-{
-  assert(f); // The behavior is undefined if the value of the pointer stream is used after fclose returns.
-  _CLOSE(f->handle);
-  _CLRCHN();
-  free(f);
-  return 0;
-}
-
-static void consume_read_whitespace(FILE *f)
-{
-  while(isspace(f->nextChar))
-  {
-    if (_READST()) return;// { CLRCHN(); printf("CONSUMEWS READST ERROR!\n"); return; }
-    f->nextChar = _CHRIN();
-  }
-}
-
-static int read_int_from_file(FILE *f)
-{
-  assert(isdigit(f->nextChar));
-  char intstr[6] = { 0, 0, 0, 0, 0, 0 }; // max length 65536
-  uint8_t i = 0;
-  while(isdigit(f->nextChar))
-  {
-    intstr[i++] = f->nextChar;
-    if (_READST()) break;//{ CLRCHN(); printf("READINT READST ERROR!\n"); break; }
-    f->nextChar = _CHRIN();
-    if (i >= 5) i = 0; // if i gets this large, read will overflow (will read garbage)
-  }
-  return atoi(intstr);
-}
-
-static void read_string_from_file(FILE *f, char *dst)
-{
-  assert(!isspace(f->nextChar));
-  while(!isspace(f->nextChar) && !_READST())
-  {
-    *dst++ = f->nextChar;
-    f->nextChar = _CHRIN();
-  }
-}
-
-static int fscanf(FILE *f, const char *format, ...)
-{
-  _CHKIN(f->handle);
-
-  va_list args;
-  va_start(args, format);
-  // consume any initial whitespace in input
-  int8_t num_parsed = 0;
-  uint8_t ch, error = 0;
-  consume_read_whitespace(f);
-
-  while(*format)
-  {
-    if (isspace(*format))
-    {
-      consume_read_whitespace(f);
-      while(isspace(*format)) ++format;
-    }
-    else if (*format != '%')
-    {
-      if (f->nextChar != *format) goto end;
-      if ((error = _READST())) goto end;
-      f->nextChar = _CHRIN();
-    }
-    else
-    {
-      ++format;
-      switch(*format)
-      {
-      case 'd':
-      {
-        if (!isdigit(f->nextChar)) goto end;
-
-        int *dst = va_arg(args, int*);
-        *dst = read_int_from_file(f);
-        ++num_parsed;
-      }
-      break;
-      case 's':
-      {
-        if (isspace(f->nextChar)) goto end; // todo not 100% sure if this would happen. Maybe "100asdf" being scanned as "%d %s"?
-        char *str = va_arg(args, char*);
-        read_string_from_file(f, str);
-        ++num_parsed;
-      }
-      break;
-      }
-    }
-    ++format;
-  }
-end:
-  va_end(args);
-  _CLRCHN();
-  if (error) printf("FSCANF ERROR %d\n", (int)error);
-  return num_parsed;
-}
-
 static void print_dos_error(uint8_t error, const char *operation)
 {
-#if defined(_STDIO_DEBUG_LEVEL) && _STDIO_DEBUG_LEVEL >= 2
+#if _STDIO_DEBUG_LEVEL >= 1
+  if (error < 20) return;
+  _CLRCHN();
+#endif
+
+#if _STDIO_DEBUG_LEVEL >= 2
   const char *err;
   switch(error)
   {
@@ -244,13 +77,179 @@ static void print_dos_error(uint8_t error, const char *operation)
     case 73: err = "POWER UP MESSAGE; break; OR WRITE ATTEMPT WITH DOS MISMATCH"; break;
     case 74: err = "DRIVE NOT READY"; break;
     default:
-      if (error > 19) printf("%s: ERROR %u\n", operation, (unsigned int)error);
+      printf("%s: ERROR %u\n", operation, (unsigned int)error);
       return;
   }
   printf("%s: %s\n", operation, err);
-#elif defined(_STDIO_DEBUG_LEVEL) && _STDIO_DEBUG_LEVEL >= 1
-  if (error > 19) printf("%s: ERROR %u\n", operation, (unsigned int)error);
+#elif _STDIO_DEBUG_LEVEL >= 1
+  printf("%s: ERROR %u\n", operation, (unsigned int)error);
 #endif
+}
+
+FILE *fopen(const char *filename, const char *mode)
+{
+  static uint8_t fileHandleCounter = 3;
+
+  char fn[MAX_FILENAME_LEN+1+3+4]; // Add +1 for null, +3 for "@0:" prefix and +4 for ",U,W" suffix.
+  // Prepend "@0:" to the filename to have any existing filename be replaced.
+  fn[0] = 64; // '@' in PETSCII
+  fn[1] = '0';
+  fn[2] = ':';
+  uint8_t i = 3;
+  assert(filename);
+  for(uint8_t j = 0; filename[j]; ++j) { fn[i++] = filename[j]; }
+  // Append ",S,R" or ",S,W" to filename to tell that the file type is Sequential, and that
+  // we are either reading or writing to the file.
+  fn[i++] = ',';
+  fn[i++] = 'S';
+  fn[i++] = ',';
+  bool readingFile = string_contains_char(mode, 'r');
+  fn[i++] = readingFile ? 'R' : 'W';
+  _SETNAM(fn, i);
+  _SETLFS(fileHandleCounter, 8, fileHandleCounter); // todo file ID
+  uint8_t error = _OPEN();
+  print_dos_error(error, "FOPEN");
+
+  error = readingFile ? _CHKIN(fileHandleCounter) : _CHKOUT(fileHandleCounter);
+  print_dos_error(error, "FOPEN/CHKINOUT");
+
+  if ((error = _READST()))
+  {
+    _CLOSE(fileHandleCounter);
+    _CLRCHN();
+    print_dos_error(error, "FOPEN/READST");
+    return 0;
+  }
+
+  FILE *f = (FILE*)malloc(sizeof(FILE));
+  if (!f)
+  {
+    _CLRCHN();
+#if _STDIO_DEBUG_LEVEL >= 2
+    printf("FOPEN: OOM\n");
+#endif
+    return 0;
+  }
+  if (readingFile) f->nextChar = _CHRIN(); // read first char in advance
+  f->handle = fileHandleCounter++; // TODO multiple handles
+  if (fileHandleCounter == 255) fileHandleCounter = 2;
+
+  return f;
+}
+
+int fclose(FILE *f)
+{
+  assert(f); // The behavior is undefined if the value of the pointer stream is used after fclose returns.
+  _CLOSE(f->handle);
+  _CLRCHN();
+  free(f);
+  return 0;
+}
+
+static void consume_read_whitespace(FILE *f)
+{
+  uint8_t error;
+  while(isspace(f->nextChar))
+  {
+    if ((error = _READST()))
+    {
+      print_dos_error(error, "CONSUMEWS");
+      return;
+    }
+    f->nextChar = _CHRIN();
+  }
+}
+
+static int read_int_from_file(FILE *f)
+{
+  uint8_t error;
+  assert(isdigit(f->nextChar));
+  char intstr[6] = { 0, 0, 0, 0, 0, 0 }; // max length 65536
+  uint8_t i = 0;
+  while(isdigit(f->nextChar))
+  {
+    intstr[i++] = f->nextChar;
+    if ((error = _READST()))
+    {
+      print_dos_error(error, "READINT");
+      break;
+    }
+    f->nextChar = _CHRIN();
+    if (i >= 5) i = 0; // if i gets this large, read will overflow (will read garbage)
+  }
+  return atoi(intstr);
+}
+
+static void read_string_from_file(FILE *f, char *dst)
+{
+  uint8_t error;
+  assert(!isspace(f->nextChar));
+  while(!isspace(f->nextChar))
+  {
+    if ((error = _READST()))
+    {
+      print_dos_error(error, "READSTR");
+      break;
+    }
+    *dst++ = f->nextChar;
+    f->nextChar = _CHRIN();
+  }
+}
+
+static int fscanf(FILE *f, const char *format, ...)
+{
+  _CHKIN(f->handle);
+
+  va_list args;
+  va_start(args, format);
+  // consume any initial whitespace in input
+  int8_t num_parsed = 0;
+  uint8_t ch, error = 0;
+  consume_read_whitespace(f);
+
+  while(*format)
+  {
+    if (isspace(*format))
+    {
+      consume_read_whitespace(f);
+      while(isspace(*format)) ++format;
+    }
+    else if (*format != '%')
+    {
+      if (f->nextChar != *format) goto end;
+      if ((error = _READST())) { print_dos_error(error, "FSCANF"); goto end; }
+      f->nextChar = _CHRIN();
+    }
+    else
+    {
+      ++format;
+      switch(*format)
+      {
+      case 'd':
+      {
+        if (!isdigit(f->nextChar)) goto end;
+
+        int *dst = va_arg(args, int*);
+        *dst = read_int_from_file(f);
+        ++num_parsed;
+      }
+      break;
+      case 's':
+      {
+        if (isspace(f->nextChar)) goto end; // todo not 100% sure if this would happen. Maybe "100asdf" being scanned as "%d %s"?
+        char *str = va_arg(args, char*);
+        read_string_from_file(f, str);
+        ++num_parsed;
+      }
+      break;
+      }
+    }
+    ++format;
+  }
+end:
+  va_end(args);
+  _CLRCHN();
+  return num_parsed;
 }
 
 size_t fread(void *buffer, size_t size, size_t count, FILE *f)
@@ -262,27 +261,25 @@ size_t fread(void *buffer, size_t size, size_t count, FILE *f)
     for(size_t j = 0; j < count; ++j)
     {
       *ptr++ = f->nextChar;
-      if ((error = _READST())) break;
+      if ((error = _READST())) { print_dos_error(error, "FREAD"); break; }
       f->nextChar = _CHRIN();
     }
   _CLRCHN();
-  if (error) printf("FREAD ERROR %d\n", (int)error);
   return (uintptr_t)ptr - (uintptr_t)buffer;
 }
 
 size_t fwrite(const void *buffer, size_t size, size_t count, FILE *f)
 {
-  _CHKOUT(f->handle);
-  uint8_t error = 0;
+  uint8_t error = _CHKOUT(f->handle);
+  print_dos_error(error, "FWRITE/CHKOUT");
   const uint8_t *ptr = (const uint8_t*)buffer;
   for(size_t i = 0; i < size; ++i)
     for(size_t j = 0; j < count; ++j)
     {
-      if ((error = _READST())) break;
+      if ((error = _READST())) { print_dos_error(error, "FWRITE"); break; }
       _CHROUT(*ptr++);
     }
   _CLRCHN();
-  if (error) printf("FWRITE ERROR %d\n", (int)error);
   return (uintptr_t)ptr - (uintptr_t)buffer;
 }
 
