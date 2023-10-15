@@ -35,7 +35,8 @@ void set_cursor_pos(uint8_t x, uint8_t y)
   *cursor_color = color_ram[y*SCREEN_WIDTH+x];
 }
 
-unsigned char petscii_to_screen_code(unsigned char petscii)
+unsigned char petscii_to_screen_code(unsigned char petscii);
+/*
 {
   if (petscii <= 31) return 32;//petscii + 128;
   if (petscii <= 63) return petscii;
@@ -46,6 +47,7 @@ unsigned char petscii_to_screen_code(unsigned char petscii)
   if (petscii <= 254) return petscii - 128;
   return 0x5E;
 }
+*/
 
 void put_screen(uint16_t linearPos, char ch, unsigned char color)
 {
