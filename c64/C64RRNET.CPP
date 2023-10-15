@@ -2,6 +2,8 @@
 #include <string.h>
 #include <stdint.h>
 #include "c64_kernal.h"
+#include "../NETWORK.h"
+#include "../SCREEN.h"
 
 static volatile uint8_t * const rrnet_ctl      = (uint8_t *)0xDE01;
 static volatile uint8_t * const cs_packet_page = (uint8_t *)0xDE02;
@@ -88,10 +90,23 @@ struct udp_header
 
 #define MAX_C64_FILENAME_LEN 16
 
-struct recv_file_datagram_header
+struct message_magic_header
 {
   uint32_t magic_header; // 0x25291423
+};
+
+struct recv_file_datagram
+{
   char filename[MAX_C64_FILENAME_LEN+1];
+};
+
+struct build_error_msg_datagram
+{
+  uint16_t line_no;
+  uint8_t column;
+  uint8_t success;
+  uint8_t msg_len; // If 0, build was ok
+  //char msg[msg_len];
 };
 
 static void read_struct(void *dst, uint16_t numBytes)
@@ -180,115 +195,13 @@ void clear_screen()
   memset((void*)screen_mem, 0x20, 40*25);
 }
 
-void set_cursor_pos(uint8_t x, uint8_t y)
-{
-  // https://sta.c64.org/cbm64krnfunc.html:
-  // $E50A == Save (get) or restore (set) cursor position.
-  // Disassembly at https://skoolkid.github.io/sk6502/c64rom/asm/E50A.html
-  asm volatile(R"(CLC // Clear Carry: Carry flag 0 signals to the KERNAL subroutine that it should set the cursor position
-                  JSR $E50A)"
-              :: "x"(y), "y"(x) : "a", "c", "memory");
-}
-
-static void SETNAM(const char *filename, uint8_t filenameLength)
-{
-  asm volatile("JSR $FFBD\n" // FFBD = SETNAM
-                : // outputs
-                : "a"(filenameLength), "x"((unsigned char)(uintptr_t)filename), "y"((unsigned char)((uintptr_t)filename>>8))
-                : "a", "x", "y");
-}
-
-static void SETLFS(unsigned char logicalFileNum, unsigned char deviceNum, unsigned char secondaryAddr)
-{
-  asm volatile("JSR $FFBA\n" // FFBA = SETLFS
-                : // outputs
-                : "a"(logicalFileNum), "x"(deviceNum), "y"(secondaryAddr) // inputs
-                :); // clobbers
-}
-
-// https://www.c64-wiki.com/wiki/Zeropage: $0002 is unused so safe to access.
-//static volatile unsigned char * const tmp = (unsigned char *)0x0002; // arbitrary safe temporary memory address for getting data out of inline assembly
-
-static uint8_t OPEN()
-{
-  unsigned char errorCode;
-  asm volatile("JSR $FFC0\n" // FFC0 = OPEN
-                : "=a" (errorCode) // outputs
-                : // inputs
-                : "x", "y", "c"); // clobbers
-  return errorCode;
-}
-
-static void CLOSE(unsigned char logicalFileNum)
-{
-  asm volatile("JSR $FFC3\n" // FFC3 = CLOSE
-                : // outputs
-                : "a"(logicalFileNum) // inputs
-                : "x", "y"); // clobbers
-}
-
-static void CHKIN(unsigned char logicalFileNum)
-{
-  asm volatile("JSR $FFC6\n" // FFC6 = CHKIN
-                : // outputs
-                : "x"(logicalFileNum) // inputs
-                : "a"); // clobbers
-}
-
-static void CHKOUT(unsigned char logicalFileNum)
-{
-  asm volatile("JSR $FFC9\n" // FFC9 = CHKOUT
-                : // outputs
-                : "x"(logicalFileNum) // inputs
-                : "a"); // clobbers
-}
-
-static uint8_t READST()
-{
-  unsigned char statusByte;
-  asm volatile("JSR $FFB7\n" // FFB7 = READST Read I/O status byte
-                : "=a" (statusByte) // outputs
-                : // inputs
-                : ); // clobbers
-  return statusByte;
-}
-
-static uint8_t CHRIN()
-{
-  unsigned char chrin;
-  asm volatile("JSR $FFCF\n" // FFCF = CHRIN
-                : "=a"(chrin) // outputs
-                : // inputs
-                : "y"); // clobbers
-  return chrin;
-}
-
-static uint8_t CHROUT(uint8_t byteToWrite)
-{
-  unsigned char error;
-  asm volatile("JSR $FFD2\n" // FFD2 = CHROUT
-               "LDA #0\n"
-               "ROL\n"
-                : "=a"(error) // outputs
-                : "a"(byteToWrite) // inputs
-                : "c"); // clobbers
-  return error;
-}
-
-static void CLRCHN()
-{
-  asm volatile("JSR $FFCC\n" // FFCC = CLRCHN - Restore default I/O channels
-                : // outputs
-                : // inputs
-                : "a", "x"); // clobbers
-}
-
 void close_file()
 {
-  CLOSE(2);
-  CLRCHN();
+  _CLOSE(2);
+  _CLRCHN();
 }
 
+// TODO REMOVE THIS FUNCTION since it is a duplicate, use fopen/fwrite instead?
 // return true on success
 bool open_file_for_saving(const char *filename)
 {
@@ -306,9 +219,9 @@ bool open_file_for_saving(const char *filename)
   fn[i++] = ',';
   fn[i++] = 'W';
   fn[i] = 0;
-  SETNAM(fn, i);
-  SETLFS(2, 8, 2);
-  uint8_t error = OPEN();
+  _SETNAM(fn, i);
+  _SETLFS(2, 8, 2);
+  uint8_t error = _OPEN();
   // 1541 documentation: https://archive.org/details/Commodore_1541_Disk_Drive_Users_Guide_1982-09_Commodore/page/n57/mode/2up
   // "Error message numbers less than 20 should be ignored with the exception of 01 which gives information about the number of
   // "files scratched" (we are not calling the SCRATCH command here)
@@ -321,8 +234,8 @@ bool open_file_for_saving(const char *filename)
 //        ; FILE EXISTS error etc.
     return false;
   }
-  CHKOUT(2);  
-  error = READST();
+  _CHKOUT(2);  
+  error = _READST();
 
 end:
   if (error)
@@ -351,7 +264,9 @@ bool poll_for_receive_file()
     eth_frame frame;
     ip_frame ip;
     udp_header udp;
-    recv_file_datagram_header recv_header;
+    message_magic_header magic;
+    recv_file_datagram recv_header;
+    build_error_msg_datagram recv_msg;
   } net;
 
 #define READ_STRUCT(s) \
@@ -370,55 +285,81 @@ bool poll_for_receive_file()
   net.udp.dst_port = ntohs(net.udp.dst_port);
   net.udp.length = ntohs(net.udp.length);
 
-  READ_STRUCT(net.recv_header);
-  if (net.recv_header.magic_header != 0x25291423) goto end;
-
-  net.recv_header.filename[MAX_C64_FILENAME_LEN] = 0;
-
-  if (!open_file_for_saving(net.recv_header.filename))
+  READ_STRUCT(net.magic);
+  if (net.magic.magic_header == 0x25291423) // Receive file from network to disk
   {
-    printf("FAILED TO OPEN FILE \"%s\"\n", net.recv_header.filename);
-    goto end;
-  }
+    READ_STRUCT(net.recv_header);
+    net.recv_header.filename[MAX_C64_FILENAME_LEN] = 0;
 
-  uint16_t size;
-  size = bytes_left;
-  clear_screen();
-  uint8_t origScreenFrameColor;
-  origScreenFrameColor = *screen_frame;
-  while(bytes_left > 0)
-  {
-    uint16_t data = rx_data_lo_hi();
-    --bytes_left;
-    uint8_t n = 1;
-    if (bytes_left)
+    if (!open_file_for_saving(net.recv_header.filename))
     {
-      ++n;
+      printf("FAILED TO OPEN FILE \"%s\"\n", net.recv_header.filename);
+      goto end;
+    }
+
+    uint16_t size;
+    size = bytes_left;
+    clear_screen();
+    uint8_t origScreenFrameColor;
+    origScreenFrameColor = *screen_frame;
+    while(bytes_left > 0)
+    {
+      uint16_t data = rx_data_lo_hi();
       --bytes_left;
-    }
-    uint8_t ch[2] = { (char)(data), (char)(data >> 8) };
+      uint8_t n = 1;
+      if (bytes_left)
+      {
+        ++n;
+        --bytes_left;
+      }
+      uint8_t ch[2] = { (char)(data), (char)(data >> 8) };
 
-    for(uint8_t i = 0; i < n; ++i)
+      for(uint8_t i = 0; i < n; ++i)
+      {
+        put_screen(ch[i]);
+        if (_READST()) { close_file(); error = true; goto end_receive_file; }
+        _CHROUT(ch[i]);
+      }
+    }
+    close_file();
+end_receive_file:
+    *screen_frame = origScreenFrameColor;
+    _PLOT_SET(0, 0);
+    clear_screen();
+    if (error)
+      printf("\nFAILED TO WRITE FILE!\n");
+    else
     {
-      put_screen(ch[i]);
-      if (READST() || CHROUT(ch[i])) { close_file(); error = true; goto end; }
+      printf("\nWROTE %u BYTES TO FILE \"%s\"\n", size, net.recv_header.filename);
+      received_file = true;
     }
   }
+  else if (net.magic.magic_header == MAGIC_BUILD_ERROR_MSG) // Receive build error message from network
+  {
+    READ_STRUCT(net.recv_msg);
 
-  close_file();
+    uint16_t linearPos = (SCREEN_HEIGHT-1)*SCREEN_WIDTH;
+    uint8_t color = (net.recv_msg.success ? LTGREEN : LTRED) | 0x80;
+    while(net.recv_msg.msg_len > 0)
+    {
+      uint16_t data = rx_data_lo_hi();
+      put_screen(linearPos++, (char)data, color);
+      --bytes_left;
+      if (bytes_left > 0)
+      {
+        put_screen(linearPos++, (char)(data>>8), color);
+        --bytes_left;
+      }
+    }
+    /*
+  uint16_t line_no;
+  uint8_t column;
+  uint8_t success;
+  uint8_t msg_len; // If 0, build was ok
+  //char msg[msg_len];
+    */
+  }
 end:
-  *screen_frame = origScreenFrameColor;
-  set_cursor_pos(0, 0);
-  clear_screen();
-  if (error)
-  {
-    printf("\nFAILED TO WRITE FILE!\n");
-  }
-  else
-  {
-    printf("\nWROTE %u BYTES TO FILE \"%s\"\n", size, net.recv_header.filename);
-    received_file = true;
-  }
 
   // Flush rest of the received bytes from the receive buffer
   discard_rx_bytes(bytes_left);
