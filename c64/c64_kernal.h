@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 #ifndef NDEBUG
-int printf(const char *format, ...);
+static void Printf(const char *format, ...);
 #endif
 
 #ifdef __C64__
@@ -32,11 +32,11 @@ static void __assert(bool condition, const char *str, const char *file, int line
     // TODO: Don't call printf from within assert, but instead do a super simple putscreen
     // to print this info.
 #if defined(_STDIO_DEBUG_LEVEL) && _STDIO_DEBUG_LEVEL >= 2
-    printf("%s:%d:%s: ASSERT \"%s\" FAILED!\n", file, line, func, str);
+    Printf("%s:%d:%s: ASSERT \"%s\" FAILED!\n", file, line, func, str);
 #elif defined(_STDIO_DEBUG_LEVEL) && _STDIO_DEBUG_LEVEL >= 1
-    printf("%s:%d: ASSERT FAILED!\n", file, line);
+    Printf("%s:%d: ASSERT FAILED!\n", file, line);
 #else
-    printf("LINE %d: ASSERT FAILED!\n", line);
+    Printf("LINE %d: ASSERT FAILED!\n", line);
 #endif
     for(;;) // Halt, and blink border red-black
     {

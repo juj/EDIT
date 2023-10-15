@@ -1,16 +1,18 @@
 #pragma once
 
-#include "c64/c64_kernal.h"
+#include <stdio.h>//xxxx
+#include <stdarg.h>
+#include "c64_kernal.h"
 
 // Prints the given uint16 to CHROUT.
 static void chrout_u16(uint16_t num)
 {
   uint8_t zp0, zp1, zp2;
-  __asm__(R"(
+  __attribute__((leaf)) __asm__(R"(
     SED // Enter BCD mode (affects ADC commands below)
 
     LDA #0
-    STA %[zp0] // Use three zero page registers 247,248,249 to store the BCD output
+    STA %[zp0] // Use three zero page registers to store the BCD output
     STA %[zp1] // Initialize these all to zero at start
     STA %[zp2]
 
@@ -33,10 +35,11 @@ loop:
     BNE loop
 
     CLD // Exit BCD mode
-  )":[zp0]"=r"(zp0), [zp1]"=r"(zp1), [zp2]"=r"(zp2), [input]"+r"(num)::"a","x");
+  )":[zp0]"=r"(zp0), [zp1]"=r"(zp1), [zp2]"=r"(zp2), [input]"+r"(num)::"a","x","c");
 
+//  printf("%02x %02x %02x\n", (int)zp0, (int)zp1, (int)zp2);
   if (zp2)     goto five;
-  if (zp1>9)   goto four;
+  if (zp1 > 9) goto four;
   if (zp1)     goto three;
   if (zp0 > 9) goto two;
   goto one;
@@ -61,8 +64,8 @@ static void Printf(const char *format, ...)
       switch(*format)
       {
       // TODO: %x/%X/%04X/%lu/%ld
-      case '%': _CHROUT('%'); break;
-      case 'c': _CHROUT(va_arg(args, char)); break;
+//      case '%': _CHROUT('%'); break;
+  //    case 'c': _CHROUT(va_arg(args, int/*char*/)); break;
       case 'd':
         dst = va_arg(args, int);
         if (dst < 0) { _CHROUT('-'); dst = -dst; }
@@ -80,7 +83,8 @@ print_unsigned:
       default: assert(false); break;
       }
     }
-    else _CHROUT(*format == '\n' ? '\r' : *format);
+    else
+      _CHROUT(*format == '\n' ? '\r' : *format);
   }
   va_end(args);
 }
