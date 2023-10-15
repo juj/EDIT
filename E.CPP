@@ -255,6 +255,7 @@ void insert_character(char ch)
       verify_screen_is_painted_correctly();
     }
   }
+  send_line_to_network_server(EDIT_TYPE_REPLACE_LINE, currentFile, currentLine, current_line_number());
 }
 
 void delete_character()
@@ -271,6 +272,7 @@ void delete_character()
     --currentLine->length;
     clear_highlight(currentLine);
     repaint_current_line_from_offset(MAX(cursorX-1, 0), currentLine->length+1);
+    send_line_to_network_server(EDIT_TYPE_REPLACE_LINE, currentFile, currentLine, current_line_number());
   }
   else // join next line on this
   {
@@ -301,6 +303,8 @@ void delete_character()
       currentFile->lastLine = currentLine;
     }
     delete_line(next);
+    send_line_to_network_server(EDIT_TYPE_DELETE_LINE, currentFile, 0, current_line_number()+1);
+    send_line_to_network_server(EDIT_TYPE_REPLACE_LINE, currentFile, currentLine, current_line_number());
     clear_highlight(currentLine);
 
     cursor_pos endY = screen_end_y_of_last_line_on_screen(currentLine, cursorY)+2;
@@ -739,6 +743,9 @@ void insert_new_line(bool cursorMovesToNewline)
   currentLine->nextLine = newLine;
   clear_highlight(currentLine);
 
+  send_line_to_network_server(EDIT_TYPE_REPLACE_LINE, currentFile, currentLine, current_line_number());
+  send_line_to_network_server(EDIT_TYPE_INSERT_LINE, currentFile, newLine, current_line_number()+1);
+
   if (cursorMovesToNewline)
   {
     bool needRepaint = (viewportXOffset != 0);
@@ -798,6 +805,8 @@ void erase_line(Line *line)
     if (subst == line->prevLine) --cursorY;
     currentLine = subst;
   }
+
+  send_line_to_network_server(EDIT_TYPE_DELETE_LINE, currentFile, line, get_line_number(line));
 
   if (line == currentFile->firstLine) currentFile->firstLine = line->nextLine;
   if (line == currentFile->lastLine) currentFile->lastLine = line->prevLine;
@@ -974,6 +983,7 @@ void main_loop()
 
   while(running)
   {
+    receive_data_from_network();
     print_line_column_info();
     set_cursor_pos(cursorX, cursorY);
 
