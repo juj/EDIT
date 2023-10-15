@@ -58,6 +58,7 @@ struct UpdateLineMsg
   uint8_t edit_type; // if 0, replace existing line
   uint8_t filename_len;
   uint8_t line_len;
+  uint8_t dummy; // pad to multiple of 16bits
   //char filename[filename_len];
   //char line[line_len];
 };
@@ -70,6 +71,7 @@ struct BuildErrorMsg
   uint8_t column;
   uint8_t success;
   uint8_t msg_len; // If 0, build was ok
+  uint8_t dummy;
   //char msg[msg_len];
 };
 
