@@ -127,7 +127,7 @@ _KERNAL void _SETLFS(uint8_t file_no, uint8_t device_address, uint8_t secondary_
 _KERNAL void _SETNAM(const char *filename, uint8_t length) { NEED_STACK(2); assert(filename || !length); _ASM volatile("JSR $FFBD"::"a"(length), "x"(_LO(filename)), "y"(_HI(filename)):); }
 
 // Open a Logical File. Returns error code (0=no error).
-_KERNAL uint8_t _OPEN() { uint8_t error; _ASM volatile("JSR $FFC0\nBCS error\nLDA #0\nerror:":"=a"(error)::"x","y","c"); return error; }
+_KERNAL uint8_t _OPEN() { uint8_t error; _ASM volatile("JSR $FFC0\nBCS error_open%=\nLDA #0\nerror_open%=:":"=a"(error)::"x","y","c"); return error; }
 
 // Close a Logical File. Returns error code (0=no error).
 _KERNAL uint8_t _CLOSE(uint8_t file_no) { NEED_STACK(2/*todo:max unknown*/); uint8_t error; _ASM volatile("JSR $FFC3":"=a"(error):"a"(file_no):"x","y","c"); return error; }
@@ -180,9 +180,9 @@ _KERNAL uint8_t _SAVE(const void *start, const void *end)
   _ASM volatile(
     "LDA #%[zp]\n"
     "JSR $FFD8\n" // Call the 'SAVE' KERNAL ROM routine
-    "BCS error\n"
+    "BCS error_save%=\n"
     "LDA #0\n"
-    "error:\n"
+    "error_save%=:\n"
     :"=a"(error),CLOB_X,CLOB_Y:[zp]"r"(start),"x"(_LO(end)),"y"(_HI(end)):"c");
   return error;
 }
