@@ -41,7 +41,7 @@ uint8_t SUB_U8_SAT(uint8_t a, uint8_t b)
 {
 #ifdef __C64__
   uint8_t tmp, result;
-  _ASM(R"(
+  __attribute__((leaf)) __asm__(R"(
     STX %[zp]
     SEC
     SBC %[zp]
