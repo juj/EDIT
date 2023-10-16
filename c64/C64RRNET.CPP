@@ -255,16 +255,11 @@ void start_udp_send(uint16_t numBytes)
   net.ip.timeToLive = 128;
   net.ip.protocol = 17; // udp
   net.ip.headerChecksum = 0; // temporary, will be filled later
-  /*
+
   net.ip.src_ip[0] = 192;
   net.ip.src_ip[1] = 168;
   net.ip.src_ip[2] = 0;
-  net.ip.src_ip[3] = 182;
-  */
-  net.ip.src_ip[0] = 192;
-  net.ip.src_ip[1] = 168;
-  net.ip.src_ip[2] = 0;
-  net.ip.src_ip[3] = 2;
+  net.ip.src_ip[3] = 255;
 
   net.ip.dst_ip[0] = 255;
   net.ip.dst_ip[1] = 255;
