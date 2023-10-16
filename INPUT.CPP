@@ -11,6 +11,7 @@
 #include <string.h>
 #include "screen.h"
 #include "cursor.h"
+#include "network.h"
 
 #if defined(__TURBOC__) && defined(__MSDOS__)
 
@@ -252,6 +253,15 @@ int ask_yes_no_prompt(const char *prompt)
   char dst[2] = {0};
   int ret = ask_string_prompt(prompt, dst, 1);
   return ret > 0 && (dst[0] == 'y' || dst[0] == 'Y');
+}
+
+int get_key_and_poll_network()
+{
+  for(;;)
+  {
+    if (is_get_key_pending()) return get_key();
+    else receive_data_from_network();
+  }
 }
 
 #if defined(_MSC_VER)

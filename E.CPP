@@ -983,7 +983,6 @@ void main_loop()
 
   while(running)
   {
-    receive_data_from_network();
     print_line_column_info();
     set_cursor_pos(cursorX, cursorY);
 
@@ -995,7 +994,7 @@ void main_loop()
 #ifdef __C64__
     highlight_scroll_to_right(viewportXOffset != 0);
 #endif
-    int key = get_key();
+    int key = get_key_and_poll_network();
 
     // Doing text selection?
     bool textSelection = 0;

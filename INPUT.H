@@ -94,7 +94,8 @@ bool is_ctrl_key_currently_down();
 bool is_alt_key_currently_down();
 
 bool is_get_key_pending();
-int get_key();
+int get_key(); // block to wait for a received key
+int get_key_and_poll_network(); // block to wait for a key, but pump network transfers while at it
 
 bool is_shift_key_held(int key);
 int is_shift_aware_key(int key);
