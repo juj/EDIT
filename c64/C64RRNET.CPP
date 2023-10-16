@@ -143,10 +143,12 @@ void start_tx(uint16_t numBytes)
 
 void tx_bytes(const void *msg, uint16_t numBytes)
 {
-  numBytes = (numBytes+1)>>1;
+  bool odd_data = (numBytes&1);
+  numBytes >>= 1;
   const uint16_t *m16 = (const uint16_t*)msg;
   while(numBytes--)
     write_u16_lo_hi(cs_rxtx_data, *m16++);
+  if (odd_data) write_u16_lo_hi(cs_rxtx_data, *(uint8_t*)m16);
 }
 
 static volatile unsigned char * const screen_mem = (unsigned char*)0x0400;
@@ -185,7 +187,7 @@ unsigned char petscii_to_screen_code(unsigned char petscii)
 uint16_t screen_pos = 0;
 void put_screen(char ch)
 {
-  screen_mem[screen_pos++] = petscii_to_screen_code(ascii_to_petscii(ch));
+  screen_mem[screen_pos++] = petscii_to_screen_code(ch);
   if (screen_pos >= 40*25) screen_pos = 0;
   *screen_frame = ch;
 }
@@ -199,6 +201,106 @@ void close_file()
 {
   _CLOSE(2);
   _CLRCHN();
+}
+
+uint16_t sum1c(uint16_t a, uint16_t b)
+{
+  a += b;
+  return a + (a < b);
+}
+
+uint16_t calculate_one1c_checksum(void *data, uint16_t numBytes)
+{
+  assert(numBytes % 2 == 0);
+  numBytes >>= 1;
+  uint16_t *d = (uint16_t *)data;
+  uint16_t checksum = 0;
+  while(numBytes--)
+    checksum = sum1c(checksum, ntohs(*d++));
+  return ~checksum;
+}
+
+void start_udp_send(uint16_t numBytes)
+{
+  union
+  {
+    eth_frame frame;
+    ip_frame ip;
+    udp_header udp;
+  } net;
+
+  uint16_t numBytesRoundedUpToEven = numBytes + (numBytes&1);
+  start_tx(sizeof(net.frame) + sizeof(net.ip) + sizeof(net.udp) + numBytesRoundedUpToEven);
+//  for(int i = 0; i < 6; ++i)
+//    net.frame.dst_mac[i] = 0xFF;
+  net.frame.dst_mac[0] = 0x80;
+  net.frame.dst_mac[1] = 0xEE;
+  net.frame.dst_mac[2] = 0x73;
+  net.frame.dst_mac[3] = 0xD3;
+  net.frame.dst_mac[4] = 0xCD;
+  net.frame.dst_mac[5] = 0x69;
+/*
+  net.frame.src_mac[0] = 0x00;
+  net.frame.src_mac[1] = 0x80;
+  net.frame.src_mac[2] = 0x10;
+  net.frame.src_mac[3] = 0xB3;
+  net.frame.src_mac[4] = 0xEB;
+  net.frame.src_mac[5] = 0xB7;
+  */
+  net.frame.src_mac[0] = 0x04;
+  net.frame.src_mac[1] = 0xD9;
+  net.frame.src_mac[2] = 0xF5;
+  net.frame.src_mac[3] = 0xD5;
+  net.frame.src_mac[4] = 0x78;
+  net.frame.src_mac[5] = 0xFD;
+
+  net.frame.etherType = 0x0008;
+  tx_bytes(&net.frame, sizeof(net.frame));
+
+  uint16_t ipChecksum = 0x4500;
+  net.ip.versionAndHeaderLength = 0x45;
+  net.ip.typeOfService = 0;
+  net.ip.packetLength = ntohs(sizeof(net.ip) + sizeof(net.udp) + numBytesRoundedUpToEven);
+  net.ip.identification = 0;
+  net.ip.flagsAndFragmentOffset = 0;
+  net.ip.timeToLive = 128;
+  net.ip.protocol = 17; // udp
+  net.ip.headerChecksum = 0; // temporary, will be filled later
+  /*
+  net.ip.src_ip[0] = 192;
+  net.ip.src_ip[1] = 168;
+  net.ip.src_ip[2] = 0;
+  net.ip.src_ip[3] = 182;
+  */
+  net.ip.src_ip[0] = 192;
+  net.ip.src_ip[1] = 168;
+  net.ip.src_ip[2] = 0;
+  net.ip.src_ip[3] = 2;
+
+  net.ip.dst_ip[0] = 192;//255;
+  net.ip.dst_ip[1] = 168;//255;
+  net.ip.dst_ip[2] = 0;//255;
+  net.ip.dst_ip[3] = 144;//255;
+  net.ip.headerChecksum = ntohs(calculate_one1c_checksum(&net.ip, sizeof(net.ip))); // Calculate the IP checksum
+
+  tx_bytes(&net.ip, sizeof(net.ip));
+/*
+  uint16_t udpChecksum = ntohs(*(uint16_t*)&net.ip.src_ip[0]);
+  udpChecksum = sum1c(udpChecksum, ntohs(*(uint16_t*)&net.ip.src_ip[2]));
+  udpChecksum = sum1c(udpChecksum, ntohs(*(uint16_t*)&net.ip.dst_ip[0]));
+  udpChecksum = sum1c(udpChecksum, ntohs(*(uint16_t*)&net.ip.dst_ip[2]));
+  udpChecksum = sum1c(udpChecksum, 17protocol); // protocol
+*/
+  net.udp.src_port = ntohs(49739);
+  net.udp.dst_port = ntohs(4009);
+  uint16_t udpLength = sizeof(net.udp) + numBytesRoundedUpToEven;
+//  udpChecksum = sum1c(udpChecksum, udpLength);
+  net.udp.length = ntohs(udpLength);
+  net.udp.checksum = 0;
+  tx_bytes(&net.udp, sizeof(net.udp));
+
+  // The only thing left now is to fill the actual UDP payload data,
+  // which is the caller's side to do.
 }
 
 // TODO REMOVE THIS FUNCTION since it is a duplicate, use fopen/fwrite instead?
@@ -340,24 +442,23 @@ end_receive_file:
 
     uint16_t linearPos = (SCREEN_HEIGHT-1)*SCREEN_WIDTH;
     uint8_t color = (net.recv_msg.success ? LTGREEN : LTRED) | 0x80;
+    if (net.recv_msg.msg_len > 34) net.recv_msg.msg_len = 34;
+    if (net.recv_msg.msg_len > bytes_left) net.recv_msg.msg_len = bytes_left;
+
     while(net.recv_msg.msg_len > 0)
     {
       uint16_t data = rx_data_lo_hi();
       put_screen(linearPos++, (char)data, color);
       --bytes_left;
-      if (bytes_left > 0)
+      --net.recv_msg.msg_len;
+      if (net.recv_msg.msg_len > 0)
       {
         put_screen(linearPos++, (char)(data>>8), color);
         --bytes_left;
+        --net.recv_msg.msg_len;
       }
     }
-    /*
-  uint16_t line_no;
-  uint8_t column;
-  uint8_t success;
-  uint8_t msg_len; // If 0, build was ok
-  //char msg[msg_len];
-    */
+    while(linearPos < SCREEN_HEIGHT*SCREEN_WIDTH-5) put_screen(linearPos++, ' ', LTBLUE);
   }
 end:
 
