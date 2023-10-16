@@ -39,7 +39,7 @@ uint8_t ADD_U8_SAT(uint8_t a, uint8_t b)
 
 uint8_t SUB_U8_SAT(uint8_t a, uint8_t b)
 {
-#ifdef __C64__
+#if defined(__C64__) && 0 // TODO: Currently disabled, as this results in incorrect code somehow?
   uint8_t tmp, result;
   __attribute__((leaf)) __asm__(R"(
     STX %[zp]
@@ -48,7 +48,7 @@ uint8_t SUB_U8_SAT(uint8_t a, uint8_t b)
     BCS good
     LDA #0
   good:
-  )":"=a"(result):[zp]"r"(tmp),"a"(a),"x"(b):"c");
+  )":"=a"(result),[zp]"+r"(tmp):"a"(a),"x"(b):"c");
   return result;
 #else
 // The above code is an optimized form of this code:
