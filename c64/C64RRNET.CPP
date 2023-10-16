@@ -239,20 +239,13 @@ void start_udp_send(uint16_t numBytes)
   net.frame.dst_mac[3] = 0xD3;
   net.frame.dst_mac[4] = 0xCD;
   net.frame.dst_mac[5] = 0x69;
-/*
+
   net.frame.src_mac[0] = 0x00;
   net.frame.src_mac[1] = 0x80;
   net.frame.src_mac[2] = 0x10;
   net.frame.src_mac[3] = 0xB3;
   net.frame.src_mac[4] = 0xEB;
   net.frame.src_mac[5] = 0xB7;
-  */
-  net.frame.src_mac[0] = 0x04;
-  net.frame.src_mac[1] = 0xD9;
-  net.frame.src_mac[2] = 0xF5;
-  net.frame.src_mac[3] = 0xD5;
-  net.frame.src_mac[4] = 0x78;
-  net.frame.src_mac[5] = 0xFD;
 
   net.frame.etherType = 0x0008;
   tx_bytes(&net.frame, sizeof(net.frame));
