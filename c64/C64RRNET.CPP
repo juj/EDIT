@@ -231,14 +231,10 @@ void start_udp_send(uint16_t numBytes)
 
   uint16_t numBytesRoundedUpToEven = numBytes + (numBytes&1);
   start_tx(sizeof(net.frame) + sizeof(net.ip) + sizeof(net.udp) + numBytesRoundedUpToEven);
-//  for(int i = 0; i < 6; ++i)
-//    net.frame.dst_mac[i] = 0xFF;
-  net.frame.dst_mac[0] = 0x80;
-  net.frame.dst_mac[1] = 0xEE;
-  net.frame.dst_mac[2] = 0x73;
-  net.frame.dst_mac[3] = 0xD3;
-  net.frame.dst_mac[4] = 0xCD;
-  net.frame.dst_mac[5] = 0x69;
+
+  // Perform UDP broadcast
+  for(int i = 0; i < 6; ++i)
+    net.frame.dst_mac[i] = 0xFF;
 
   net.frame.src_mac[0] = 0x00;
   net.frame.src_mac[1] = 0x80;
