@@ -246,7 +246,6 @@ void start_udp_send(uint16_t numBytes)
   net.frame.etherType = 0x0008;
   tx_bytes(&net.frame, sizeof(net.frame));
 
-  uint16_t ipChecksum = 0x4500;
   net.ip.versionAndHeaderLength = 0x45;
   net.ip.typeOfService = 0;
   net.ip.packetLength = ntohs(sizeof(net.ip) + sizeof(net.udp) + numBytesRoundedUpToEven);
@@ -265,21 +264,13 @@ void start_udp_send(uint16_t numBytes)
   net.ip.dst_ip[1] = 255;
   net.ip.dst_ip[2] = 255;
   net.ip.dst_ip[3] = 255;
-  net.ip.headerChecksum = ntohs(calculate_one1c_checksum(&net.ip, sizeof(net.ip))); // Calculate the IP checksum
+  net.ip.headerChecksum = ntohs(calculate_one1c_checksum(&net.ip, sizeof(net.ip))); // Calculate the IP checksum (this is not optional)
 
   tx_bytes(&net.ip, sizeof(net.ip));
-/*
-  uint16_t udpChecksum = ntohs(*(uint16_t*)&net.ip.src_ip[0]);
-  udpChecksum = sum1c(udpChecksum, ntohs(*(uint16_t*)&net.ip.src_ip[2]));
-  udpChecksum = sum1c(udpChecksum, ntohs(*(uint16_t*)&net.ip.dst_ip[0]));
-  udpChecksum = sum1c(udpChecksum, ntohs(*(uint16_t*)&net.ip.dst_ip[2]));
-  udpChecksum = sum1c(udpChecksum, 17protocol); // protocol
-*/
+
   net.udp.src_port = ntohs(49739);
   net.udp.dst_port = ntohs(4009);
-  uint16_t udpLength = sizeof(net.udp) + numBytesRoundedUpToEven;
-//  udpChecksum = sum1c(udpChecksum, udpLength);
-  net.udp.length = ntohs(udpLength);
+  net.udp.length = ntohs(sizeof(net.udp) + numBytesRoundedUpToEven);
   net.udp.checksum = 0;
   tx_bytes(&net.udp, sizeof(net.udp));
 
