@@ -115,7 +115,7 @@ _KERNAL void _LISTEN(uint8_t device) { uint8_t a; _ASM volatile("JSR $FFB1":CLOB
 _KERNAL void _TALK(uint8_t device)   { NEED_STACK(8); uint8_t a; _ASM volatile("JSR $FFB4":CLOB_A:"a"(device):); }
 
 // Return I/O status byte
-_KERNAL uint8_t _READST() { NEED_STACK(2); uint8_t status; _ASM("JSR $FFB7":"=a"(status)::); return status; }
+_KERNAL uint8_t _READST() { NEED_STACK(2); uint8_t status; _ASM volatile("JSR $FFB7":"=a"(status)::); return status; }
 
 // Set logical file number, device number, secondary address for I/O
 // If secondary address is 0: default file type is PRG, and file is opened for reading
