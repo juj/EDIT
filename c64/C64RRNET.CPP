@@ -266,10 +266,10 @@ void start_udp_send(uint16_t numBytes)
   net.ip.src_ip[2] = 0;
   net.ip.src_ip[3] = 2;
 
-  net.ip.dst_ip[0] = 192;//255;
-  net.ip.dst_ip[1] = 168;//255;
-  net.ip.dst_ip[2] = 0;//255;
-  net.ip.dst_ip[3] = 144;//255;
+  net.ip.dst_ip[0] = 255;
+  net.ip.dst_ip[1] = 255;
+  net.ip.dst_ip[2] = 255;
+  net.ip.dst_ip[3] = 255;
   net.ip.headerChecksum = ntohs(calculate_one1c_checksum(&net.ip, sizeof(net.ip))); // Calculate the IP checksum
 
   tx_bytes(&net.ip, sizeof(net.ip));
