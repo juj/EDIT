@@ -92,6 +92,7 @@ void send_datagram(const void *src, size_t numBytes)
   dst_addr.sin_family = AF_INET;
   dst_addr.sin_port = htons(SENDTO_PORT);
   dst_addr.sin_addr.s_addr = INADDR_BROADCAST;
+  //inet_pton(AF_INET, "192.168.0.144", &dst_addr.sin_addr.s_addr);
 
   if (sendto(sendSock, (const char*)src, (int)numBytes, 0, (sockaddr *)&dst_addr, sizeof(dst_addr)) < 0)
     perror("send failed");
