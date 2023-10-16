@@ -4,7 +4,7 @@
 #include "c64rrnet.h"
 #include <string.h>
 
-// #define ENABLE_NETWORKING
+#define ENABLE_NETWORKING
 
 void init_network()
 {
@@ -25,12 +25,15 @@ void send_line_to_network_server(uint8_t editType, File *f, Line *l, line_num li
   m.line_no = lineno;
   m.edit_type = editType;
   m.filename_len = (uint8_t)strlen(f->filename);
+  uint8_t orig_filename_len = m.filename_len;
   if (m.filename_len&1) ++m.filename_len;
   m.line_len = l ? l->length : 0;
-  start_tx(sizeof(UpdateLineMsg) + m.filename_len + l->length);
+  uint8_t orig_line_len = m.line_len;
+  if (m.line_len&1) ++m.line_len;
+  start_udp_send(sizeof(UpdateLineMsg) + m.filename_len + m.line_len);
   tx_bytes(&m, sizeof(m)); // send header
-  tx_bytes(f->filename, m.filename_len); // send filename
-  tx_bytes(l->text, l->length); // send line data
+  tx_bytes(f->filename, orig_filename_len); // send filename
+  tx_bytes(l->text, orig_line_len); // send line data
 #endif
 }
 
