@@ -11,6 +11,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef __C64__
+#include "c64/mystdio.h" // todo replace this
+#endif
+
 #if defined(_MSC_VER) || defined(__TURBOC__)
 
 static long huge_fread(char huge *dst, long numBytes, FILE *handle)
@@ -46,6 +50,7 @@ long huge_fwrite(char huge *src, long numBytes, FILE *handle)
 }
 #endif
 
+#if 0
 line_num find_lines(File *f)
 {
   char huge *data = f->fileData;
@@ -108,6 +113,7 @@ line_num find_lines(File *f)
   f->lastLine = curLine;
   return 1;
 }
+#endif
 
 void repaint_open_files_list(File *highlightFilename);
 
@@ -125,17 +131,14 @@ File *open_new_file()
   File *f = (File*)Malloc(sizeof(File));
   if (!f)
     return 0;
+  memset(f, 0, sizeof(File));
 
-  f->nextFile = f->prevFile = 0;
-  f->hasUnsavedChanges = 0;
 #if defined(__C64__) || defined(__MSDOS__) // files are all uppercase, and on C64 chars too
   const char *filename = "<UNTITLED>";
 #else
   const char *filename = "<untitled>";
 #endif
   strcpy(f->filename, filename);
-  f->fileData = 0;
-  f->size = 0;
 
   Line far *firstLine = (Line far *)Farmalloc(sizeof(Line));
   if (!firstLine)
@@ -144,7 +147,6 @@ File *open_new_file()
     return 0;
   }
 
-  firstLine->ownsPtr = 1;
   firstLine->prevLine = firstLine->nextLine = 0;
   firstLine->text = 0;
 #ifdef ENABLE_SYNTAX_HIGHLIGHTING
@@ -174,34 +176,23 @@ void close_file(File *file)
   if (file->nextFile) file->nextFile->prevFile = file->prevFile;
   for(Line far *l = file->firstLine; l; l = l->nextLine)
   {
-    if (l->ownsPtr)
-      Farfree(l->text, l->capacity);
+    Farfree(l->text, l->capacity);
 #ifdef ENABLE_SYNTAX_HIGHLIGHTING
     if (l->colors) Farfree(l->colors, l->capacity);
 #endif
   }
 
-  Farfree(file->fileData, file->size);
   Free(file, sizeof(File));
 }
 
+char ss[32];
+
 File *load_file(const char *filename)
 {
-#if defined(_MSC_VER) || defined(__TURBOC__)
-  FILE *handle = fopen(filename, "rb");
+  FILE *handle = fopen(filename, "r");
   if (!handle)
   {
     printf("Failed to open %s!\n", filename);
-    return 0;
-  }
-  fseek(handle, 0, SEEK_END);
-  long size = ftell(handle);
-  fseek(handle, 0, SEEK_SET);
-
-  if (size > MAX_CHARS_IN_FILE)
-  {
-    printf("File is too large!\n");
-    fclose(handle);
     return 0;
   }
 
@@ -211,37 +202,88 @@ File *load_file(const char *filename)
     fclose(handle);
     return 0;
   }
-  f->nextFile = f->prevFile = 0;
-  f->hasUnsavedChanges = 0;
-  memset(f->filename, 0, MAX_FILENAME_LEN);
+  memset(f, 0, sizeof(File));
   strcpy(f->filename, filename);
-  f->fileData = (char huge *)Farmalloc(size);
-  if (!f->fileData)
+
+  char *tmp_line = (char*)malloc(MAX_CHARS_PER_LINE+1);
+  if (!tmp_line)
   {
+    free(f);
     fclose(handle);
     return 0;
   }
-  f->size = (file_idx)size;
-  file_idx numRead = (file_idx)huge_fread(f->fileData, size, handle);
-  if (numRead != size)
+  bool prev_line_ended_in_newline = false;
+  int y = 0; //zz
+  while(fgets(tmp_line, MAX_CHARS_PER_LINE, handle))
   {
-    printf("Failed to read %ld bytes, only read %ld bytes!\n", size, (long)numRead);
-    // todo: error handling
-    return 0;
+    line_xpos len = (line_xpos)strlen(tmp_line);
+//    if (len == 1 && tmp_line[0] == 'G')
+  //    break;
+//////    sprintf(ss, "%d:%d", (int)len, (int)tmp_line[0]);
+/////////    put_string_on_screen(ss, 0, y++, 0); // xxxx
+    prev_line_ended_in_newline = (len > 0 && tmp_line[len-1] == '\n');
+    if (prev_line_ended_in_newline) // subtract newline from line
+    {
+      tmp_line[len-1] = 0; // xxxx
+      --len;
+    }
+//////    put_string_on_screen(tmp_line, 0, y++, 9); // xxxx
+
+    Line far *curLine = (Line far *)Farmalloc(sizeof(Line));
+    if (!curLine) break; // TODO Alert/report malloc error
+    memset(curLine, 0, sizeof(Line));
+    curLine->text = (char*)malloc(len);
+    if (!curLine->text) break; // TODO Alert/report malloc error
+    curLine->length = curLine->capacity = len;
+    memcpy(curLine->text, tmp_line, len);
+    if (!f->firstLine) f->firstLine = curLine;
+    else
+    {
+      curLine->prevLine = f->lastLine;
+      f->lastLine->nextLine = curLine;
+    }
+    f->lastLine = curLine;
+
+    /* TODO:
+    if (showWhitespace)
+    {
+      if (ch[i] == '\t') ch[i] = CHAR_RIGHT_ARROW; // substitute tab chars with right arrows
+      if (ch[i] == ' ') ch[i] = CHAR_MIDDLE_DOT;
+    }
+    */
   }
+  free(tmp_line);
+  // Gotcha: Must append a dummy newline if the previous line ended in a newline
+  // and the last line in file is actually empty.
+/*
+  if (prev_line_ended_in_newline)
+  {
+    Line far *lastLine = (Line far *)Farmalloc(sizeof(Line));
+    if (lastLine)
+    {
+      memset(lastLine, 0, sizeof(Line));
+      lastLine->length = lastLine->capacity = 0;
+      lastLine->text = (char*)malloc(0);
+      lastLine->prevLine = f->lastLine;
+      f->lastLine->nextLine = lastLine;
+      f->lastLine = lastLine;
+    }
+  }
+*/
   fclose(handle);
 
-  int success = find_lines(f);
-  if (!success)
-  {
-   // TODO:
-//    deallocate_file(f);
-    return 0;
-  }
-  return f;
-#else
-  return 0;
+#ifdef __C64__
+  // XXXXXXXXXXXXXXXXXX HACK
+  Line *last = f->lastLine;
+  if (last->prevLine) last->prevLine->nextLine = 0;
+  free(last);
+  // XXXXXXXXXXXXXXXXXX HACK
 #endif
+
+  for(Line *l = f->firstLine; l; l = l->nextLine)
+    syntax_highlight(l);
+  get_key();
+  return f;
 }
 
 bool is_file_unnamed(File *f)

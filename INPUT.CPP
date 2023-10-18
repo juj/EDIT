@@ -208,6 +208,8 @@ void deinit_keyboard()
 
 int ask_string_prompt(const char *prompt, char *dst, int maxLen)
 {
+  clear_line((uint16_t)(SCREEN_HEIGHT-1)*SCREEN_WIDTH, ' '); // Clear last line to start with
+
   put_string_on_screen(prompt, 0, SCREEN_HEIGHT-1, WHITE);
   uint8_t prompt_len = (uint8_t)strlen(prompt);
   uint8_t x = (uint8_t)strlen(dst);

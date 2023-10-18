@@ -11,7 +11,6 @@
 
 struct Line
 {
-  bool ownsPtr;
 #ifdef ENABLE_SYNTAX_HIGHLIGHTING
   unsigned char colorFlags;
 #endif

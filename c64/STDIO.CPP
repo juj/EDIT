@@ -1,43 +1,43 @@
-#pragma once
-
-// Before including this file, call
-// #define _STDIO_DEBUG_LEVEL 2 to add verbose debugging support, or
-// #define _STDIO_DEBUG_LEVEL 1 to add more lightweight debugging support.
-// #define NDEBUG to disable assert() macro.
-#include <stdint.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <string.h>
-#include <ctype.h>
-
-#include_next <stdio.h>
-
+#include "mystdio.h"
 #include "c64_kernal.h"
 
-#ifndef _STDIO_DEBUG_LEVEL
-#define _STDIO_DEBUG_LEVEL 0
+#ifndef EOF
+#define EOF -1 // xxx todo move to header after upstream stdio.h is removed
 #endif
 
-typedef _BitInt(24) int24_t;
+//#define _STDIO_DEBUG_LEVEL 2
 
-struct FILE
+void __assert(bool condition, const char *str, const char *file, int line, const char *func)
 {
-  uint8_t nextChar; // for read streams, the next character to come out from the file.
-  bool nextCharAvailable; // If true, nextChar is present. If false, must read first.
-  uint8_t error;
-  uint8_t handle;
-};
+#ifndef NDEBUG
+  if (!condition)
+  {
+    // TODO: Don't call printf from within assert, but instead do a super simple putscreen
+    // to print this info.
+#if defined(_STDIO_DEBUG_LEVEL) && _STDIO_DEBUG_LEVEL >= 2
+    Printf("%s:%d:%s: ASSERT \"%s\" FAILED!\n", file, line, func, str);
+#elif defined(_STDIO_DEBUG_LEVEL) && _STDIO_DEBUG_LEVEL >= 1
+    Printf("%s:%d: ASSERT FAILED!\n", file, line);
+#else
+    Printf("LINE %d: ASSERT FAILED!\n", line);
+#endif
+    for(;;) // Halt, and blink border red-black
+    {
+      *(volatile uint8_t*)0xD020 = (*(volatile uint8_t*)0xD020) & 0xF ? 0 : 0x0A;
+      for(unsigned int i = 0; i < 65535; ++i) asm("NOP":::"memory"); // pause for a moment
+    }
+  }
+#endif
+}
 
-#define MAX_FILENAME_LEN 16
-
-static bool string_contains_char(const char *str, char ch)
+bool string_contains_char(const char *str, char ch)
 {
   assert(str);
   while(*str) if (*str++ == ch) return true;
   return false;
 }
 
-static void print_dos_error(uint8_t error, const char *operation)
+void print_dos_error(uint8_t error, const char *operation)
 {
 #if _STDIO_DEBUG_LEVEL >= 1
   if (error < 20) return;
@@ -82,22 +82,22 @@ static void print_dos_error(uint8_t error, const char *operation)
     case 73: err = "POWER UP MESSAGE; break; OR WRITE ATTEMPT WITH DOS MISMATCH"; break; // DOS I and 2 are read compatible but not write compatible. Disks may be interchangeably read with either DOS, but a disk formatted on one version cannot be written upon with the other version because the format is different. This error is displayed whenever an attempt is made to write upon a disk which has been formatted in a non-compatible format. (A utility routine is available to assist in converting from one format to another.) This message may also appear after power up.
     case 74: err = "DRIVE NOT READY"; break; // An attempt has been made to access the 1541 Single Drive Floppy Disk without any diskettes present in either drive.
     default:
-      printf("%s: ERROR %u\n", operation, (unsigned int)error);
+      Printf("%s: ERROR %u\n", operation, (unsigned int)error);
       return;
   }
-  printf("%s: %s\n", operation, err);
+  Printf("%s: %s\n", operation, err);
 #elif _STDIO_DEBUG_LEVEL >= 1
-  printf("%s: ERROR %u\n", operation, (unsigned int)error);
+  Printf("%s: ERROR %u\n", operation, (unsigned int)error);
 #endif
 }
 
-static uint8_t read_next_char(FILE *f)
+uint8_t read_next_char(FILE *f)
 {
   if (f->nextCharAvailable) return 0; // If we already have the next character in buffer, no-op
-  if (f->error) return f->error;
+  if (f->error >= 0x20) return f->error;
   f->error = _READST();
 
-  if (f->error)
+  if (f->error >= 0x20)
   {
     f->nextCharAvailable = false;
     return f->error;
@@ -147,7 +147,7 @@ FILE *fopen(const char *filename, const char *mode)
   {
     _CLRCHN();
 #if _STDIO_DEBUG_LEVEL >= 2
-    printf("FOPEN: OOM\n");
+    Printf("FOPEN: OOM\n");
 #endif
     return 0;
   }
@@ -157,6 +157,7 @@ FILE *fopen(const char *filename, const char *mode)
   f->handle = fileHandleCounter++; // TODO multiple handles
   if (fileHandleCounter == 255) fileHandleCounter = 2;
 
+  _CLRCHN();
   return f;
 }
 
@@ -169,7 +170,7 @@ int fclose(FILE *f)
   return 0;
 }
 
-static void consume_read_whitespace(FILE *f)
+void consume_read_whitespace(FILE *f)
 {
   if (f->error) return;
   f->error = read_next_char(f);
@@ -185,7 +186,7 @@ static void consume_read_whitespace(FILE *f)
   }
 }
 
-static int read_int_from_file(FILE *f)
+int read_int_from_file(FILE *f)
 {
   if (f->error) return 0;
   f->error = read_next_char(f);
@@ -207,7 +208,7 @@ static int read_int_from_file(FILE *f)
   return atoi(intstr);
 }
 
-static void read_string_from_file(FILE *f, char *dst)
+void read_string_from_file(FILE *f, char *dst)
 {
   if (f->error) return;
   f->error = read_next_char(f);
@@ -225,7 +226,7 @@ static void read_string_from_file(FILE *f, char *dst)
   }
 }
 
-static int fscanf(FILE *f, const char *format, ...)
+int fscanf(FILE *f, const char *format, ...)
 {
   _CHKIN(f->handle);
 
@@ -288,16 +289,16 @@ char *fgets(char *str, int count, FILE *f)
   assert(count > 0);
   assert(f);
 
-  _CHKIN(f->handle);
-
-  if (f->error)
+  if (f->error >= 0x20)
   {
     *str = 0;
-    _CLRCHN();
     return 0;
   }
+
+  _CHKIN(f->handle);
+
   f->error = read_next_char(f);
-  if (f->error)
+  if (f->error >= 0x20 || !f->nextCharAvailable)
   {
     *str = 0;
     _CLRCHN();
@@ -315,7 +316,7 @@ char *fgets(char *str, int count, FILE *f)
       break;
     }
     f->nextChar = _CHRIN();
-    if ((f->error = _READST())) { f->nextCharAvailable = false; print_dos_error(f->error, "FGETS"); break; }
+    if ((f->error = _READST()) >= 0x20) { f->nextCharAvailable = false; print_dos_error(f->error, "FGETS"); break; }
   }
   *str = 0;
   _CLRCHN();
@@ -343,386 +344,156 @@ size_t fread(void *buffer, size_t size, size_t count, FILE *f)
 
 size_t fwrite(const void *buffer, size_t size, size_t count, FILE *f)
 {
-  if (f->error) return 0;
+  assert(f);
+
+  if (f->error >= 0x20) return 0;
   f->error = _CHKOUT(f->handle);
-  if (f->error) return 0;
+  if (f->error >= 0x20) return 0;
   print_dos_error(f->error, "FWRITE/CHKOUT");
   const uint8_t *ptr = (const uint8_t*)buffer;
   for(size_t i = 0; i < size; ++i)
     for(size_t j = 0; j < count; ++j)
     {
-      if ((f->error = _READST())) { print_dos_error(f->error, "FWRITE"); break; }
+      if ((f->error = _READST()) >= 0x20) { print_dos_error(f->error, "FWRITE"); break; }
       _CHROUT(*ptr++);
     }
   _CLRCHN();
   return (uintptr_t)ptr - (uintptr_t)buffer;
 }
 
-static volatile uint8_t * const rrnet_ctl      = (uint8_t *)0xDE01;
-static volatile uint8_t * const cs_packet_page = (uint8_t *)0xDE02;
-static volatile uint8_t * const cs_packet_data = (uint8_t *)0xDE04;
-static volatile uint8_t * const cs_rxtx_data   = (uint8_t *)0xDE08;
-static volatile uint8_t * const cs_tx_cmd      = (uint8_t *)0xDE0C;
-static volatile uint8_t * const cs_tx_len      = (uint8_t *)0xDE0E;
-
-static void write_u16_lo_hi(volatile uint8_t *dst, uint16_t value)
+int fputc(int ch, FILE *f)
 {
-  dst[0] = (uint8_t)value;
-  dst[1] = (uint8_t)(value>>8);
-}
+  assert(f);
 
-static uint16_t read_u16_lo_hi(volatile uint8_t *ptr)
-{
-  uint8_t lo = ptr[0];
-  return (((uint16_t)ptr[1]) << 8) | lo;
-}
-
-static uint16_t read_u16_hi_lo(volatile uint8_t *ptr)
-{
-  uint8_t hi = ptr[1];
-  return (((uint16_t)hi) << 8) | ptr[0];
-}
-
-static void cs_set_page(uint16_t page) { write_u16_lo_hi(cs_packet_page, page); }
-static uint16_t cs_read_page_data()    { return read_u16_hi_lo(cs_packet_data); }
-static uint16_t rx_data_lo_hi()        { return read_u16_lo_hi(cs_rxtx_data); }
-static uint16_t rx_data_hi_lo()        { return read_u16_hi_lo(cs_rxtx_data); }
-static uint16_t ntohs(uint16_t x)      { return (x << 8) | (x >> 8); }
-
-static void cs_write_page_data(uint16_t page, uint16_t data)
-{
-  cs_set_page(page);
-  write_u16_lo_hi(cs_packet_data, data);
-}
-
-static int rrnet_init()
-{
-  *rrnet_ctl |= 1; // enable clock port
-  // Detect RR-Net
-  cs_set_page(0);
-  if (cs_read_page_data() != 0x630E) return 0;
-  // Configure chip
-  cs_write_page_data(0x0114/*pp_self_ctl*/, 0x0055); // reset chip
-  cs_write_page_data(0x0104/*pp_rx_ctl*/, 0x0D05); // accept individual and broadcast packets
-//  cs_write_page_data(0x0104/*pp_rx_ctl*/, 0x0D85); // accept individual and broadcast packets (promisc)
-  cs_write_page_data(0x0158/*pp_ia*/, 0x8000); // Write MAC Address
-  cs_write_page_data(0x015A/*pp_ia*/, 0xB310);
-  cs_write_page_data(0x015C/*pp_ia*/, 0xB7EB);
-  cs_write_page_data(0x0112/*pp_line_ctl*/, 0xD3); // Enable RX and TX
-  return 1;
-}
-
-struct eth_frame
-{
-  unsigned char dst_mac[6];
-  unsigned char src_mac[6];
-  uint16_t etherType; // Big Endian: https://en.wikipedia.org/wiki/EtherType#Values
-};
-
-struct ip_frame
-{
-  uint8_t versionAndHeaderLength;
-  uint8_t typeOfService;
-  uint16_t packetLength;
-  uint16_t identification;
-  uint16_t flagsAndFragmentOffset;
-  uint8_t timeToLive;
-  uint8_t protocol;
-  uint16_t headerChecksum;
-  uint8_t src_ip[4];
-  uint8_t dst_ip[4];
-};
-
-struct udp_header
-{
-  uint16_t src_port;
-  uint16_t dst_port;
-  uint16_t length;
-  uint16_t checksum;
-};
-
-#define MAX_C64_FILENAME_LEN 16
-
-struct udp_magic
-{
-  uint32_t magic_header;
-};
-
-#define RECV_FILE_DATAGRAM_MAGIC 0x25291423
-struct recv_file_datagram_header
-{
-//  uint32_t magic_header;
-  char filename[20];
-  uint16_t file_id;
-  uint16_t num_fragments;
-} __attribute__((packed));
-
-#define RECV_FILE_DATAGRAM_FRAGMENT_MAGIC 0x53915315
-struct recv_file_datagram_fragment_header
-{
-//  uint32_t magic_header;
-  uint16_t file_id;
-  uint16_t fragment_index;
-} __attribute__((packed));
-
-static void read_struct(void *dst, uint16_t numBytes)
-{
-  uint16_t *frame = (uint16_t *)dst;
-  numBytes = (numBytes+1)>>1;
-  while(numBytes--)
-    *frame++ = rx_data_lo_hi();
-}
-
-static void discard_rx_bytes(unsigned int numBytes)
-{
-  numBytes = (numBytes+1)>>1;
-  while(numBytes-- > 0)
-    rx_data_lo_hi();
-}
-
-static void debug_dump_rx_bytes(unsigned int numBytes)
-{
-  numBytes = (numBytes+1)>>1;
-  while(numBytes-- > 0)
-    printf("%04X", ntohs(rx_data_lo_hi()));
-  printf("\n");
-}
-
-static void start_tx(uint16_t numBytes)
-{
-  write_u16_lo_hi(cs_tx_cmd, 0x00C0); // Send Transmit command 00C0h
-  write_u16_lo_hi(cs_tx_len, numBytes);
-  cs_set_page(0x0138);
-  while (!(cs_read_page_data() & 0x0100))
-    ; // Wait until we are ready to transmit
-}
-
-static void tx_bytes(const void *msg, uint16_t numBytes)
-{
-  numBytes = (numBytes+1)>>1;
-  const uint16_t *m16 = (const uint16_t*)msg;
-  while(numBytes--)
-    write_u16_lo_hi(cs_rxtx_data, *m16++);
-}
-
-static volatile unsigned char * const screen_mem = (unsigned char*)0x0400;
-static volatile unsigned char * const screen_frame = (unsigned char *)0xD020;
-
-static unsigned char ascii_to_petscii(unsigned char ch)
-{
-  if (ch == 0x08) return 0x14; // Backspace character
-  if (ch == 0x0A) return 0x0D; // NL line feed, new line
-  if (ch == 0x0B) return 0x11; // Vertical tab
-  if (ch == 0x0C) return 0x93; // NP form feed, new page
-  if (ch == 0x0D) return 0x0A; // Carriage return
-  if (ch == 0x11) return 0x0B; // Device Control 1
-  if (ch == 0x14) return 0x08; // Device Control 4
-  if (ch == 0x60) return 0xC0; // `
-  if (ch == 0x93) return 0x0C; // "
-  if (ch >= 0x41 && ch <= 0x5A) return ch + 0x80; // A-Z
-  if (ch >= 0x61 && ch <= 0x7A) return ch - 0x20; // a-z
-  if (ch >= 0x7B && ch <= 0x7F) return ch + 0x60; // {, |, }, ~ and DEL
-  if (ch <= 0xBF || ch >= 0xE0) return ch; // Various other characters that map directly through
-  return ch - 0x60;
-}
-
-static unsigned char petscii_to_screen_code(unsigned char petscii)
-{
-  if (petscii <= 31) return 32;//petscii + 128;
-  if (petscii <= 63) return petscii;
-  if (petscii <= 95) return petscii - 64;
-  if (petscii <= 127) return petscii - 32;
-  if (petscii <= 159) return 32;//petscii + 64;
-  if (petscii <= 191) return petscii - 64;
-  if (petscii <= 254) return petscii - 128;
-  return 0x5E;
-}
-
-uint16_t screen_pos = 0;
-static void put_screen(char ch)
-{
-  screen_mem[screen_pos++] = petscii_to_screen_code(ascii_to_petscii(ch));
-  if (screen_pos >= 40*25) screen_pos = 0;
-  *screen_frame = ch;
-}
-
-static void clear_screen()
-{
-  memset((void*)screen_mem, 0x20, 40*25);
-}
-
-static void close_file()
-{
-  _CLOSE(2);
+  if (f->error < 0x20)
+  {
+    f->error = _CHKOUT(f->handle);
+    print_dos_error(f->error, "FPUTC/CHKOUT");
+  }
+  if (f->error >= 0x20) return EOF;
+  
+  if ((f->error = _READST()) >= 0x20)
+  {
+    print_dos_error(f->error, "FPUTC");
+    return EOF;
+  }
+  _CHROUT((unsigned char)ch);
   _CLRCHN();
+  return ch;
 }
 
-// return true on success
-bool open_file_for_saving(const char *filename)
+int fputs(const char *str, FILE *f)
 {
-  char fn[MAX_C64_FILENAME_LEN+1+3+4]; // Add +1 for null, +3 for "@0:" prefix and +4 for ",U,W" suffix.
-  // Prepend "@0:" to the filename to have any existing filename be replaced.
-  fn[0] = 64; // '@' in PETSCII
-  fn[1] = '0';
-  fn[2] = ':';
-  uint8_t i = 3;
-  for(uint8_t j = 0; filename[j]; ++j) { fn[i++] = filename[j]; }
-  // Append ",S,W" to filename to tell that the file type is Sequential, and that
-  // we are Writing to the file.
-  fn[i++] = ',';
-  fn[i++] = 'S';
-  fn[i++] = ',';
-  fn[i++] = 'W';
-  fn[i] = 0;
-  _SETNAM(fn, i);
-  _SETLFS(2, 8, 2);
-  uint8_t error = _OPEN();
-  // 1541 documentation: https://archive.org/details/Commodore_1541_Disk_Drive_Users_Guide_1982-09_Commodore/page/n57/mode/2up
-  // "Error message numbers less than 20 should be ignored with the exception of 01 which gives information about the number of
-  // "files scratched" (we are not calling the SCRATCH command here)
-  // Oddly I am getting an error 199, so ignore too high error numbers as well. (something is very definitely wrong)
-  if (error >= 20 && error <= 74)
+  assert(str);
+  assert(f);
+
+  if (f->error < 0x20)
   {
-    printf("ERROR: %d\n", (int)error);
-// TODO: how to do this:
-//      ; check drive error channel here to test for
-//        ; FILE EXISTS error etc.
-    return false;
+    f->error = _CHKOUT(f->handle);
+    print_dos_error(f->error, "FPUTS/CHKOUT");
   }
-  _CHKOUT(2);  
-  error = _READST();
-
-end:
-  if (error)
+  if (f->error >= 0x20)
   {
-    close_file();
-    printf("FAILED %d\n", error);
-    return false;
+    _CLRCHN();
+    return EOF;
   }
-  return true;
-}
-
-uint16_t poll_for_udp_file_transfer_fragment(bool first_fragment)
-{
-  // Poll if there is an Ethernet frame ready for processing
-  cs_set_page(0x0124);
-  if ((cs_read_page_data() & 0x0D00) == 0) return false;
-
-  rx_data_hi_lo(); // dummy read to flush status word (ignored)
-  uint16_t bytes_left = rx_data_hi_lo();
-
-  union
+  while(*str)
   {
-    eth_frame frame;
-    ip_frame ip;
-    udp_header udp;
-    udp_magic magic;
-  } net;
-
-#define READ_STRUCT(s) \
-  if (bytes_left < sizeof(s)) goto end; \
-  bytes_left -= sizeof(s); \
-  read_struct(&s, sizeof(s));
-
-  READ_STRUCT(net.frame);
-  if (net.frame.etherType != 0x0008/*IPV4*/) goto end;
-
-  READ_STRUCT(net.ip);
-  if (net.ip.protocol != 0x11/*UDP*/) goto end;
-
-  READ_STRUCT(net.udp);
-
-  READ_STRUCT(net.magic);
-  if ((first_fragment && net.magic.magic_header == RECV_FILE_DATAGRAM_MAGIC && bytes_left == sizeof(recv_file_datagram_header))
-    || (!first_fragment && net.magic.magic_header == RECV_FILE_DATAGRAM_FRAGMENT_MAGIC && bytes_left > sizeof(recv_file_datagram_fragment_header)))
-    return bytes_left; // this is interesting data, return it for processing
-
-end:
-  discard_rx_bytes(bytes_left);
+    if ((f->error = _READST()) >= 0x20)
+    {
+      print_dos_error(f->error, "FPUTS");
+      _CLRCHN();
+      return EOF;
+    }
+    _CHROUT(*str++);
+  }
+  _CLRCHN();
   return 0;
 }
 
-char rrnet_recv_filename[MAX_FILENAME_LEN+1];
-
-const char *receive_file()
+// Prints the given uint16 to CHROUT.
+void chrout_u16(uint16_t num)
 {
-  uint16_t bytes_left = 0;
-  while(!bytes_left)
-    bytes_left = poll_for_udp_file_transfer_fragment(true);
+  uint8_t zp0, zp1, zp2;
+  __attribute__((leaf)) __asm__(R"(
+    SED // Enter BCD mode (affects ADC commands below)
 
-  recv_file_datagram_header header;
-  read_struct(&header, sizeof(header));
-  assert(bytes_left == sizeof(header));
+    LDA #0
+    STA %[zp0] // Use three zero page registers to store the BCD output
+    STA %[zp1] // Initialize these all to zero at start
+    STA %[zp2]
 
-  header.filename[MAX_C64_FILENAME_LEN] = 0;
-  strcpy(rrnet_recv_filename, header.filename);
-  if (!open_file_for_saving(header.filename))
-  {
-    printf("FAILED TO OPEN FILE \"%s\"\n", header.filename);
-    return 0;
-  }
-  clear_screen();
-  uint8_t origScreenFrameColor;
-  origScreenFrameColor = *screen_frame;
+    LDX #16 // Loop 16 bits of the u16 input
+loop:
+    ROL %[input] // Rotate u16 to left to get the next MSB bit of input into carry
+    ROL %[input]+1
 
-  uint32_t totalBytesWritten = 0;
-  bool error = false;
-  uint16_t next_fragment_index = 0;
-  while(next_fragment_index != header.num_fragments)
-  {
-    uint16_t data_left = poll_for_udp_file_transfer_fragment(false);
+    LDA %[zp0] // Multiply the three BCD number pairs by two, and add the input bit from carry to the BCD
+    ADC %[zp0]
+    STA %[zp0]
+    LDA %[zp1]
+    ADC %[zp1]
+    STA %[zp1]
+    LDA %[zp2]
+    ADC %[zp2]
+    STA %[zp2]
 
-    recv_file_datagram_fragment_header frag;
-    read_struct(&frag, sizeof(frag));
-    data_left -= sizeof(frag);
+    DEX     // Loop back to next input bit
+    BNE loop
 
-    if (frag.file_id == header.file_id)
-    {
-      if (frag.fragment_index != next_fragment_index) { error = true; goto end; }
+    CLD // Exit BCD mode
+  )":[zp0]"=r"(zp0), [zp1]"=r"(zp1), [zp2]"=r"(zp2), [input]"+r"(num)::"a","x","c");
 
-      while(data_left > 0)
-      {
-        uint16_t data = rx_data_lo_hi();
-        --data_left;
-        uint8_t n = 1;
-        if (data_left)
-        {
-          ++n;
-          --data_left;
-        }
-        uint8_t ch[2] = { (char)(data), (char)(data >> 8) };
-
-        for(uint8_t i = 0; i < n; ++i)
-        {
-          put_screen(ch[i]);
-          if (_READST()) { error = true; goto end; }
-          _CHROUT(ch[i]);
-          ++totalBytesWritten;
-        }
-      }
-      ++next_fragment_index;
-    }
-    else
-      discard_rx_bytes(data_left);
-  }
-
-end:
-  close_file();
-  *screen_frame = origScreenFrameColor;
-  _PLOT_SET(0, 0);
-  clear_screen();
-  if (error) printf("\nFAILED TO WRITE FILE!\n");
-  else printf("\nWROTE %lu BYTES TO FILE \"%s\"\n", totalBytesWritten, header.filename);
-  return error ? 0 : rrnet_recv_filename;
+//  Printf("%02x %02x %02x\n", (int)zp0, (int)zp1, (int)zp2);
+  if (zp2)     goto five;
+  if (zp1 > 9) goto four;
+  if (zp1)     goto three;
+  if (zp0 > 9) goto two;
+  goto one;
+five:  _CHROUT('0'+ zp2);
+four:  _CHROUT('0'+(zp1>>4));
+three: _CHROUT('0'+(zp1&0xF));
+two:   _CHROUT('0'+(zp0>>4));
+one:   _CHROUT('0'+(zp0&0xF));
 }
 
-const char *receive_network_file()
+void Printf(const char *format, ...)
 {
-  if (!rrnet_init())
+  va_list args;
+  va_start(args, format);
+  int dst;
+  const char *str;
+
+  _CLRCHN();
+  for(; *format; ++format)
   {
-    printf("NETWORK ADAPTER NOT FOUND!\n");
-    return 0;
+    if (*format == '%')
+    {
+      ++format;
+      switch(*format)
+      {
+      // TODO: %x/%X/%04X/%lu/%ld
+//      case '%': _CHROUT('%'); break;
+  //    case 'c': _CHROUT(va_arg(args, int/*char*/)); break;
+      case 'd':
+        dst = va_arg(args, int);
+        if (dst < 0) { _CHROUT('-'); dst = -dst; }
+        goto print_unsigned;
+      case 'u':
+        dst = va_arg(args, unsigned int);
+print_unsigned:
+        chrout_u16(dst);
+      break;
+      case 's':
+        str = va_arg(args, const char *);
+        assert(str);
+        while(!str) _CHROUT(*str++);
+      break;
+      default: assert(false); break;
+      }
+    }
+    else
+      _CHROUT(*format == '\n' ? '\r' : *format);
   }
-  printf("WAITING FOR FILE...\n");
-  return receive_file();
+  va_end(args);
 }

@@ -284,7 +284,6 @@ void paste_selection()
     }
     for(line_xpos k = 0; k < j-i; ++k)
       newLine->text[k] = copyBuffer[i+k];
-    newLine->ownsPtr = 1;
     newLine->prevLine = startLine;
     startLine->nextLine = newLine;
     startLine = newLine;

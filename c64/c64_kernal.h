@@ -3,10 +3,7 @@
 // C64 KERNAL ROM functions
 
 #include <stdint.h>
-
-#ifndef NDEBUG
-static void Printf(const char *format, ...);
-#endif
+#include "mystdio.h"
 
 #ifdef __C64__
 
@@ -23,31 +20,6 @@ static void Printf(const char *format, ...);
 #define CLOB_A "=a"(a)
 #define CLOB_X "=x"(x)
 #define CLOB_Y "=y"(y)
-
-static void __assert(bool condition, const char *str, const char *file, int line, const char *func)
-{
-#ifndef NDEBUG
-  if (!condition)
-  {
-    // TODO: Don't call printf from within assert, but instead do a super simple putscreen
-    // to print this info.
-#if defined(_STDIO_DEBUG_LEVEL) && _STDIO_DEBUG_LEVEL >= 2
-    Printf("%s:%d:%s: ASSERT \"%s\" FAILED!\n", file, line, func, str);
-#elif defined(_STDIO_DEBUG_LEVEL) && _STDIO_DEBUG_LEVEL >= 1
-    Printf("%s:%d: ASSERT FAILED!\n", file, line);
-#else
-    Printf("LINE %d: ASSERT FAILED!\n", line);
-#endif
-    for(;;) // Halt, and blink border red-black
-    {
-      *(volatile uint8_t*)0xD020 = (*(volatile uint8_t*)0xD020) & 0xF ? 0 : 0x0A;
-      for(unsigned int i = 0; i < 65535; ++i) asm("NOP":::"memory"); // pause for a moment
-    }
-  }
-#endif
-}
-
-#define assert(x) __assert((x), #x, __FILE__, __LINE__, __func__);
 
 _KERNAL uint8_t __stack_avail()
 {

@@ -7,6 +7,7 @@
 
 void save_file(File *file)
 {
+#if 0
   char fn[MAX_FILENAME_LEN+1+3+4]; // Add +1 for null, +3 for "@0:" prefix and +4 for ",U,W" suffix.
   // Prepend "@0:" to the filename to have any existing filename be replaced.
   fn[0] = 64; // '@' in PETSCII
@@ -54,6 +55,22 @@ void save_file(File *file)
 end:
   _CLOSE(2);
   _CLRCHN();
+#endif
+
+  bool error = false;
+  FILE *handle = fopen(file->filename, "w");
+  if (!handle) error = true;
+  else
+  {
+    for(Line *l = file->firstLine; l; l = l->nextLine)
+    {
+      //if (handle->error) { printf("EXP %d\n", (int)handle->error); }
+      //if (fputs(l->text, handle) == EOF) { printf("FPUTS %d!\n", (int)handle->error); error = true; break; }
+      if (fwrite(l->text, l->length, 1, handle) != l->length) { printf("FWRITE!\n"); error = true; break; }
+      if (fputc('\n', handle) == EOF) { printf("FPUTC!\n"); error = true; break; }
+    }
+    fclose(handle);
+  }
 
   if (error)
   {

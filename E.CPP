@@ -726,7 +726,6 @@ void insert_new_line(bool cursorMovesToNewline)
   for(line_xpos k = 0; k < newLine->length && currentCharOffset+k < currentLine->length; ++k)
     newLine->text[curLineIndent+newIndent+k] = currentLine->text[currentCharOffset+k];
   currentLine->length -= currentLine->length - currentCharOffset;
-  newLine->ownsPtr = 1;
   newLine->prevLine = currentLine;
   newLine->nextLine = currentLine->nextLine;
   if (currentLine->nextLine)

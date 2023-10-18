@@ -74,8 +74,7 @@ line_num get_current_line_number()
 void delete_line(Line far *line)
 {
   assert(line);
-  if (line->ownsPtr)
-    Farfree(line->text, line->capacity);
+  Farfree(line->text, line->capacity);
 #ifdef ENABLE_SYNTAX_HIGHLIGHTING
   if (line->colors)
     Farfree(line->colors, line->capacity);
@@ -101,15 +100,9 @@ bool increase_capacity(Line far *line, line_xpos newCapacity)
     line->colors = 0;
   }
 #endif
-  if (line->ownsPtr)
-    Farfree(line->text, line->capacity);
-  else
-  {
-    // TODO: Move this ptr to small allocs buffer
-  }
+  Farfree(line->text, line->capacity);
   line->text = newText;
   line->capacity = newCapacity;
-  line->ownsPtr = 1;
   return 1;
 }
 
