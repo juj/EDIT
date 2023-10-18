@@ -30,6 +30,12 @@ void __assert(bool condition, const char *str, const char *file, int line, const
 #endif
 }
 
+#if defined(_STDIO_DEBUG_LEVEL) && _STDIO_DEBUG_LEVEL >= 2
+#define _STDIO_DEBUG2(...) Printf(__VA_ARGS__)
+#else
+#define _STDIO_DEBUG2(...) ((void)0)
+#endif
+
 bool string_contains_char(const char *str, char ch)
 {
   assert(str);
@@ -103,9 +109,20 @@ uint8_t read_next_char(FILE *f, bool *error)
     f->nextCharAvailable = *error = false;
     return f->nextChar;
   }
+  // For best performance, we would like to keep calling CHRIN() in as tight loop
+  // as possible, and observe disk errors only via the carry flag returned by CHRIN.
+  // However, if a disk is at EOF, issuing a CHRIN will not raise the
+  // error flag, but instead on error, and a decimal value 199 is returned.
+  // Presumably the intent is that caller should always check READST before issuing
+  // a read call, but that might have slower performance. (TBD benchmark)
+  // So an idea: instead of checking READST before reading a char with CHRIN(),
+  // we proceed to CHRIN without READST. CHRIN is observed to return decimal 199
+  // when at end of file, so if that happens, we then call READST to confirm if we
+  // are actually at EOF.
   uint8_t ch = _CHRIN_GET_ERROR(error);
-  if (ch == 199 && DRIVE_STATUS_ERROR()) // Value 199 is returned when end of file.
-    *error = true; // We are at EOF
+  if (error) _STDIO_DEBUG2("FREAD ERR");
+  if (ch == 199 && DRIVE_STATUS_ERROR())
+    *error = true;
   return ch;
 }
 
@@ -147,7 +164,7 @@ FILE *fopen(const char *filename, const char *mode)
   {
     _CLOSE(fileHandleCounter);
     _CLRCHN();
-    print_dos_error(error, "FOPEN/READST");
+    _STDIO_DEBUG2("FOPEN/READST ERROR");
     return 0;
   }
 
@@ -155,9 +172,7 @@ FILE *fopen(const char *filename, const char *mode)
   if (!f)
   {
     _CLRCHN();
-#if _STDIO_DEBUG_LEVEL >= 2
-    Printf("FOPEN: OOM\n");
-#endif
+    _STDIO_DEBUG2("FOPEN OOM");
     return 0;
   }
   f->nextCharAvailable = false;
@@ -176,7 +191,7 @@ int fclose(FILE *f)
   return 0;
 }
 
-void consume_read_whitespace(FILE *f)
+static void fscanf_skip_whitespace(FILE *f)
 {
   bool error;
   uint8_t ch = read_next_char(f, &error);
@@ -185,29 +200,26 @@ void consume_read_whitespace(FILE *f)
   if (!error) put_char_back(f, ch); // Non-whitespace character, put it back to stream
 }
 
-int read_int_from_file(FILE *f)
+static int fscanf_read_int(FILE *f)
 {
   bool error;
   uint8_t ch = read_next_char(f, &error);
   char intstr[6] = { 0, 0, 0, 0, 0, 0 }; // max length 65536
   uint8_t i = 0;
-  assert(isdigit(ch));
+  assert(isdigit(ch)); // Precondition to calling this function: next character in file must be an integer
   while(isdigit(ch))
   {
     intstr[i++] = ch;
     if (i >= 5) i = 0; // if i gets this large, read will overflow (will read garbage)
     f->nextChar = read_next_char(f, &error);
-    if (error)
-    {
-      //print_dos_error(f->error, "READINT");
-      break;
-    }
+    if (error) goto end;
   }
-  if (!error) put_char_back(f, ch);
+  put_char_back(f, ch);
+end:
   return atoi(intstr);
 }
 
-void read_string_from_file(FILE *f, char *dst)
+static void fscanf_read_str(FILE *f, char *dst)
 {
   bool error;
   uint8_t ch = read_next_char(f, &error);
@@ -216,13 +228,9 @@ void read_string_from_file(FILE *f, char *dst)
   {
     *dst++ = ch;
     ch = read_next_char(f, &error);
-    if (error)
-    {
-//      print_dos_error(f->error, "READSTR");
-      break;
-    }
+    if (error) return;
   }
-  if (!error) put_char_back(f, ch);
+  put_char_back(f, ch);
 }
 
 int fscanf(FILE *f, const char *format, ...)
@@ -235,13 +243,13 @@ int fscanf(FILE *f, const char *format, ...)
   int8_t num_parsed = 0;
   uint8_t ch;
   bool error;
-  consume_read_whitespace(f);
+  fscanf_skip_whitespace(f);
 
   for(; *format; ++format)
   {
     if (isspace(*format))
     {
-      consume_read_whitespace(f);
+      fscanf_skip_whitespace(f);
       while(isspace(*format)) ++format;
     }
     else if (*format != '%')
@@ -266,7 +274,7 @@ int fscanf(FILE *f, const char *format, ...)
         put_char_back(f, ch);
         if (!isdigit(ch)) goto end;
         int *dst = va_arg(args, int*);
-        *dst = read_int_from_file(f);
+        *dst = fscanf_read_int(f);
         ++num_parsed;
       }
       break;
@@ -276,7 +284,7 @@ int fscanf(FILE *f, const char *format, ...)
         if (error) goto end;
         if (isspace(ch)) goto end; // todo not 100% sure if this would happen. Maybe "100asdf" being scanned as "%d %s"?
         char *str = va_arg(args, char*);
-        read_string_from_file(f, str);
+        fscanf_read_str(f, str);
         ++num_parsed;
       }
       break;
@@ -344,12 +352,11 @@ size_t fwrite(const void *buffer, size_t size, size_t count, FILE *f)
 {
   assert(f);
   if (_CHKOUT(f->handle)) return 0;
-//  print_dos_error(f->error, "FWRITE/CHKOUT");
   const uint8_t *ptr = (const uint8_t*)buffer;
   for(size_t i = 0; i < size; ++i)
     for(size_t j = 0; j < count; ++j)
     {
-      if (DRIVE_STATUS_ERROR()) break;//{ print_dos_error(f->error, "FWRITE"); break; }
+      if (DRIVE_STATUS_ERROR()) break;
       _CHROUT(*ptr++);
     }
   _CLRCHN();
@@ -359,18 +366,10 @@ size_t fwrite(const void *buffer, size_t size, size_t count, FILE *f)
 int fputc(int ch, FILE *f)
 {
   assert(f);
-
-  if (_CHKOUT(f->handle)) return EOF;
-//    print_dos_error(f->error, "FPUTC/CHKOUT");
-  
-  if (DRIVE_STATUS_ERROR())
-  {
-//    print_dos_error(f->error, "FPUTC");
-    return EOF;
-  }
-  _CHROUT((unsigned char)ch);
+  if (_CHKOUT(f->handle) || DRIVE_STATUS_ERROR()) return EOF;
+  bool error = _CHROUT_GET_ERROR((unsigned char)ch);
   _CLRCHN();
-  return ch;
+  return error ? EOF : ch;
 }
 
 int fputs(const char *str, FILE *f)
@@ -378,7 +377,6 @@ int fputs(const char *str, FILE *f)
   assert(str);
   assert(f);
 
-//  print_dos_error(f->error, "FPUTS/CHKOUT");
   if (_CHKOUT(f->handle)) return EOF;
 
   while(*str)
@@ -386,7 +384,6 @@ int fputs(const char *str, FILE *f)
     bool error = _CHROUT_GET_ERROR(*str++);
     if (error)
     {
-//      print_dos_error(f->error, "FPUTS");
       _CLRCHN();
       return EOF;
     }
@@ -451,33 +448,34 @@ void Printf(const char *format, ...)
   _CLRCHN();
   for(; *format; ++format)
   {
-    if (*format == '%')
+    if (*format != '%')
     {
-      ++format;
-      switch(*format)
-      {
-      // TODO: %x/%X/%04X/%lu/%ld
-//      case '%': _CHROUT('%'); break;
-  //    case 'c': _CHROUT(va_arg(args, int/*char*/)); break;
-      case 'd':
-        dst = va_arg(args, int);
-        if (dst < 0) { _CHROUT('-'); dst = -dst; }
-        goto print_unsigned;
-      case 'u':
-        dst = va_arg(args, unsigned int);
-print_unsigned:
-        chrout_u16(dst);
-      break;
-      case 's':
-        str = va_arg(args, const char *);
-        assert(str);
-        while(!str) _CHROUT(*str++);
-      break;
-      default: assert(false); break;
-      }
-    }
-    else
       _CHROUT(*format == '\n' ? '\r' : *format);
+      continue;
+    }
+
+    ++format;
+    switch(*format)
+    {
+    // TODO: %x/%X/%04X/%lu/%ld
+    case '%': _CHROUT('%'); break;
+    case 'c': _CHROUT(va_arg(args, int/*char*/)); break;
+    case 'd':
+      dst = va_arg(args, int);
+      if (dst < 0) { _CHROUT('-'); dst = -dst; }
+      goto print_unsigned;
+    case 'u':
+      dst = va_arg(args, unsigned int);
+print_unsigned:
+      chrout_u16(dst);
+    break;
+    case 's':
+      str = va_arg(args, const char *);
+      assert(str);
+      while(!str) _CHROUT(*str++);
+    break;
+    default: assert(false); break;
+    }
   }
   va_end(args);
 }
