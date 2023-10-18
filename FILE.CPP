@@ -272,14 +272,6 @@ File *load_file(const char *filename)
 */
   fclose(handle);
 
-#ifdef __C64__
-  // XXXXXXXXXXXXXXXXXX HACK
-  Line *last = f->lastLine;
-  if (last->prevLine) last->prevLine->nextLine = 0;
-  free(last);
-  // XXXXXXXXXXXXXXXXXX HACK
-#endif
-
   for(Line *l = f->firstLine; l; l = l->nextLine)
     syntax_highlight(l);
   get_key();

@@ -91,20 +91,29 @@ void print_dos_error(uint8_t error, const char *operation)
 #endif
 }
 
-uint8_t read_next_char(FILE *f)
-{
-  if (f->nextCharAvailable) return 0; // If we already have the next character in buffer, no-op
-  if (f->error >= 0x20) return f->error;
-  f->error = _READST();
+// For some reason, bit 5 (checksum error) is seen to be
+// high in the drive status flags field. Ignore it when
+// testing for drive status errors
+#define DRIVE_STATUS_ERROR() (_READST() & ~0x20)
 
-  if (f->error >= 0x20)
+uint8_t read_next_char(FILE *f, bool *error)
+{
+  if (f->nextCharAvailable)
   {
-    f->nextCharAvailable = false;
-    return f->error;
+    f->nextCharAvailable = *error = false;
+    return f->nextChar;
   }
+  uint8_t ch = _CHRIN_GET_ERROR(error);
+  if (ch == 199 && DRIVE_STATUS_ERROR()) // Value 199 is returned when end of file.
+    *error = true; // We are at EOF
+  return ch;
+}
+
+void put_char_back(FILE *f, uint8_t ch)
+{
+  assert(!f->nextCharAvailable);
   f->nextCharAvailable = true;
-  f->nextChar = _CHRIN();
-  return 0;
+  f->nextChar = ch;
 }
 
 FILE *fopen(const char *filename, const char *mode)
@@ -151,9 +160,7 @@ FILE *fopen(const char *filename, const char *mode)
 #endif
     return 0;
   }
-  f->error = 0;
   f->nextCharAvailable = false;
-  if (readingFile) read_next_char(f); // read first char in advance into a char buffer
   f->handle = fileHandleCounter++; // TODO multiple handles
   if (fileHandleCounter == 255) fileHandleCounter = 2;
 
@@ -165,78 +172,70 @@ int fclose(FILE *f)
 {
   assert(f); // The behavior is undefined if the value of the pointer stream is used after fclose returns.
   _CLOSE(f->handle);
-  _CLRCHN();
   free(f);
   return 0;
 }
 
 void consume_read_whitespace(FILE *f)
 {
-  if (f->error) return;
-  f->error = read_next_char(f);
-  while(isspace(f->nextChar))
-  {
-    f->nextChar = _CHRIN();
-    if ((f->error = _READST()))
-    {
-      f->nextCharAvailable = false;
-      print_dos_error(f->error, "CONSUMEWS");
-      return;
-    }
-  }
+  bool error;
+  uint8_t ch = read_next_char(f, &error);
+  while(!error && isspace(ch))
+    ch = read_next_char(f, &error);
+  if (!error) put_char_back(f, ch); // Non-whitespace character, put it back to stream
 }
 
 int read_int_from_file(FILE *f)
 {
-  if (f->error) return 0;
-  f->error = read_next_char(f);
-  assert(isdigit(f->nextChar));
+  bool error;
+  uint8_t ch = read_next_char(f, &error);
   char intstr[6] = { 0, 0, 0, 0, 0, 0 }; // max length 65536
   uint8_t i = 0;
-  while(isdigit(f->nextChar))
+  assert(isdigit(ch));
+  while(isdigit(ch))
   {
-    intstr[i++] = f->nextChar;
+    intstr[i++] = ch;
     if (i >= 5) i = 0; // if i gets this large, read will overflow (will read garbage)
-    f->nextChar = _CHRIN();
-    if ((f->error = _READST()))
+    f->nextChar = read_next_char(f, &error);
+    if (error)
     {
-      f->nextCharAvailable = false;
-      print_dos_error(f->error, "READINT");
+      //print_dos_error(f->error, "READINT");
       break;
     }
   }
+  if (!error) put_char_back(f, ch);
   return atoi(intstr);
 }
 
 void read_string_from_file(FILE *f, char *dst)
 {
-  if (f->error) return;
-  f->error = read_next_char(f);
-  assert(!isspace(f->nextChar));
-  while(!isspace(f->nextChar))
+  bool error;
+  uint8_t ch = read_next_char(f, &error);
+  assert(!isspace(ch));
+  while(!isspace(ch))
   {
-    *dst++ = f->nextChar;
-    f->nextChar = _CHRIN();
-    if ((f->error = _READST()))
+    *dst++ = ch;
+    ch = read_next_char(f, &error);
+    if (error)
     {
-      f->nextCharAvailable = false;
-      print_dos_error(f->error, "READSTR");
+//      print_dos_error(f->error, "READSTR");
       break;
     }
   }
+  if (!error) put_char_back(f, ch);
 }
 
 int fscanf(FILE *f, const char *format, ...)
 {
-  _CHKIN(f->handle);
+  if (_CHKIN(f->handle)) return 0;
 
   va_list args;
   va_start(args, format);
   // consume any initial whitespace in input
   int8_t num_parsed = 0;
-  uint8_t ch, error = 0;
+  uint8_t ch;
+  bool error;
   consume_read_whitespace(f);
-  if (!f->nextCharAvailable) return 0;
 
   for(; *format; ++format)
   {
@@ -247,10 +246,13 @@ int fscanf(FILE *f, const char *format, ...)
     }
     else if (*format != '%')
     {
-      assert(f->nextCharAvailable);
-      if (f->nextChar != *format) goto end;
-      f->nextChar = _CHRIN();
-      if ((error = _READST())) { f->nextCharAvailable = false; print_dos_error(error, "FSCANF"); goto end; }
+      ch = read_next_char(f, &error);
+      if (error) goto end;
+      if (ch != *format)
+      {
+        put_char_back(f, ch);
+        goto end;
+      }
     }
     else
     {
@@ -259,8 +261,10 @@ int fscanf(FILE *f, const char *format, ...)
       {
       case 'd':
       {
-        if (!isdigit(f->nextChar)) goto end;
-
+        ch = read_next_char(f, &error);
+        if (error) goto end;
+        put_char_back(f, ch);
+        if (!isdigit(ch)) goto end;
         int *dst = va_arg(args, int*);
         *dst = read_int_from_file(f);
         ++num_parsed;
@@ -268,7 +272,9 @@ int fscanf(FILE *f, const char *format, ...)
       break;
       case 's':
       {
-        if (isspace(f->nextChar)) goto end; // todo not 100% sure if this would happen. Maybe "100asdf" being scanned as "%d %s"?
+        ch = read_next_char(f, &error);
+        if (error) goto end;
+        if (isspace(ch)) goto end; // todo not 100% sure if this would happen. Maybe "100asdf" being scanned as "%d %s"?
         char *str = va_arg(args, char*);
         read_string_from_file(f, str);
         ++num_parsed;
@@ -289,54 +295,46 @@ char *fgets(char *str, int count, FILE *f)
   assert(count > 0);
   assert(f);
 
-  if (f->error >= 0x20)
-  {
-    *str = 0;
-    return 0;
-  }
+  if (_CHKIN(f->handle)) return 0;
 
-  _CHKIN(f->handle);
-
-  f->error = read_next_char(f);
-  if (f->error >= 0x20 || !f->nextCharAvailable)
-  {
-    *str = 0;
-    _CLRCHN();
-    return 0;
-  }
-
-  assert(f->nextCharAvailable);
   --count; // account early for null terminating byte
   char *dst = str;
   while(count-- > 0)
   {
-    if ((*str++ = f->nextChar) == '\n')
-    {
-      f->nextCharAvailable = false;
-      break;
-    }
-    f->nextChar = _CHRIN();
-    if ((f->error = _READST()) >= 0x20) { f->nextCharAvailable = false; print_dos_error(f->error, "FGETS"); break; }
+    bool error;
+    uint8_t ch = read_next_char(f, &error);
+    if (error) break;
+    *str++ = ch;
+    if (ch == '\n') break;
   }
   *str = 0;
   _CLRCHN();
-  return dst;
+  return (dst == str) ? 0 : dst;
+}
+
+int fgetc(FILE *f)
+{
+  assert(f);
+  if (_CHKIN(f->handle)) return EOF;
+  bool error;
+  uint8_t ch = read_next_char(f, &error);
+  _CLRCHN();
+  if (error) return EOF;
+  else return ch;
 }
 
 size_t fread(void *buffer, size_t size, size_t count, FILE *f)
 {
-  _CHKIN(f->handle);
-  if (f->error) return 0;
-  f->error = read_next_char(f);
-  if (f->error) return 0;
+  if (_CHKIN(f->handle)) return 0;
 
   uint8_t *ptr = (uint8_t*)buffer;
   for(size_t i = 0; i < size; ++i)
     for(size_t j = 0; j < count; ++j)
     {
-      *ptr++ = f->nextChar;
-      f->nextChar = _CHRIN();
-      if ((f->error = _READST())) { f->nextCharAvailable = false; print_dos_error(f->error, "FREAD"); break; }
+      bool error;
+      uint8_t ch = read_next_char(f, &error);
+      if (error) break;
+      *ptr++ = ch;
     }
   _CLRCHN();
   return (uintptr_t)ptr - (uintptr_t)buffer;
@@ -345,16 +343,13 @@ size_t fread(void *buffer, size_t size, size_t count, FILE *f)
 size_t fwrite(const void *buffer, size_t size, size_t count, FILE *f)
 {
   assert(f);
-
-  if (f->error >= 0x20) return 0;
-  f->error = _CHKOUT(f->handle);
-  if (f->error >= 0x20) return 0;
-  print_dos_error(f->error, "FWRITE/CHKOUT");
+  if (_CHKOUT(f->handle)) return 0;
+//  print_dos_error(f->error, "FWRITE/CHKOUT");
   const uint8_t *ptr = (const uint8_t*)buffer;
   for(size_t i = 0; i < size; ++i)
     for(size_t j = 0; j < count; ++j)
     {
-      if ((f->error = _READST()) >= 0x20) { print_dos_error(f->error, "FWRITE"); break; }
+      if (DRIVE_STATUS_ERROR()) break;//{ print_dos_error(f->error, "FWRITE"); break; }
       _CHROUT(*ptr++);
     }
   _CLRCHN();
@@ -365,16 +360,12 @@ int fputc(int ch, FILE *f)
 {
   assert(f);
 
-  if (f->error < 0x20)
-  {
-    f->error = _CHKOUT(f->handle);
-    print_dos_error(f->error, "FPUTC/CHKOUT");
-  }
-  if (f->error >= 0x20) return EOF;
+  if (_CHKOUT(f->handle)) return EOF;
+//    print_dos_error(f->error, "FPUTC/CHKOUT");
   
-  if ((f->error = _READST()) >= 0x20)
+  if (DRIVE_STATUS_ERROR())
   {
-    print_dos_error(f->error, "FPUTC");
+//    print_dos_error(f->error, "FPUTC");
     return EOF;
   }
   _CHROUT((unsigned char)ch);
@@ -387,25 +378,18 @@ int fputs(const char *str, FILE *f)
   assert(str);
   assert(f);
 
-  if (f->error < 0x20)
-  {
-    f->error = _CHKOUT(f->handle);
-    print_dos_error(f->error, "FPUTS/CHKOUT");
-  }
-  if (f->error >= 0x20)
-  {
-    _CLRCHN();
-    return EOF;
-  }
+//  print_dos_error(f->error, "FPUTS/CHKOUT");
+  if (_CHKOUT(f->handle)) return EOF;
+
   while(*str)
   {
-    if ((f->error = _READST()) >= 0x20)
+    bool error = _CHROUT_GET_ERROR(*str++);
+    if (error)
     {
-      print_dos_error(f->error, "FPUTS");
+//      print_dos_error(f->error, "FPUTS");
       _CLRCHN();
       return EOF;
     }
-    _CHROUT(*str++);
   }
   _CLRCHN();
   return 0;

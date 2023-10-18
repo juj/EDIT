@@ -23,7 +23,6 @@ struct FILE
 {
   uint8_t nextChar; // for read streams, the next character to come out from the file.
   bool nextCharAvailable; // If true, nextChar is present. If false, must read first.
-  uint8_t error;
   uint8_t handle;
 };
 
@@ -44,6 +43,7 @@ void read_string_from_file(FILE *f, char *dst);
 
 FILE *fopen(const char *filename, const char *mode);
 int fscanf(FILE *f, const char *format, ...);
+int fgetc(FILE *f);
 char *fgets(char *str, int count, FILE *f);
 size_t fread(void *buffer, size_t size, size_t count, FILE *f);
 size_t fwrite(const void *buffer, size_t size, size_t count, FILE *f);

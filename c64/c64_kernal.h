@@ -105,19 +105,68 @@ _KERNAL uint8_t _OPEN() { uint8_t error; _ASM volatile("JSR $FFC0\nBCS error_ope
 _KERNAL uint8_t _CLOSE(uint8_t file_no) { NEED_STACK(2/*todo:max unknown*/); uint8_t error; _ASM volatile("JSR $FFC3":"=a"(error):"a"(file_no):"x","y","c"); return error; }
 
 // Designate a Logical File as the current Input Channel. Returns error code (0=no error).
-_KERNAL uint8_t _CHKIN(uint8_t file_no) { uint8_t error,x; _ASM volatile("JSR $FFC6":"=a"(error),CLOB_X:"x"(file_no):"y","c"); return error; }
+_KERNAL uint8_t _CHKIN(uint8_t file_no)
+{
+  uint8_t error,x;
+  _ASM volatile(
+    "JSR $FFC6\n"
+    "BCS end%=\n"
+    "LDA #0\n" // No error occurred, so clear A register that would contain the error
+    "end%=:\n"
+    :"=a"(error),CLOB_X:"x"(file_no):"y","c");
+  return error;
+}
 
 // Designate a Logical File As the current Output Channel. Returns error code (0=no error).
-_KERNAL uint8_t _CHKOUT(uint8_t file_no) { NEED_STACK(4/*todo:max unknown*/); uint8_t error,x; _ASM volatile("JSR $FFC9":"=a"(error),CLOB_X:"x"(file_no):"y","c"); return error; }
+_KERNAL uint8_t _CHKOUT(uint8_t file_no)
+{
+  NEED_STACK(4/*todo:max unknown*/);
+  uint8_t error,x;
+  _ASM volatile(
+    "JSR $FFC9\n"
+    "BCS end%=\n"
+    "LDA #0\n"
+    "end%=:\n"
+    :"=a"(error),CLOB_X:"x"(file_no):"y","c");
+  return error;
+}
 
 // Restore current Input and Output Devices to the Default Devices
 _KERNAL void _CLRCHN() { NEED_STACK(9); _ASM volatile("JSR $FFCC":::"a","x"); }
 
 // Input a character from the current Input Channel
 _KERNAL uint8_t _CHRIN() { NEED_STACK(7/*todo:max unknown*/); uint8_t byte;  _ASM volatile("JSR $FFCF":"=a"(byte)::"c"); return byte; }
+_KERNAL uint8_t _CHRIN_GET_ERROR(bool *error)
+{
+  assert(error);
+  NEED_STACK(7/*todo:max unknown*/);
+  uint8_t byte;
+  bool err;
+  _ASM volatile(
+    "JSR $FFCF\n"
+    "LDX #0\n"
+    "BCC end%=\n"
+    "LDX #1\n"
+    "end%=:\n"
+    :"=a"(byte), "=x"(err)::"c");
+  *error = err;
+  if (err) return 0;
+  return byte;
+}
 
 // Output a character to the current Output Channel
 _KERNAL void _CHROUT(uint8_t byte) { NEED_STACK(8/*todo:max unknown*/); _ASM volatile("JSR $FFD2"::"a"(byte):"c"); }
+_KERNAL bool _CHROUT_GET_ERROR(uint8_t byte)
+{
+  NEED_STACK(8/*todo:max unknown*/);
+  bool error;
+  _ASM volatile(
+    "JSR $FFD2\n"
+    "LDA #0\n"
+    "ROL\n"
+    :"=a"(error):"a"(byte):"c");
+  return error;
+}
 
 // Load file to RAM, or verify (compare) file contents against RAM. To use, call SETNAM+SETLFS+LOAD. This function
 // does not open a file handle, so no call to CLOSE is needed afterwards.
