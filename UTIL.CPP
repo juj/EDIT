@@ -41,7 +41,7 @@ uint8_t SUB_U8_SAT(uint8_t a, uint8_t b)
 {
 #if defined(__C64__) && 0 // TODO: Currently disabled, as this results in incorrect code somehow?
   uint8_t tmp, result;
-  __attribute__((leaf)) __asm__(R"(
+  __asm__(R"(
     STX %[zp]
     SEC
     SBC %[zp]

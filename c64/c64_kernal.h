@@ -7,8 +7,11 @@
 
 #ifdef __C64__
 
-#define _ASM __attribute__((leaf)) __asm__
-#define _KERNAL static __inline__ __attribute__((__always_inline__, __nodebug__, leaf))
+// TODO: Might want to use this form, but can't due to https://github.com/llvm-mos/llvm-mos/issues/392
+// #define _ASM __attribute__((leaf)) __asm__
+// #define _KERNAL static __inline__ __attribute__((__always_inline__, __nodebug__, leaf))
+#define _ASM __asm__
+#define _KERNAL static __inline__ __attribute__((__always_inline__, __nodebug__))
 #define _HI(x) ((uint8_t)((uint16_t)(x)>>8))
 #define _LO(x) ((uint8_t)(uint16_t)(x))
 #define _U16(lo, hi) (((uint16_t)(hi) << 8) | (lo))
@@ -249,7 +252,7 @@ _KERNAL uintptr_t _IOBASE() { NEED_STACK(2); uint8_t lo, hi; _ASM("JSR $FFF3":"=
 
 // Soft-resets the system.
 // TODO: This won't work on C16, C116, Plus/4 or C128x: https://www.c64-wiki.com/wiki/Reset_(Process)
-_KERNAL void _Noreturn _RESET() { _ASM volatile("JMP ($FFFC)"); }
+_KERNAL void _Noreturn _RESET() { _ASM volatile("JMP ($FFFC)"); __builtin_unreachable(); }
 
 // Returns true if there is a key pending in the keyboard input queue.
 _KERNAL bool _KBHIT() { return *(volatile unsigned char *)0x00C6; }

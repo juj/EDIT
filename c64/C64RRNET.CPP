@@ -194,7 +194,8 @@ void put_screen(char ch)
 
 void clear_screen()
 {
-  memset((void*)screen_mem, 0x20, 40*25);
+  _CLRSCR();
+//  memset((void*)screen_mem, 0x20, 40*25);
 }
 
 void close_file()

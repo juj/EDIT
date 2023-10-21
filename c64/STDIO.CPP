@@ -392,22 +392,62 @@ int fputs(const char *str, FILE *f)
   return 0;
 }
 
+/*
+// Prints the given uint8 to CHROUT.
+void chrout_u8(uint8_t num)
+{
+  uint8_t zp0, zp1;
+  // Convert 'num' to 2x2 BCD digits.
+  __asm__(R"(
+    SED // Enter Binary Coded Decimal (BCD) mode (affects ADC commands below)
+
+    LDA #0
+    STA %[zp0] // zp0-zp1 will store the output BCD digits, 0-255.
+    STA %[zp1] // Initialize these all to zero to start
+
+    LDX #8 // Loop each of the 8 bits of the u8 input
+loop%=:
+    ROL %[input]   // Shift the input u8 one bit to the left
+
+    LDA %[zp0] // Multiply the three BCD number pairs by two, and add the input bit from carry to the BCD
+    ADC %[zp0]
+    STA %[zp0]
+    LDA %[zp1]
+    ADC %[zp1]
+    STA %[zp1]
+
+    DEX     // Loop back to next input bit
+    BNE loop%=
+
+    CLD // Exit BCD mode
+  )":[zp0]"=r"(zp0), [zp1]"=r"(zp1), [input]"+r"(num)::"a","x","c");
+
+  if (zp1)     goto three;
+  if (zp0 > 9) goto two;
+  goto one;
+three: _CHROUT('0'+(zp1&0xF));
+two:   _CHROUT('0'+(zp0>>4));
+one:   _CHROUT('0'+(zp0&0xF));
+}
+*/
+
 // Prints the given uint16 to CHROUT.
 void chrout_u16(uint16_t num)
 {
   uint8_t zp0, zp1, zp2;
-  __attribute__((leaf)) __asm__(R"(
-    SED // Enter BCD mode (affects ADC commands below)
+  // Convert 'num' to 3x2 BCD digits.
+  __asm__(R"(
+    SED // Enter Binary Coded Decimal (BCD) mode (affects ADC commands below)
 
     LDA #0
-    STA %[zp0] // Use three zero page registers to store the BCD output
-    STA %[zp1] // Initialize these all to zero at start
+    STA %[zp0] // zp0-zp2 will store the output BCD digits, 0-65535.
+    STA %[zp1] // Initialize these all to zero to start
     STA %[zp2]
 
-    LDX #16 // Loop 16 bits of the u16 input
+    LDX #16 // Loop each of the 16 bits of the u16 input
 loop%=:
-    ROL %[input] // Rotate u16 to left to get the next MSB bit of input into carry
-    ROL %[input]+1
+    ROL %[input]   // Shift the input u16 one bit to the left
+    ROL %[input]+1 // rotating the next MSB bit of input into Carry
 
     LDA %[zp0] // Multiply the three BCD number pairs by two, and add the input bit from carry to the BCD
     ADC %[zp0]
@@ -425,7 +465,6 @@ loop%=:
     CLD // Exit BCD mode
   )":[zp0]"=r"(zp0), [zp1]"=r"(zp1), [zp2]"=r"(zp2), [input]"+r"(num)::"a","x","c");
 
-//  Printf("%02x %02x %02x\n", (int)zp0, (int)zp1, (int)zp2);
   if (zp2)     goto five;
   if (zp1 > 9) goto four;
   if (zp1)     goto three;
@@ -436,6 +475,32 @@ four:  _CHROUT('0'+(zp1>>4));
 three: _CHROUT('0'+(zp1&0xF));
 two:   _CHROUT('0'+(zp0>>4));
 one:   _CHROUT('0'+(zp0&0xF));
+}
+
+void chrout_x16(uint16_t num)
+{
+  const uint8_t ch[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' };
+  if (num >= 0x1000) goto four;
+  if (num >= 0x100) goto three;
+  if (num >= 0x10) goto two;
+  goto one;
+four:  _CHROUT(ch[num>>12]);
+three: _CHROUT(ch[(num>>8)&15]);
+two:   _CHROUT(ch[(num>>4)&15]);
+one:   _CHROUT(ch[num&15]);
+}
+
+void chrout_X16(uint16_t num)
+{
+  const uint8_t ch[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
+  if (num >= 0x1000) goto four;
+  if (num >= 0x100) goto three;
+  if (num >= 0x10) goto two;
+  goto one;
+four:  _CHROUT(ch[num>>12]);
+three: _CHROUT(ch[(num>>8)&15]);
+two:   _CHROUT(ch[(num>>4)&15]);
+one:   _CHROUT(ch[num&15]);
 }
 
 void Printf(const char *format, ...)
@@ -463,16 +528,27 @@ void Printf(const char *format, ...)
     case 'd':
       dst = va_arg(args, int);
       if (dst < 0) { _CHROUT('-'); dst = -dst; }
-      goto print_unsigned;
+      chrout_u16(dst);
+      __asm__("NOP":::"memory"); // xxx random fix to mask/avoid bug https://github.com/llvm-mos/llvm-mos/issues/393
+    break;
     case 'u':
       dst = va_arg(args, unsigned int);
 print_unsigned:
       chrout_u16(dst);
+      __asm__("NOP":::"memory"); // xxx random fix to mask/avoid bug https://github.com/llvm-mos/llvm-mos/issues/393
     break;
+    case 'x':
+      chrout_x16(va_arg(args, unsigned int));
+      __asm__("NOP":::"memory"); // xxx random fix to mask/avoid bug https://github.com/llvm-mos/llvm-mos/issues/393
+      break;
+    case 'X':
+      chrout_X16(va_arg(args, unsigned int));
+      __asm__("NOP":::"memory"); // xxx random fix to mask/avoid bug https://github.com/llvm-mos/llvm-mos/issues/393
+      break;
     case 's':
       str = va_arg(args, const char *);
       assert(str);
-      while(!str) _CHROUT(*str++);
+      while(*str) _CHROUT(*str++);
     break;
     default: assert(false); break;
     }
