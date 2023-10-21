@@ -34,12 +34,13 @@ void print_dos_error(uint8_t error, const char *operation);
 
 uint8_t read_next_char(FILE *f);
 
-
 void consume_read_whitespace(FILE *f);
 
 int read_int_from_file(FILE *f);
 
 void read_string_from_file(FILE *f, char *dst);
+
+char *strstr(const char *str1, const char *str2);
 
 FILE *fopen(const char *filename, const char *mode);
 int fscanf(FILE *f, const char *format, ...);

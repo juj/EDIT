@@ -244,4 +244,17 @@ _KERNAL void _PLOT_SET(uint8_t x, uint8_t y)          { NEED_STACK(2); _ASM vola
 // Fetch CIA #1 base address
 _KERNAL uintptr_t _IOBASE() { NEED_STACK(2); uint8_t lo, hi; _ASM("JSR $FFF3":"=x"(lo),"=y"(hi)::); return _U16(lo, hi); }
 
+/////////////////////////////////////////////
+// Custom extensions to KERNAL functionality:
+
+// Soft-resets the system.
+// TODO: This won't work on C16, C116, Plus/4 or C128x: https://www.c64-wiki.com/wiki/Reset_(Process)
+_KERNAL void _Noreturn _RESET() { _ASM volatile("JMP ($FFFC)"); }
+
+// Returns true if there is a key pending in the keyboard input queue.
+_KERNAL bool _KBHIT() { return *(volatile unsigned char *)0x00C6; }
+
+// Clears the screen (resets both character and color data) and moves cursor to top-left (0,0).
+_KERNAL void _CLRSCR() { _ASM volatile("JSR $E544"); }
+
 #endif // ~__C64__

@@ -40,19 +40,31 @@ static void cs_write_page_data(uint16_t page, uint16_t data)
   write_u16_lo_hi(cs_packet_data, data);
 }
 
-static int rrnet_init()
+int rrnet_init(bool enable_promiscuous_mode)
 {
-  *rrnet_ctl |= 1; // enable clock port
+  *rrnet_ctl |= 1; // enable clock port on the C64 to access RR-Net through a carrier cartridge
+
   // Detect RR-Net
   cs_set_page(0);
-  if (cs_read_page_data() != 0x630E) return 0;
+  if (cs_read_page_data() != 0x630E)
+  {
+    printf("RR-NET/CS8900A WAS NOT DETECTED.");
+    return 0;
+  }
+
+  // Detect RR-Net MK3 by calculating a checksum. See http://wiki.icomp.de/wiki/RRNet
+  volatile uint8_t * const mk3_eeprom = (uint8_t *)0xDE0C;
+  if ((mk3_eeprom[0] ^ mk3_eeprom[1] ^ 0x55) != mk3_eeprom[2] ||
+     ((mk3_eeprom[0] + mk3_eeprom[1] + mk3_eeprom[2]) ^ 0xAA) != mk3_eeprom[3])
+  {
+    printf("RR-NET MK3 NOT DETECTED (CKSUM ERROR)\n");
+  }
+
   // Configure chip
   cs_write_page_data(0x0114/*pp_self_ctl*/, 0x0055); // reset chip
-  cs_write_page_data(0x0104/*pp_rx_ctl*/, 0x0D05); // accept individual and broadcast packets
-//  cs_write_page_data(0x0104/*pp_rx_ctl*/, 0x0D85); // accept individual and broadcast packets (promisc)
-  cs_write_page_data(0x0158/*pp_ia*/, 0x8000); // Write MAC Address
-  cs_write_page_data(0x015A/*pp_ia*/, 0xB310);
-  cs_write_page_data(0x015C/*pp_ia*/, 0xB7EB);
+  uint16_t mode = 0x0D05; // accept individual and broadcast packets
+  if (enable_promiscuous_mode) mode |= 0x80; // and maybe enable promiscuous mode
+  cs_write_page_data(0x0104/*pp_rx_ctl*/, mode);
   cs_write_page_data(0x0112/*pp_line_ctl*/, 0xD3); // Enable RX and TX
   return 1;
 }
@@ -120,9 +132,44 @@ static void read_struct(void *dst, uint16_t numBytes)
 
 static void discard_rx_bytes(unsigned int numBytes)
 {
+  // Read the hardware port cs_rxtx_data[1] numBytes/2 times (rounded up)
+  // to discard received uint16s that are uninteresting.
+#if 0
   numBytes = (numBytes+1)>>1;
   while(numBytes-- > 0)
-    rx_data_lo_hi();
+    (void)cs_rxtx_data[1];
+#else
+  // This is a hot function, so implement a tight discard loop
+  // manually.
+  asm(R"(
+    // A and X contain number of bytes to discard
+    CMP #0        // Test if A is zero (have an even multiple of 256 bytes to discard)
+    BEQ high_part%= // Jump to deal directly with high part
+
+    ROR A         // Calculate (A+1)/2 by shifting once right, and
+    ADC #0        // adding the lowest bit (now in Carry) back to A.
+    TAY           // Move A to Y, since A cannot be used as a loop counter
+loop_lo%=:        // Loop Y times to read the $DE09 hardware port
+    LDA $DE09     // Discards one uint16 from CS8900A receive buffer
+    DEY
+    BNE loop_lo%=
+
+high_part%=:      // Now discard full multiples of 256 bytes
+    CPX #00       // No high part to discard
+    BEQ end%=
+
+loop_hi%=:
+    LDY #128      // 256 bytes == 128 uint16s
+times_128%=:      // Loop just like before
+    LDA $DE09     // Discard a uint16 from CS8900A receive bufer
+    DEY
+    BNE times_128%=
+   
+    DEX
+    BNE loop_hi%= // If we still have multiples of 256 left, do it again
+end%=:
+  )"::"a"((uint8_t)numBytes), "x"((uint8_t)(numBytes>>8)));
+#endif
 }
 
 static void debug_dump_rx_bytes(unsigned int numBytes)
@@ -193,7 +240,7 @@ static void put_screen(char ch)
 
 static void clear_screen()
 {
-  memset((void*)screen_mem, 0x20, 40*25);
+  _CLRSCR();
 }
 
 static void close_file()
@@ -387,11 +434,11 @@ void send_udp_fragment_received_msg(uint16_t fragment_index)
 
 char rrnet_recv_filename[MAX_FILENAME_LEN+1];
 
-const char *receive_file()
+const char *poll_to_receive_file()
 {
-  uint16_t bytes_left = 0;
-  while(!bytes_left)
-    bytes_left = poll_for_udp_file_transfer_fragment(true);
+  uint16_t bytes_left = poll_for_udp_file_transfer_fragment(true);
+  if (!bytes_left)
+    return 0;
 
   recv_file_datagram_header header;
   read_struct(&header, sizeof(header));
@@ -467,14 +514,19 @@ end:
 
 int main()
 {
-  int success = rrnet_init();
+  int success = rrnet_init(/*promiscuous:*/false);
   if (success) printf("RR-NET INITIALIZED\n");
   else printf("RR-NET NOT FOUND!\n");
 
-  for(;;)
+  bool quit = false;
+  while(!quit)
   {
-    printf("WAITING TO RECEIVE FILE...\n");
-    receive_file();
+    printf("WAITING TO RECEIVE FILE (ESC QUITS)...\n");
+    while(!quit)
+    {
+      if (poll_to_receive_file()) break;
+      if (_KBHIT() && _GETIN() == 0x5F/*ESC*/) quit = true;
+    }
   }
-  return 0;
+  _RESET();
 }

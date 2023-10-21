@@ -405,7 +405,7 @@ void chrout_u16(uint16_t num)
     STA %[zp2]
 
     LDX #16 // Loop 16 bits of the u16 input
-loop:
+loop%=:
     ROL %[input] // Rotate u16 to left to get the next MSB bit of input into carry
     ROL %[input]+1
 
@@ -420,7 +420,7 @@ loop:
     STA %[zp2]
 
     DEX     // Loop back to next input bit
-    BNE loop
+    BNE loop%=
 
     CLD // Exit BCD mode
   )":[zp0]"=r"(zp0), [zp1]"=r"(zp1), [zp2]"=r"(zp2), [input]"+r"(num)::"a","x","c");
@@ -478,4 +478,27 @@ print_unsigned:
     }
   }
   va_end(args);
+}
+
+char *strstr(const char *str1, const char *str2)
+{
+  while(*str1)
+  {
+    while(*str1 != *str2)
+    {
+      ++str1;
+      if (!*str1) return 0;
+    }
+    const char *s1 = str1;
+    const char *s2 = str2;
+    while(*s1 == *s2)
+    {
+      ++s1;
+      ++s2;
+      if (!*s1) return !*s2 ? (char*)str1 : 0;
+      if (!*s2) return (char*)str1;
+    }
+    ++str1;
+  }
+  return 0;
 }
