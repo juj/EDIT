@@ -40,7 +40,7 @@ static void cs_write_page_data(uint16_t page, uint16_t data)
   write_u16_lo_hi(cs_packet_data, data);
 }
 
-int rrnet_init()
+static int rrnet_init()
 {
   *rrnet_ctl |= 1; // enable clock port
   // Detect RR-Net
@@ -88,11 +88,27 @@ struct udp_header
 
 #define MAX_C64_FILENAME_LEN 16
 
+struct udp_magic
+{
+  uint32_t magic_header;
+};
+
+#define RECV_FILE_DATAGRAM_MAGIC 0x25291423
 struct recv_file_datagram_header
 {
-  uint32_t magic_header; // 0x25291423
+//  uint32_t magic_header;
   char filename[20];
-};
+  uint16_t file_id;
+  uint16_t num_fragments;
+} __attribute__((packed));
+
+#define RECV_FILE_DATAGRAM_FRAGMENT_MAGIC 0x53915315
+struct recv_file_datagram_fragment_header
+{
+//  uint32_t magic_header;
+  uint16_t file_id;
+  uint16_t fragment_index;
+} __attribute__((packed));
 
 static void read_struct(void *dst, uint16_t numBytes)
 {
@@ -117,7 +133,7 @@ static void debug_dump_rx_bytes(unsigned int numBytes)
   printf("\n");
 }
 
-void start_tx(uint16_t numBytes)
+static void start_tx(uint16_t numBytes)
 {
   write_u16_lo_hi(cs_tx_cmd, 0x00C0); // Send Transmit command 00C0h
   write_u16_lo_hi(cs_tx_len, numBytes);
@@ -126,7 +142,7 @@ void start_tx(uint16_t numBytes)
     ; // Wait until we are ready to transmit
 }
 
-void tx_bytes(const void *msg, uint16_t numBytes)
+static void tx_bytes(const void *msg, uint16_t numBytes)
 {
   numBytes = (numBytes+1)>>1;
   const uint16_t *m16 = (const uint16_t*)msg;
@@ -137,7 +153,7 @@ void tx_bytes(const void *msg, uint16_t numBytes)
 static volatile unsigned char * const screen_mem = (unsigned char*)0x0400;
 static volatile unsigned char * const screen_frame = (unsigned char *)0xD020;
 
-unsigned char ascii_to_petscii(unsigned char ch)
+static unsigned char ascii_to_petscii(unsigned char ch)
 {
   if (ch == 0x08) return 0x14; // Backspace character
   if (ch == 0x0A) return 0x0D; // NL line feed, new line
@@ -155,7 +171,7 @@ unsigned char ascii_to_petscii(unsigned char ch)
   return ch - 0x60;
 }
 
-unsigned char petscii_to_screen_code(unsigned char petscii)
+static unsigned char petscii_to_screen_code(unsigned char petscii)
 {
   if (petscii <= 31) return 32;//petscii + 128;
   if (petscii <= 63) return petscii;
@@ -168,19 +184,19 @@ unsigned char petscii_to_screen_code(unsigned char petscii)
 }
 
 uint16_t screen_pos = 0;
-void put_screen(char ch)
+static void put_screen(char ch)
 {
   screen_mem[screen_pos++] = petscii_to_screen_code(ascii_to_petscii(ch));
   if (screen_pos >= 40*25) screen_pos = 0;
   *screen_frame = ch;
 }
 
-void clear_screen()
+static void clear_screen()
 {
   memset((void*)screen_mem, 0x20, 40*25);
 }
 
-void close_file()
+static void close_file()
 {
   _CLOSE(2);
   _CLRCHN();
@@ -231,11 +247,8 @@ end:
   return true;
 }
 
-bool poll_for_receive_file()
+uint16_t poll_for_udp_file_transfer_fragment(bool first_fragment)
 {
-  bool received_file = false;
-  bool error = false;
-
   // Poll if there is an Ethernet frame ready for processing
   cs_set_page(0x0124);
   if ((cs_read_page_data() & 0x0D00) == 0) return false;
@@ -248,7 +261,7 @@ bool poll_for_receive_file()
     eth_frame frame;
     ip_frame ip;
     udp_header udp;
-    recv_file_datagram_header recv_header;
+    udp_magic magic;
   } net;
 
 #define READ_STRUCT(s) \
@@ -263,135 +276,112 @@ bool poll_for_receive_file()
   if (net.ip.protocol != 0x11/*UDP*/) goto end;
 
   READ_STRUCT(net.udp);
-  net.udp.src_port = ntohs(net.udp.src_port);
-  net.udp.dst_port = ntohs(net.udp.dst_port);
-  net.udp.length = ntohs(net.udp.length);
 
-  READ_STRUCT(net.recv_header);
-  if (net.recv_header.magic_header != 0x25291423) goto end;
+  READ_STRUCT(net.magic);
+  if ((first_fragment && net.magic.magic_header == RECV_FILE_DATAGRAM_MAGIC && bytes_left == sizeof(recv_file_datagram_header))
+    || (!first_fragment && net.magic.magic_header == RECV_FILE_DATAGRAM_FRAGMENT_MAGIC && bytes_left > sizeof(recv_file_datagram_fragment_header)))
+    return bytes_left; // this is interesting data, return it for processing
 
-  net.recv_header.filename[MAX_C64_FILENAME_LEN] = 0;
+end:
+  discard_rx_bytes(bytes_left);
+  return 0;
+}
 
-  if (!open_file_for_saving(net.recv_header.filename))
+char rrnet_recv_filename[MAX_FILENAME_LEN+1];
+
+const char *receive_file()
+{
+  uint16_t bytes_left = 0;
+  while(!bytes_left)
+    bytes_left = poll_for_udp_file_transfer_fragment(true);
+
+  recv_file_datagram_header header;
+  read_struct(&header, sizeof(header));
+  assert(bytes_left == sizeof(header));
+
+  header.filename[MAX_C64_FILENAME_LEN] = 0;
+  strcpy(rrnet_recv_filename, header.filename);
+  if (!open_file_for_saving(header.filename))
   {
-    printf("FAILED TO OPEN FILE \"%s\"\n", net.recv_header.filename);
-    goto end;
+    printf("FAILED TO OPEN FILE \"%s\"\n", header.filename);
+    return 0;
   }
-
-  uint16_t size;
-  size = bytes_left;
   clear_screen();
   uint8_t origScreenFrameColor;
   origScreenFrameColor = *screen_frame;
-  while(bytes_left > 0)
-  {
-    uint16_t data = rx_data_lo_hi();
-    --bytes_left;
-    uint8_t n = 1;
-    if (bytes_left)
-    {
-      ++n;
-      --bytes_left;
-    }
-    uint8_t ch[2] = { (char)(data), (char)(data >> 8) };
 
-    for(uint8_t i = 0; i < n; ++i)
+  uint32_t totalBytesWritten = 0;
+  bool error = false;
+  uint16_t next_fragment_index = 0;
+  while(next_fragment_index != header.num_fragments)
+  {
+    uint16_t data_left = poll_for_udp_file_transfer_fragment(false);
+
+    recv_file_datagram_fragment_header frag;
+    read_struct(&frag, sizeof(frag));
+    data_left -= sizeof(frag);
+
+    if (frag.file_id == header.file_id)
     {
-      put_screen(ch[i]);
-      if (_READST()) { close_file(); error = true; goto end; }
-      _CHROUT(ch[i]);
+      if (frag.fragment_index != next_fragment_index) { error = true; goto end; }
+
+      while(data_left > 0)
+      {
+        uint16_t data = rx_data_lo_hi();
+        --data_left;
+        uint8_t n = 1;
+        if (data_left)
+        {
+          ++n;
+          --data_left;
+        }
+        uint8_t ch[2] = { (char)(data), (char)(data >> 8) };
+
+        for(uint8_t i = 0; i < n; ++i)
+        {
+          put_screen(ch[i]);
+          if (_READST()) { error = true; goto end; }
+          _CHROUT(ch[i]);
+          ++totalBytesWritten;
+        }
+      }
+      ++next_fragment_index;
     }
+    else
+      discard_rx_bytes(data_left);
   }
 
-  close_file();
 end:
+  close_file();
   *screen_frame = origScreenFrameColor;
   _PLOT_SET(0, 0);
   clear_screen();
-  if (error)
-  {
-    printf("\nFAILED TO WRITE FILE!\n");
-  }
-  else
-  {
-    printf("\nWROTE %u BYTES TO FILE \"%s\"\n", size, net.recv_header.filename);
-    received_file = true;
-  }
-
-  // Flush rest of the received bytes from the receive buffer
-  discard_rx_bytes(bytes_left);
-  return received_file;
+  if (error) printf("\nFAILED TO WRITE FILE!\n");
+  else printf("\nWROTE %lu BYTES TO FILE \"%s\"\n", totalBytesWritten, header.filename);
+  return error ? 0 : rrnet_recv_filename;
 }
 
-void wait_to_receive_file()
+const char *receive_network_file()
 {
-  while(!poll_for_receive_file()) ;
-}
-
-#if 0
-void send_udp_broadcast(const void *data, uint16_t numBytes)
-{
-  uint16_t numBytesRoundedUpToEven = numBytes + (numBytes&1);
-  start_tx(sizeof(frame) + sizeof(ip) + sizeof(udp) + numBytesRoundedUpToEven);
-  for(int i = 0; i < 6; ++i)
-    frame.dst_mac[i] = 0xFF;
-  frame.src_mac[0] = 0x00;
-  frame.src_mac[1] = 0x80;
-  frame.src_mac[2] = 0x10;
-  frame.src_mac[3] = 0xB3;
-  frame.src_mac[4] = 0xEB;
-  frame.src_mac[5] = 0xB7;
-  frame.etherType = 0x0008;
-  tx_bytes(&frame, sizeof(frame));
-
-  ip.versionAndHeaderLength = 0x45;
-  ip.typeOfService = 0;
-  ip.packetLength = ntohs(sizeof(ip) + sizeof(udp) + numBytesRoundedUpToEven);
-  ip.identification = 0;//ntohs(17299); // ???
-  ip.flagsAndFragmentOffset = 0;
-  ip.timeToLive = 128;
-  ip.protocol = 17; // udp
-  ip.headerChecksum = 0; // not checksummed
-  /*
-  ip.src_ip[0] = 192;
-  ip.src_ip[1] = 168;
-  ip.src_ip[2] = 0;
-  ip.src_ip[3] = 182;
-  */
-  ip.src_ip[0] = 87;
-  ip.src_ip[1] = 100;
-  ip.src_ip[2] = 208;
-  ip.src_ip[3] = 236;
-
-  ip.dst_ip[0] = 255;
-  ip.dst_ip[1] = 255;
-  ip.dst_ip[2] = 255;
-  ip.dst_ip[3] = 255;
-  tx_bytes(&ip, sizeof(ip));
-
-  udp.src_port = ntohs(49739);
-  udp.dst_port = ntohs(4009);
-  udp.length = ntohs(sizeof(udp) + numBytesRoundedUpToEven);
-  udp.checksum = 0;
-  tx_bytes(&udp, sizeof(udp));
-
-  tx_bytes(data, numBytes);
-  if ((numBytes & 1))
+  if (!rrnet_init())
   {
-    unsigned char zero = 0;
-    tx_bytes(&zero, 1);
+    printf("NETWORK ADAPTER NOT FOUND!\n");
+    return 0;
   }
+  printf("WAITING FOR FILE...\n");
+  return receive_file();
 }
-#endif
-
 int main()
 {
   int success = rrnet_init();
   if (success) printf("RR-NET INITIALIZED\n");
   else printf("RR-NET NOT FOUND!\n");
 
-  printf("WAITING TO RECEIVE FILE...\n");
-  wait_to_receive_file();
+  for(;;)
+  {
+    printf("WAITING TO RECEIVE FILE...\n");
+    receive_network_file();
+  }
 
   return 0;
 }
