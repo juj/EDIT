@@ -214,8 +214,14 @@ bool open_file_for_saving(const char *filename)
   for(uint8_t j = 0; filename[j]; ++j) { fn[i++] = filename[j]; }
   // Append ",S,W" to filename to tell that the file type is Sequential, and that
   // we are Writing to the file.
+  char file_type = 'S';
+  if (strstr(filename, ".PRG") || strstr(filename, ".prg"))
+  {
+    i -= 4; // Erase ".PRG" part from file suffix
+    file_type = 'P';
+  }
   fn[i++] = ',';
-  fn[i++] = 'S';
+  fn[i++] = file_type;
   fn[i++] = ',';
   fn[i++] = 'W';
   fn[i] = 0;
@@ -287,6 +293,98 @@ end:
   return 0;
 }
 
+uint16_t sum1c(uint16_t a, uint16_t b)
+{
+  a += b;
+  return a + (a < b);
+}
+
+uint16_t calculate_one1c_checksum(void *data, uint16_t numBytes)
+{
+  assert(numBytes % 2 == 0);
+  numBytes >>= 1;
+  uint16_t *d = (uint16_t *)data;
+  uint16_t checksum = 0;
+  while(numBytes--)
+    checksum = sum1c(checksum, ntohs(*d++));
+  return ~checksum;
+}
+
+void start_udp_send(uint16_t numBytes)
+{
+  union
+  {
+    eth_frame frame;
+    ip_frame ip;
+    udp_header udp;
+  } net;
+
+  uint16_t numBytesRoundedUpToEven = numBytes + (numBytes&1);
+  start_tx(sizeof(net.frame) + sizeof(net.ip) + sizeof(net.udp) + numBytesRoundedUpToEven);
+
+  // Perform UDP broadcast
+  for(int i = 0; i < 6; ++i)
+    net.frame.dst_mac[i] = 0xFF;
+
+  // http://wiki.icomp.de/wiki/RRNet
+  net.frame.src_mac[0] = 0x28;
+  net.frame.src_mac[1] = 0xCD;
+  net.frame.src_mac[2] = 0x4C;
+  net.frame.src_mac[3] = 0xFF;
+  net.frame.src_mac[4] = *(volatile unsigned char *)0xDE0E;
+  net.frame.src_mac[5] = *(volatile unsigned char *)0xDE0F;
+
+  net.frame.etherType = 0x0008;
+  tx_bytes(&net.frame, sizeof(net.frame));
+
+  net.ip.versionAndHeaderLength = 0x45;
+  net.ip.typeOfService = 0;
+  net.ip.packetLength = ntohs(sizeof(net.ip) + sizeof(net.udp) + numBytesRoundedUpToEven);
+  net.ip.identification = 0;
+  net.ip.flagsAndFragmentOffset = 0;
+  net.ip.timeToLive = 128;
+  net.ip.protocol = 17; // udp
+  net.ip.headerChecksum = 0; // temporary, will be filled later
+
+  net.ip.src_ip[0] = 192;
+  net.ip.src_ip[1] = 168;
+  net.ip.src_ip[2] = 0;
+  net.ip.src_ip[3] = 255;
+
+  net.ip.dst_ip[0] = 255;
+  net.ip.dst_ip[1] = 255;
+  net.ip.dst_ip[2] = 255;
+  net.ip.dst_ip[3] = 255;
+  net.ip.headerChecksum = ntohs(calculate_one1c_checksum(&net.ip, sizeof(net.ip))); // Calculate the IP checksum (this is not optional)
+
+  tx_bytes(&net.ip, sizeof(net.ip));
+
+  net.udp.src_port = ntohs(49739);
+  net.udp.dst_port = ntohs(4009);
+  net.udp.length = ntohs(sizeof(net.udp) + numBytesRoundedUpToEven);
+  net.udp.checksum = 0; // Skip computing UDP checksum - that is optional. (tricky to compute since checksum extends over user payload)
+  tx_bytes(&net.udp, sizeof(net.udp));
+
+  // The only thing left now is to fill the actual UDP payload data,
+  // which is the caller's side to do.
+}
+
+#define FRAGMENT_RECEIVED_DATAGRAM_MAGIC 0xEE365F02
+struct fragment_received
+{
+  uint32_t magic;
+  uint16_t fragment_index;
+};
+
+void send_udp_fragment_received_msg(uint16_t fragment_index)
+{
+  fragment_received recv;
+  recv.magic = FRAGMENT_RECEIVED_DATAGRAM_MAGIC;
+  recv.fragment_index = fragment_index;
+  start_udp_send(sizeof(recv));
+  tx_bytes(&recv, sizeof(recv));
+}
+
 char rrnet_recv_filename[MAX_FILENAME_LEN+1];
 
 const char *receive_file()
@@ -301,11 +399,13 @@ const char *receive_file()
 
   header.filename[MAX_C64_FILENAME_LEN] = 0;
   strcpy(rrnet_recv_filename, header.filename);
+
   if (!open_file_for_saving(header.filename))
   {
     printf("FAILED TO OPEN FILE \"%s\"\n", header.filename);
     return 0;
   }
+
   clear_screen();
   uint8_t origScreenFrameColor;
   origScreenFrameColor = *screen_frame;
@@ -313,6 +413,9 @@ const char *receive_file()
   uint32_t totalBytesWritten = 0;
   bool error = false;
   uint16_t next_fragment_index = 0;
+
+  send_udp_fragment_received_msg(0xFFFF); // Send back msg that we are ready to start transfer.
+
   while(next_fragment_index != header.num_fragments)
   {
     uint16_t data_left = poll_for_udp_file_transfer_fragment(false);
@@ -345,6 +448,7 @@ const char *receive_file()
           ++totalBytesWritten;
         }
       }
+      send_udp_fragment_received_msg(frag.fragment_index);
       ++next_fragment_index;
     }
     else
@@ -361,16 +465,6 @@ end:
   return error ? 0 : rrnet_recv_filename;
 }
 
-const char *receive_network_file()
-{
-  if (!rrnet_init())
-  {
-    printf("NETWORK ADAPTER NOT FOUND!\n");
-    return 0;
-  }
-  printf("WAITING FOR FILE...\n");
-  return receive_file();
-}
 int main()
 {
   int success = rrnet_init();
@@ -380,8 +474,7 @@ int main()
   for(;;)
   {
     printf("WAITING TO RECEIVE FILE...\n");
-    receive_network_file();
+    receive_file();
   }
-
   return 0;
 }
