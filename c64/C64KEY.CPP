@@ -40,6 +40,19 @@ unsigned char lastReturnedKeyCode = 0;
 unsigned char lastKeyCode = 0;
 unsigned char last_key_time = 0;
 
+static bool is_printable_character(uint8_t petsciiCode)
+{
+  if (petsciiCode == 0x5C) return false; // GBP character
+  if (petsciiCode >= 0x20 && petsciiCode <= 0x5E) return true; // Petscii space, 0-9, a-z, and other characters
+  if (petsciiCode >= 0xC1 && petsciiCode <= 0xDA) return true; // Petscii A-Z
+  if (petsciiCode == PETSCII_THIN_UNDERSCORE) return true; // Underscore character '_'
+  if (petsciiCode == PETSCII_LEFT_CURLY_BRACE) return true; // Petscii close substitute for ASCII '{'
+  if (petsciiCode == PETSCII_BACKSLASH) return true; // Petscii close substitute for ASCII '\'
+  if (petsciiCode == PETSCII_RIGHT_CURLY_BRACE) return true; // Petscii close substitute for ASCII '}'
+  if (petsciiCode == PETSCII_OR_PIPE) return true; // Petscii graphical character for '|'
+  return false;
+}
+
 int get_key()
 {
   unsigned char keyCode = 0, ch;
@@ -58,33 +71,17 @@ int get_key()
   lastReturnedKeyCode = keyCode;
   last_key_time = *jiffy_lsb;
 
-  // Is shift key down:
-  unsigned char modifiers = *key_modifiers;
-  bool is_shift = (modifiers&1);
-//  bool is_cmdre = (modifiers&2);
-  bool is_ctrl = (modifiers&4);
-  unsigned int key = keyCode;
+  // Replace a thicker underscore character with the thinnest underscore to avoid causing
+  // confusion which character represents an underscore symbol. (both can be used interchangeably)
+  if (keyCode == PETSCII_THICK_UNDERSCORE) keyCode = PETSCII_THIN_UNDERSCORE;
+  // 0xBA is Shift+@, which produces some uninteresting graphical character.
+  // Replace it with underscore, which is Cmdr+@. (Shift+@ is easier to type than Cmdr+@)
+  else if (keyCode == 0xBA) keyCode = PETSCII_THIN_UNDERSCORE;
+  // This is somewhat of an arbitrary remap: Replace GBP character with backslash '\'
+  else if (keyCode == PETSCII_GREAT_BRITAIN_POUND) keyCode = PETSCII_BACKSLASH;
+
+  if (is_printable_character(keyCode)) return keyCode;
   unsigned char key_matrix_code = *key_address;
-
-  if (key >= 0xC1 && key <= 0xDA) key -= 0x60; // xxx why this?
-//  key &= 0x7F; // xxx why this?
-  if (keyCode == 0xBA && key_matrix_code == 0x2E) key = LEFT_CURLY_BRACE;
-  else if (keyCode == 0xC0 && key_matrix_code == 0x31) key = RIGHT_CURLY_BRACE;
-  else if (keyCode == 0xDE && key_matrix_code == 0x36) key = TEXT_BACKSLASH;
-  else if (key == 0xA0) key = 0x20; // convert shift-space back to space. xxx why this?
-
-  if (is_shift)
-  {
-    if (is_shift_aware_key(key)) key |= KEY_SHIFT_MODIFIER;
-    else if (key >= 'A' && key <= 'Z')
-      key ^= 0x20; // In PETSCII uppercase and lowercase are reversed
-  }
-  if (key == 0x5F) // The PETSCII back arrow key at top left of keyboard
-  {
-    if (is_ctrl) key = KEY_CTRL_TAB;
-    else key = KEY_TAB;
-  }
-//  printf("  %XH/%XH\n", (int)key, (int)*key_address);
-  return key;
+  return KEY_SCANCODE_MODIFIER | key_matrix_code | (((uint16_t)(*key_modifiers & 7)) << 8);
 }
 

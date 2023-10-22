@@ -24,10 +24,10 @@ void clear_screen(unsigned char ch, unsigned char color)
     put_screen(i, ch, color);
 }
 
-void clear_line(uint16_t screenPos, unsigned char ch)
+void clear_line(uint16_t screenPos, unsigned char ch, unsigned char color)
 {
   for(int i = 0; i < SCREEN_WIDTH; ++i)
-    put_screen(screenPos + i, ch, BLUE); //DKGRAY | BGCOLOR(BLUE);//editorTextColor;
+    put_screen(screenPos + i, ch, color);
 }
 
 void set_chars_color(cursor_pos x, cursor_pos y, int numChars, unsigned char color)

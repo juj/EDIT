@@ -5,7 +5,7 @@ SET FLAGS=-DNDEBUG -Oz -Wno-nonportable-include-path
 
 C:\code\llvm-mos-sdk\build\install\bin\mos-clang --config mos-c64.cfg -o e.prg %FLAGS% %SOURCES%
 
-C:\code\llvm-mos-sdk\build\install\bin\mos-clang --config mos-c64.cfg -Wl,--lto-emit-asm -g -o test.s %FLAGS% %SOURCES%
+::C:\code\llvm-mos-sdk\build\install\bin\mos-clang --config mos-c64.cfg -Wl,--lto-emit-asm -g -o test.s %FLAGS% %SOURCES%
 
 
 

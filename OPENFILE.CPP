@@ -53,22 +53,22 @@ void run_open_file_menu()
   while(!done)
   {
     int key = get_key();
-    if (key == KEY_ESC) break;
-    if (key == KEY_ENTER)
+    if (key == ACTION_ESC) break;
+    if (key == ACTION_ENTER)
     {
       char fname[FILE_WIDTH];
       get_string_on_screen(selectionX*FILE_WIDTH, selectionY, FILE_WIDTH-1, fname);
       open_file(fname);
       break;
     }
-    if (key == KEY_UP || key == KEY_DOWN || key == KEY_LEFT || key == KEY_RIGHT)
+    if (key == ACTION_CURSOR_UP || key == ACTION_CURSOR_DOWN || key == ACTION_CURSOR_LEFT || key == ACTION_CURSOR_RIGHT)
     {
       set_chars_color(selectionX*FILE_WIDTH, selectionY, FILE_WIDTH-1, LTGRAY);
 
-      if (key == KEY_UP) selectionY = MAX(0, selectionY-1);
-      else if (key == KEY_DOWN) selectionY = MIN(SCREEN_HEIGHT-1, selectionY + 1);
-      else if (key == KEY_LEFT) selectionX = MAX(0, selectionX - 1);
-      else/* if (key == KEY_RIGHT)*/ selectionX = MIN(SCREEN_WIDTH / (FILE_WIDTH+1), selectionX + 1);
+      if (key == ACTION_CURSOR_UP) selectionY = MAX(0, selectionY-1);
+      else if (key == ACTION_CURSOR_DOWN) selectionY = MIN(SCREEN_HEIGHT-1, selectionY + 1);
+      else if (key == ACTION_CURSOR_LEFT) selectionX = MAX(0, selectionX - 1);
+      else/* if (key == ACTION_CURSOR_RIGHT)*/ selectionX = MIN(SCREEN_WIDTH / (FILE_WIDTH+1), selectionX + 1);
 
       set_chars_color(selectionX*FILE_WIDTH, selectionY, FILE_WIDTH-1, WHITE | BGCOLOR(LTGRAY));
     }

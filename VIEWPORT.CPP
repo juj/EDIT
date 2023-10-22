@@ -75,7 +75,11 @@ void run_alt_tab_menu()
     if (is_get_key_pending())
     {
       int key = get_key();
-      if (key == KEY_TAB || key == KEY_ALT_TAB || key == KEY_SHIFT_TAB || key == KEY_CTRL_TAB)
+      if (key == ACTION_ALT_TAB_MENU_NEXT_DOCUMENT
+#ifdef ACTION_ALT_TAB_MENU_NEXT_DOCUMENT_ALT2
+        || key == ACTION_ALT_TAB_MENU_NEXT_DOCUMENT_ALT2
+#endif
+        || key == ACTION_ALT_TAB_MENU_PREV_DOCUMENT)
       {
         if (is_shift_key_currently_down())
         {

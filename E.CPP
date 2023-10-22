@@ -845,10 +845,10 @@ void run_goto_line_menu()
   while(1)
   {
     int key = get_key();
-    if ((key == KEY_BACKSPACE && inputLen > 0) || (key >= '0' && key <= '9' && inputLen < sizeof(targetLineNumberStr)-1
+    if ((key == ACTION_DELETE_LEFT && inputLen > 0) || (key >= '0' && key <= '9' && inputLen < sizeof(targetLineNumberStr)-1
      && (inputLen > 0 || key != '0')))
     {
-      if (key == KEY_BACKSPACE)
+      if (key == ACTION_DELETE_LEFT)
         targetLineNumberStr[--inputLen] = 0;
       else if (inputLen < 8)
         targetLineNumberStr[inputLen++] = (char)key;
@@ -882,8 +882,7 @@ void run_goto_line_menu()
       }
       // TODO: Goto line
     }
-#ifndef __C64__ // TODO
-    else if (key == KEY_ESC)
+    else if (key == ACTION_ESC)
     {
       currentLine = originalCurrentLine;
       firstDisplayedLine = originalFirstDisplayedLine;
@@ -891,8 +890,7 @@ void run_goto_line_menu()
       cursorY = originalCursorY;
       break;
     }
-#endif
-    else if (key == KEY_ENTER)
+    else if (key == ACTION_ENTER)
     {
       cursorX = virtualX = find_line_indent_position(currentLine);
       break;
@@ -1023,89 +1021,100 @@ void main_loop()
       else clear_currently_selected_text();
     }
 
-    switch(key & ~KEY_SHIFT_MODIFIER)
+    switch(key)
     {
-      case KEY_LEFT: move_cursor_horizontally(-1); break;
-      case KEY_RIGHT: move_cursor_horizontally(1); break;
-      case KEY_UP: move_cursor_vertically(-1); break;
-      case KEY_DOWN: move_cursor_vertically(1); break;
-#ifndef __C64__ // TODO
-      case KEY_PGUP: move_viewport_vertically(-SCREEN_HEIGHT, 1); break;
-      case KEY_PGDN: move_viewport_vertically(SCREEN_HEIGHT, 1); break;
-      case KEY_HOME: toggle_cursor_home(); break;
-      case KEY_END: move_cursor_to_line_end(); break;
-      case KEY_CTRL_LEFT: move_cursor_to_prev_word(); break;
-      case KEY_CTRL_RIGHT: move_cursor_to_next_word(); break;
-      case KEY_CTRL_UP: move_viewport_vertically(-1, 0); break;
-      case KEY_CTRL_DOWN: move_viewport_vertically(1, 0); break;
-      case KEY_CTRL_HOME: scroll_to_beginning(); break;
-      case KEY_CTRL_END: scroll_to_end(); break;
-      case KEY_ESC:
-      case KEY_ALT_F4:
-      case KEY_CTRL_Q:
+      case ACTION_CURSOR_LEFT: move_cursor_horizontally(-1); break;
+      case ACTION_CURSOR_RIGHT: move_cursor_horizontally(1); break;
+      case ACTION_CURSOR_UP: move_cursor_vertically(-1); break;
+      case ACTION_CURSOR_DOWN: move_cursor_vertically(1); break;
+      case ACTION_PAGE_UP: move_viewport_vertically(-SCREEN_HEIGHT, 1); break;
+      case ACTION_PAGE_DOWN: move_viewport_vertically(SCREEN_HEIGHT, 1); break;
+      case ACTION_CURSOR_TO_LINE_START: toggle_cursor_home(); break;
+      case ACTION_CURSOR_TO_LINE_END: move_cursor_to_line_end(); break;
+      case ACTION_CURSOR_TO_PREV_WORD: move_cursor_to_prev_word(); break;
+      case ACTION_CURSOR_TO_NEXT_WORD: move_cursor_to_next_word(); break;
+#ifdef ACTION_VIEWPORT_UP_ONE_LINE
+      case ACTION_VIEWPORT_UP_ONE_LINE: move_viewport_vertically(-1, 0); break;
+#endif
+#ifdef ACTION_VIEWPORT_DOWN_ONE_LINE
+      case ACTION_VIEWPORT_DOWN_ONE_LINE: move_viewport_vertically(1, 0); break;
+#endif
+#ifdef ACTION_CURSOR_TO_FILE_START
+      case ACTION_CURSOR_TO_FILE_START: scroll_to_beginning(); break;
+#endif
+#ifdef ACTION_CURSOR_TO_FILE_END
+      case ACTION_CURSOR_TO_FILE_END: scroll_to_end(); break;
+#endif
+      case ACTION_CURSOR_TO_TOGGLE_FILE_START_END:
+        if (currentLine->nextLine) scroll_to_end();
+        else scroll_to_beginning(); 
+        break;
+      case ACTION_QUIT_PROGRAM:
+#ifdef ACTION_QUIT_PROGRAM_ALT2
+      case ACTION_QUIT_PROGRAM_ALT2:
+#endif
+#ifdef ACTION_QUIT_PROGRAM_ALT3
+      case ACTION_QUIT_PROGRAM_ALT3:
+#endif
         running = 0;
         break;
-#endif
-      case KEY_CTRL_A: select_all(); break;
-      case KEY_BACKSPACE:
-        if (selectionStartLine)
-          erase_selected_text();
-        else
-          backspace_character();
+      case ACTION_SELECT_ALL: select_all(); break;
+      case ACTION_DELETE_LEFT:
+        if (selectionStartLine) erase_selected_text();
+        else                    backspace_character();
         break;
-      case KEY_DELETE:
-        if (key == KEY_SHIFT_DELETE)
-          copy_selection(/*cut_selection=*/true);
-        else if (selectionStartLine)
-        {
-          erase_selected_text();
-          repaint_screen(); // TODO better repaint
-        }
-        else
-          delete_character();
+      case ACTION_DELETE_RIGHT:
+        if (selectionStartLine) erase_selected_text();
+        else                    delete_character();
         break;
-      case KEY_CTRL_DELETE:
+#ifdef ACTION_DELETE_CURRENT_LINE
+      case ACTION_DELETE_CURRENT_LINE:
+      case ACTION_DELETE_CURRENT_LINE_ALT2:
         if (selectionStartLine) erase_selected_text();
         else                    erase_current_line();
         break;
-      case KEY_CTRL_K:
-        erase_current_line(); break; // TODO: optimize to repaint only from given line forward
-      case KEY_INSERT:
-        if (key == KEY_SHIFT_INSERT)
-          paste_selection(); // TODO: this does not work, Shift-Ins generates a zero instead.
-        else
-          toggle_insert();
-        break;
-      case KEY_ENTER: insert_new_line(/*cursorMovesToNewLine=*/1); break;
-      case KEY_TAB: insert_indent(); break;
-      case KEY_SHIFT_TAB: unindent(); break;
-      case KEY_CTRL_TAB:
-      case KEY_ALT_TAB: run_alt_tab_menu(); repaint_screen(); break;
-      case KEY_F7: switch_to_next_file(false); break;
-      case KEY_F8: switch_to_next_file(true); break;
-      case KEY_CTRL_N:
+#endif
+      case ACTION_TOGGLE_INSERT_MODE: toggle_insert(); break;
+      case ACTION_ENTER: insert_new_line(/*cursorMovesToNewLine=*/1); break;
+      case ACTION_ADD_INDENT: insert_indent(); break;
+      case ACTION_UNINDENT: unindent(); break;
+      case ACTION_ALT_TAB_MENU_NEXT_DOCUMENT:
+#ifdef ACTION_ALT_TAB_MENU_NEXT_DOCUMENT_ALT2
+      case ACTION_ALT_TAB_MENU_NEXT_DOCUMENT_ALT2:
+#endif
+        run_alt_tab_menu(); repaint_screen(); break;
+#ifdef ACTION_OPEN_NEXT_DOCUMENT
+      case ACTION_OPEN_NEXT_DOCUMENT: switch_to_next_file(false); break;
+#endif
+#ifdef ACTION_OPEN_PREV_DOCUMENT
+      case ACTION_OPEN_PREV_DOCUMENT: switch_to_next_file(true); break;
+#endif
+      case ACTION_NEW_FILE:
       {
         File *f = open_new_file();
         if (f)
           open_file_in_viewport(f, /*bringToMruFront*/1);
       }
         break;
-      case KEY_CTRL_C:
-      case KEY_CTRL_INSERT:
-        copy_selection(/*cutSelection=*/false);
-        break;
-      case KEY_CTRL_X:
+      case ACTION_CUT_TEXT:
+      case ACTION_CUT_TEXT_ALT2:
         copy_selection(/*cutSelection=*/true);
         break;
-      case KEY_CTRL_V:
+      case ACTION_COPY_TEXT:
+#ifdef ACTION_COPY_TEXT_ALT2
+      case ACTION_COPY_TEXT_ALT2:
+#endif
+        copy_selection(/*cutSelection=*/false);
+        break;
+      case ACTION_PASTE_TEXT:
+      case ACTION_PASTE_TEXT_ALT2:
         paste_selection();
         break;
-      case KEY_F1:
+      case ACTION_TOGGLE_TEXT_SELECT_MODE:
         textSelectionModeActive = !textSelectionModeActive;
         print_textsel_info();
         break;
-      case KEY_CTRL_S:
-      case KEY_F2:
+      case ACTION_SAVE_FILE:
       {
         bool userCancelled = false;
 //        if (is_file_unnamed(currentFile) || is_shift_key_held(key))
@@ -1118,26 +1127,25 @@ void main_loop()
         {
           save_file(currentFile);
           save_file_to_network(currentFile);
-          repaint_screen();
         }
+        repaint_screen();
         break;
       }
-      case KEY_CTRL_G: run_goto_line_menu(); break;
-      case KEY_CTRL_O:
-      case KEY_F3:
+      case ACTION_OPEN_GOTO_LINE_MENU: run_goto_line_menu(); break;
+      case ACTION_OPEN_FILE:
         run_open_file_menu();
         repaint_screen();
         break;
-      case KEY_CTRL_W:
-#ifndef __C64__ // TODO
-      case KEY_CTRL_F4:
+      case ACTION_CLOSE_FILE:
+#ifdef ACTION_CLOSE_FILE_ALT2
+      case ACTION_CLOSE_FILE_ALT2:
 #endif
         close_file(currentFile);
         repaint_screen();
         break;
 
-#if defined(__TURBOC__) && defined(__MSDOS__)
-      case KEY_CTRL_PLUS:
+#ifdef ACTION_ZOOM_FONT_BIGGER
+      case ACTION_ZOOM_FONT_BIGGER:
         if (currentVideoMode > 0)
         {
           set_vga_text_mode(--currentVideoMode);
@@ -1150,14 +1158,20 @@ void main_loop()
           repaint_screen();
         }
         break;
-      case KEY_CTRL_MINUS:
+#endif
+
+#ifdef ACTION_ZOOM_FONT_SMALLER
+      case ACTION_ZOOM_FONT_SMALLER:
         if (currentVideoMode < LAST_VIDEO_MODE)
         {
           set_vga_text_mode(++currentVideoMode);
           repaint_screen();
         }
         break;
-      case KEY_F10:
+#endif
+
+#ifdef ACTION_OPEN_COMMAND_LINE
+      case ACTION_OPEN_COMMAND_LINE:
         clear_screen(' ', LTGRAY);
         clrscr();
         system("command.com");

@@ -260,4 +260,13 @@ _KERNAL bool _KBHIT() { return *(volatile unsigned char *)0x00C6; }
 // Clears the screen (resets both character and color data) and moves cursor to top-left (0,0).
 _KERNAL void _CLRSCR() { _ASM volatile("JSR $E544"); }
 
+// Disables interrupts. Be sure to re-enable interrupts after executing a critical block.
+// Note that these calls do not have a nesting counter, i.e. calls to _DISABLE_INTR()
+// won't "stack up". After multiple calls to _DISABLE_INTR(), interrupts can be re-enabled
+// with just one call to _ENABLE_INTR().
+_KERNAL void _DISABLE_INTR() { _ASM volatile("SEI"); }
+
+// Re-enables interrupts.
+_KERNAL void _ENABLE_INTR() { _ASM volatile("CLI"); }
+
 #endif // ~__C64__

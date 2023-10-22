@@ -8,8 +8,11 @@
 static volatile unsigned char * const color_ram = (unsigned char*)0xD800;
 static volatile unsigned char * const screen_mem = (unsigned char*)0x0400;
 static volatile unsigned char * const cursor_blink = (unsigned char *)0xCC;
+static volatile unsigned char * const cursor_delay = (unsigned char *)0xCD;
+static volatile unsigned char * const char_under_cursor = (unsigned char *)0xCE;
 static volatile unsigned char * const cursor_blink_phase = (unsigned char *)0xCF;
 static volatile unsigned char * const cursor_color = (unsigned char*)0x0286;
+static volatile unsigned char * const color_under_cursor = (unsigned char*)0x0287;
 
 #define CURSOR_NONE   0
 #define CURSOR_NORMAL 1
@@ -21,9 +24,54 @@ void set_cursor_style(uint8_t style)
 
 static unsigned char cx, cy;
 unsigned char colorUnderCursor = 7;
+uint16_t cursorLinearPos;
+
 void set_cursor_pos(uint8_t x, uint8_t y)
 {
+///  while (*cursor_blink_phase) ;
+  uint16_t old_pos = (uint16_t)cy*SCREEN_WIDTH+cx;
+//  while(!*cursor_blink && (*cursor_delay <= 10 || *cursor_delay >= 17)) ;
+  _DISABLE_INTR();
+  uint8_t reverse_on = *cursor_blink_phase;
+  uint8_t charc = *char_under_cursor; // restore character under cursor
+  uint8_t colorc = *color_under_cursor; // and its color
+  if (reverse_on)
+  {
+    *cursor_blink_phase = 0; // hide cursor
+//    screen_mem[old_pos] = 
+//    color_ram[old_pos] = 
+  }
+//  uint8_t cuc = *color_under_cursor;
+  cursorLinearPos = (uint16_t)y*SCREEN_WIDTH+x;
+  *cursor_color = color_ram[cursorLinearPos];
+//  uint8_t new_cursor_color = color_ram[(uint16_t)y*SCREEN_WIDTH+x];
   _PLOT_SET(x, y);
+
+  if (reverse_on)
+  {
+    screen_mem[old_pos] = charc;
+    color_ram[old_pos] = colorc;
+  }
+
+//  *cursor_color = new_cursor_color;
+  // After changing cursor position, we need to clean up the old character, which
+  // might have been left inverted by the blinking cursor in the old location
+  /*
+  if (reverse_on)
+  {
+    color_ram[pos] = cuc;
+  }
+  if (reverse_on)
+  {
+    uint16_t pos = (uint16_t)cy*SCREEN_WIDTH+cx;
+    screen_mem[pos] = screen_mem[pos] & 0x7F;    
+  }
+  */
+  _ENABLE_INTR();
+  cx = x;
+  cy = y;
+
+/*
   // After changing cursor position, we need to clean up the old character, which
   // might have been left inverted by the blinking cursor in the old location
   uint16_t pos = (uint16_t)cy*SCREEN_WIDTH+cx;
@@ -33,6 +81,7 @@ void set_cursor_pos(uint8_t x, uint8_t y)
   cy = y;
   //colorUnderCursor = *cursor_color = color_ram[y*SCREEN_WIDTH+x];
   *cursor_color = color_ram[y*SCREEN_WIDTH+x];
+*/
 }
 
 unsigned char petscii_to_screen_code(unsigned char petscii);
@@ -51,8 +100,16 @@ unsigned char petscii_to_screen_code(unsigned char petscii);
 
 void put_screen(uint16_t linearPos, char ch, unsigned char color)
 {
-  screen_mem[linearPos] = petscii_to_screen_code(ch) ^ (color&0x80);
+  _DISABLE_INTR();
+  uint8_t newChar = petscii_to_screen_code(ch) ^ (color&0x80);
+  if (linearPos == cursorLinearPos)
+  {
+    *char_under_cursor = newChar;
+    *color_under_cursor = color;
+  }
+  screen_mem[linearPos] = newChar;
   color_ram[linearPos] = color;
+  _ENABLE_INTR();
 }
 
 void put_screen(uint16_t linearPos, char ch)

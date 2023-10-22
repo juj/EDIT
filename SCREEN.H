@@ -78,7 +78,7 @@ void put_screen(uint16_t linearPos, char ch, unsigned char color);
 char get_screen(uint16_t linearPos);
 unsigned char get_screen_color(uint16_t linearPos);
 
-void clear_line(uint16_t screenPos, unsigned char ch);
+void clear_line(uint16_t screenPos, unsigned char ch, unsigned char color = LTBLUE);
 
 void show_line_with_colors_with_sel(uint16_t screenPos, char huge *text, line_xpos textLen,
 #ifdef ENABLE_SYNTAX_HIGHLIGHTING

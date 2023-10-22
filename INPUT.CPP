@@ -120,54 +120,24 @@ bool is_alt_key_currently_down()
 
 int is_navigation_action_key(int key)
 {
-  switch((key & ~KEY_SHIFT_MODIFIER))
-  {
-  case KEY_LEFT:
-  case KEY_RIGHT:
-  case KEY_UP:
-  case KEY_DOWN:
-#ifndef __C64__ // TODO
-  case KEY_PGUP:
-#endif
-  case KEY_PGDN:
-  case KEY_HOME:
-  case KEY_END:
-#ifndef __C64__ // TODO
-  case KEY_CTRL_LEFT:
-  case KEY_CTRL_RIGHT:
-  case KEY_CTRL_UP:
-  case KEY_CTRL_DOWN:
-  case KEY_CTRL_HOME:
-  case KEY_CTRL_END:
-#endif
-    return 1;
-  default:
-    return 0;
-  }
-}
-
-int is_shift_aware_key(int key)
-{
   switch(key)
   {
-  case KEY_INSERT:
-  case KEY_DELETE:
-  case KEY_LEFT:
-  case KEY_RIGHT:
-  case KEY_UP:
-  case KEY_DOWN:
-#ifndef __C64__ // TODO
-  case KEY_PGUP:
-#endif
-#ifdef __C64__
-  case KEY_F2:
-#endif
-  case KEY_PGDN:
-  case KEY_HOME:
-  case KEY_END:
-    return 1;
+  case ACTION_CURSOR_LEFT:
+  case ACTION_CURSOR_RIGHT:
+  case ACTION_CURSOR_UP:
+  case ACTION_CURSOR_DOWN:
+  case ACTION_CURSOR_TO_PREV_WORD:
+  case ACTION_CURSOR_TO_NEXT_WORD:
+  case ACTION_CURSOR_TO_LINE_START:
+  case ACTION_CURSOR_TO_LINE_END:
+  case ACTION_CURSOR_TO_TOGGLE_FILE_START_END:
+  case ACTION_PAGE_ONE_THIRD_UP:
+  case ACTION_PAGE_ONE_THIRD_DOWN:
+  case ACTION_PAGE_UP:
+  case ACTION_PAGE_DOWN:
+    return true;
   default:
-    return 0;
+    return false;
   }
 }
 
@@ -208,7 +178,7 @@ void deinit_keyboard()
 
 int ask_string_prompt(const char *prompt, char *dst, int maxLen)
 {
-  clear_line((uint16_t)(SCREEN_HEIGHT-1)*SCREEN_WIDTH, ' '); // Clear last line to start with
+  clear_line((uint16_t)(SCREEN_HEIGHT-1)*SCREEN_WIDTH, ' ', LTGRAY); // Clear last line to start with
 
   put_string_on_screen(prompt, 0, SCREEN_HEIGHT-1, WHITE);
   uint8_t prompt_len = (uint8_t)strlen(prompt);
@@ -222,11 +192,9 @@ int ask_string_prompt(const char *prompt, char *dst, int maxLen)
     int key = get_key();
     switch(key)
     {
-#ifndef __C64__
-    case KEY_ESC: result = -1; break;
-#endif
-    case KEY_ENTER: if (x > 0) result = 1; break;
-    case KEY_BACKSPACE:
+    case ACTION_ESC: result = -1; break;
+    case ACTION_ENTER: if (x > 0) result = 1; break;
+    case ACTION_DELETE_LEFT:
       if (x > 0)
       {
         dst[--x] = 0;
