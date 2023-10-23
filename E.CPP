@@ -177,19 +177,18 @@ void repaint_current_line_from_offset(cursor_pos xOffset, cursor_pos xEnd)
   //repaint_screen_lines(cursorY, cursorY+1);
 }
 
-void insert_character(char ch)
+void insert_character(char ch, uint8_t times, line_xpos insert_pos)
 {
   assert(currentLine);
 
   erase_selected_text();
 
-  line_xpos currentCharOffset = current_column();
-
-  if (insertMode && currentCharOffset < currentLine->length)
+  if (insertMode && insert_pos < currentLine->length)
   {
+    assert(times == 1); // this path doesn't support multiple char inserts
     // in insert mode, the length of the text stays put, and we only replace existing
     // characters.
-    currentLine->text[currentCharOffset] = ch;
+    currentLine->text[insert_pos] = ch;
     clear_highlight(currentLine);
     mark_current_file_modified();
     put_screen(cursorY*SCREEN_WIDTH+cursorX, ch);
@@ -200,7 +199,8 @@ void insert_character(char ch)
     // If the current cursor position is outside the end of the line,
     // we may need to insert one or more whitespace as well to create
     // a properly indented text.
-    line_xpos numCharsToInsert = 1 + MAX(0, currentCharOffset - currentLine->length);
+    line_xpos numCharsToInsert = times;
+    if (currentLine->length < insert_pos) numCharsToInsert += insert_pos - currentLine->length;
 
     // Check if the current line has too many characters already.
     line_xpos newLineLength = ADD_U8_SAT(currentLine->length, numCharsToInsert);
@@ -212,14 +212,14 @@ void insert_character(char ch)
 
 #ifdef __C64__
     // Don't do geometric vector increases on C64, it seems to be wasteful in tight memory situation
-    if (!increase_capacity(currentLine, ADD_U8_SAT(currentLine->length, 4)))
+    if (!increase_capacity(currentLine, ADD_U8_SAT(newLineLength, 4)))
 #else
     if (newLineLength > currentLine->capacity && !increase_capacity(currentLine, ADD_U8_SAT(newLineLength, currentLine->capacity)))
 #endif
       return;
 
     // Shift existing characters up
-    for(line_xpos i = currentLine->length + numCharsToInsert - 1; i > currentCharOffset; --i)
+    for(line_xpos i = currentLine->length + numCharsToInsert - 1; i > insert_pos; --i)
     {
       assert(i < currentLine->capacity);
       assert(i-numCharsToInsert >= 0);
@@ -234,30 +234,31 @@ void insert_character(char ch)
     {
       for(line_xpos j = 1; j < numCharsToInsert; ++j)
       {
-        assert(currentCharOffset - j >= 0 && currentCharOffset - j < currentLine->length);
+        assert(insert_pos - j >= 0 && insert_pos - j < currentLine->length);
         assert(numCharsToInsert-1-j >= 0 && prevLine->length && numCharsToInsert-1-j < prevLine->length);
 
         assert(currentLine->text);
-        currentLine->text[currentCharOffset - j] =
+        currentLine->text[insert_pos - j] =
           is_whitespace(prevLine->text[numCharsToInsert-1-j])
           ? prevLine->text[numCharsToInsert-1-j] : tabChar;
       }
     }
 
-    assert(currentCharOffset >= 0);
-    assert(currentCharOffset <= currentLine->length);
-    assert(currentCharOffset < currentLine->capacity);
+    assert(insert_pos >= 0);
+    assert(insert_pos <= currentLine->length);
+    assert(insert_pos < currentLine->capacity);
     assert(currentLine->text);
-    currentLine->text[currentCharOffset] = ch;
+    currentLine->text[insert_pos] = ch;
     currentLine->length = newLineLength;
     assert(currentLine->length <= currentLine->capacity);
     clear_highlight(currentLine);
     mark_current_file_modified();
     bool full_repaint = 0;
-    if (++cursorX >= SCREEN_WIDTH)
+    cursorX += times;
+    if (cursorX >= SCREEN_WIDTH)
     {
-      --cursorX;
-      ++viewportXOffset;
+      viewportXOffset += SCREEN_WIDTH-1-cursorX;
+      cursorX = SCREEN_WIDTH-1;
       full_repaint = true;
     }
     virtualX = cursorX;
@@ -1133,13 +1134,13 @@ void main_loop()
         insert_new_line(/*cursorMovesToNewLine=*/1);
         break;
 #endif
-      case ACTION_ADD_INDENT:
-#ifdef ACTION_ADD_INDENT_ALT2
-      case ACTION_ADD_INDENT_ALT2:
-#endif
-        insert_indent();
+      case ACTION_INSERT_INDENT:
+        insert_indent(/*line_start=*/false);
         break;
-      case ACTION_UNINDENT: unindent(); break;
+      case ACTION_ADD_INDENT_TO_LINE_START:
+        insert_indent(/*line_start=*/true);
+        break;
+      case ACTION_UNINDENT_LINE_START: unindent(); break;
       case ACTION_ALT_TAB_MENU_NEXT_DOCUMENT:
 #ifdef ACTION_ALT_TAB_MENU_NEXT_DOCUMENT_ALT2
       case ACTION_ALT_TAB_MENU_NEXT_DOCUMENT_ALT2:
@@ -1271,7 +1272,7 @@ void main_loop()
               unindent();
           }
           if (showWhitespace && key == ' ') key = CHAR_MIDDLE_DOT;
-          insert_character(key);
+          insert_character(key, 1, current_column());
         }
         break;
     }

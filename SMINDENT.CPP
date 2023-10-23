@@ -52,10 +52,10 @@ int infer_indent_gcd(Line far *line)
   return indent ? indent : indentSize;
 }
 
-void insert_character(char ch);
+void insert_character(char ch, uint8_t times, line_xpos insert_pos);
 void repaint_screen();
 
-void insert_indent()
+void insert_indent(bool line_start)
 {
   assert(currentLine);
 
@@ -119,8 +119,7 @@ void insert_indent()
     if (!guessedIndentChar) guessedIndentChar = tabChar;
   }
   assert(is_tab(guessedIndentChar) || is_whitespace(guessedIndentChar));
-  for(line_xpos i = 0; i < guessedIndentAmount; ++i)
-    insert_character(guessedIndentChar);
+  insert_character(guessedIndentChar, guessedIndentAmount, line_start ? 0 : currentCharOffset);
 }
 
 void repaint_current_line_from_offset(cursor_pos xOffset, cursor_pos xEnd);
