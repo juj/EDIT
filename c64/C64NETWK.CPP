@@ -4,12 +4,13 @@
 #include "c64rrnet.h"
 #include <string.h>
 
-#define ENABLE_NETWORKING
+//#define ENABLE_NETWORKING
 
+bool network_initialized = false;
 void init_network()
 {
 #ifdef ENABLE_NETWORKING
-  rrnet_init();
+  network_initialized = rrnet_init();
 #endif
 }
 
@@ -20,6 +21,8 @@ void deinit_network()
 void send_line_to_network_server(uint8_t editType, File *f, Line *l, line_num lineno)
 {
 #ifdef ENABLE_NETWORKING
+  if (!network_initialized) return;
+
   UpdateLineMsg m;
   m.magic = MAGIC_UPDATE_LINE_MSG;
   m.line_no = lineno;
@@ -44,5 +47,7 @@ int save_file_to_network(File *file)
 
 void receive_data_from_network()
 {
+#ifdef ENABLE_NETWORKING
   poll_for_receive_file();
+#endif
 }
