@@ -3,7 +3,7 @@
 
 static volatile unsigned char * const queued_key_buffer_length = (unsigned char *)0x00C6;
 
-static volatile unsigned char * const key_address = (unsigned char *)0x00CB;
+static volatile unsigned char * const key_matrix_code = (unsigned char *)0x00CB;
 static volatile unsigned char * const key_modifiers = (unsigned char *)0x028D;
 
 static volatile unsigned char * const jiffy_lsb = (unsigned char*)0xA2;
@@ -40,7 +40,7 @@ unsigned char lastReturnedKeyCode = 0;
 unsigned char lastKeyCode = 0;
 unsigned char last_key_time = 0;
 
-static bool is_printable_character(uint8_t petsciiCode)
+static bool is_printable_petscii(uint8_t petsciiCode)
 {
   if (petsciiCode == 0x5C) return false; // GBP character
   if (petsciiCode >= 0x20 && petsciiCode <= 0x5E) return true; // Petscii space, 0-9, a-z, and other characters
@@ -53,23 +53,17 @@ static bool is_printable_character(uint8_t petsciiCode)
   return false;
 }
 
+bool is_printable_key(int key)
+{
+  return (key & KEY_SCANCODE_MODIFIER) == 0;
+}
+
 int get_key()
 {
   unsigned char keyCode = 0, ch;
   while(!keyCode)
-  {
     keyCode = _GETIN();
-
-    unsigned char repeat_delay = (key_is_repeating ? 10 : 15);
-    if ((unsigned char)(*jiffy_lsb - last_key_time) >= repeat_delay) lastKeyCode = 0;
-
-    if (keyCode == lastKeyCode && (unsigned char)(*jiffy_lsb - last_key_time) < repeat_delay)
-      keyCode = 0;
-  }
-  key_is_repeating = (lastReturnedKeyCode == keyCode);
-  lastKeyCode = keyCode;
-  lastReturnedKeyCode = keyCode;
-  last_key_time = *jiffy_lsb;
+  uint8_t modifiers = *key_modifiers & 7;
 
   // Replace a thicker underscore character with the thinnest underscore to avoid causing
   // confusion which character represents an underscore symbol. (both can be used interchangeably)
@@ -79,9 +73,12 @@ int get_key()
   else if (keyCode == 0xBA) keyCode = PETSCII_THIN_UNDERSCORE;
   // This is somewhat of an arbitrary remap: Replace GBP character with backslash '\'
   else if (keyCode == PETSCII_GREAT_BRITAIN_POUND) keyCode = PETSCII_BACKSLASH;
+  else if (keyCode == 0xC0) keyCode = PETSCII_LEFT_CURLY_BRACE; // Shift-* -> '{'
+  else if (keyCode == 0xDE) keyCode = PETSCII_RIGHT_CURLY_BRACE; // Shift-UpArrow -> '}'
+  else if ((keyCode == 0x3C || keyCode == 0x3E) && (modifiers & 2)) keyCode = 0; // Cmdr-, and Cmdr-. indent and unindent
+  else if (keyCode == PETSCII_EQUALS && modifiers) keyCode = 0; // Do not treat Shift-= and Cmdr-= as printable
 
-  if (is_printable_character(keyCode)) return keyCode;
-  unsigned char key_matrix_code = *key_address;
-  return KEY_SCANCODE_MODIFIER | key_matrix_code | (((uint16_t)(*key_modifiers & 7)) << 8);
+  if (is_printable_petscii(keyCode)) return keyCode;
+  return KEY_SCANCODE_MODIFIER | *key_matrix_code | (((uint16_t)modifiers) << 8);
 }
 

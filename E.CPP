@@ -139,6 +139,17 @@ void print_line_column_info()
   put_string_on_screen(str, SCREEN_WIDTH - (cursor_pos)strlen(str), SCREEN_HEIGHT-1, LTGRAY);
 }
 
+void print_insert_status_text(bool print_on_clear = false)
+{
+  if (insertMode)
+  {
+    const char *text = "insert mode";
+    put_string_on_screen(text, (SCREEN_WIDTH - (cursor_pos)strlen(text))/2, SCREEN_HEIGHT-1, LTGRAY);
+  }
+  else if (print_on_clear)
+    clear_line(SCREEN_WIDTH*(SCREEN_HEIGHT-1), ' ', LTGRAY);
+}
+
 void repaint_screen()
 {
   repaint_screen_lines(0, SCREEN_HEIGHT);
@@ -169,6 +180,9 @@ void repaint_current_line_from_offset(cursor_pos xOffset, cursor_pos xEnd)
 void insert_character(char ch)
 {
   assert(currentLine);
+
+  erase_selected_text();
+
   line_xpos currentCharOffset = current_column();
 
   if (insertMode && currentCharOffset < currentLine->length)
@@ -598,6 +612,15 @@ void scroll_to_end()
   repaint_screen();
 }
 
+void move_cursor_to_line_start()
+{
+  int oldOffset = viewportXOffset;
+  viewportXOffset = 0;
+  cursorX = virtualX = 0;
+  if (viewportXOffset != oldOffset)
+    repaint_screen();
+}
+
 void move_cursor_to_line_end()
 {
   int minimumXOffset = MAX(0, currentLine->length - (SCREEN_WIDTH-1));
@@ -688,6 +711,9 @@ void move_cursor_to_next_word()
 // Inserts a new line after the current one, e.g. when enter is pressed (maybe in the middle of a line)
 void insert_new_line(bool cursorMovesToNewline)
 {
+  assert(currentLine);
+  erase_selected_text();
+
   line_xpos currentCharOffset = current_column();
 
   // TODO: Also guess indent here
@@ -929,7 +955,7 @@ void print_textsel_info()
   char str[64];
   if (numCharsSelected == 0)
   {
-    if (textSelectionModeActive) sprintf(str, "SELECT");
+    if (textSelectionModeActive) sprintf(str, "text select mode");
     else str[0] = 0;
   }
   else if (numLinesSelected == 1)
@@ -964,6 +990,7 @@ void clear_currently_selected_text()
     repaint_screen_lines(startLine, endLine);
     repaint_screen_lines(SCREEN_HEIGHT-1, SCREEN_HEIGHT);
   }
+  textSelectionModeActive = 0;
 }
 
 void highlight_scroll_to_right(bool scrolled);
@@ -1027,6 +1054,12 @@ void main_loop()
       case ACTION_CURSOR_RIGHT: move_cursor_horizontally(1); break;
       case ACTION_CURSOR_UP: move_cursor_vertically(-1); break;
       case ACTION_CURSOR_DOWN: move_cursor_vertically(1); break;
+#ifdef ACTION_PAGE_ONE_THIRD_UP
+      case ACTION_PAGE_ONE_THIRD_UP: move_viewport_vertically(-SCREEN_HEIGHT / 3, 1); break;
+#endif
+#ifdef ACTION_PAGE_ONE_THIRD_DOWN
+      case ACTION_PAGE_ONE_THIRD_DOWN: move_viewport_vertically(SCREEN_HEIGHT / 3, 1); break;
+#endif
       case ACTION_PAGE_UP: move_viewport_vertically(-SCREEN_HEIGHT, 1); break;
       case ACTION_PAGE_DOWN: move_viewport_vertically(SCREEN_HEIGHT, 1); break;
       case ACTION_CURSOR_TO_LINE_START: toggle_cursor_home(); break;
@@ -1075,8 +1108,37 @@ void main_loop()
         break;
 #endif
       case ACTION_TOGGLE_INSERT_MODE: toggle_insert(); break;
+      case ACTION_ESC:
+        clear_currently_selected_text();
+        break;
       case ACTION_ENTER: insert_new_line(/*cursorMovesToNewLine=*/1); break;
-      case ACTION_ADD_INDENT: insert_indent(); break;
+#ifdef ACTION_ENTER_NEW_LINE_BEFORE_CURRENT_LINE
+      case ACTION_ENTER_NEW_LINE_BEFORE_CURRENT_LINE:
+        if (currentLine->prevLine)
+        {
+          move_cursor_vertically(-1);
+          move_cursor_to_line_end();
+          insert_new_line(/*cursorMovesToNewLine=*/1);
+        }
+        else
+        {
+          move_cursor_to_line_start();
+          insert_new_line(/*cursorMovesToNewLine=*/0);
+        }
+        break;
+#endif
+#ifdef ACTION_ENTER_NEW_LINE_AFTER_CURRENT_LINE
+      case ACTION_ENTER_NEW_LINE_AFTER_CURRENT_LINE:
+        move_cursor_to_line_end();
+        insert_new_line(/*cursorMovesToNewLine=*/1);
+        break;
+#endif
+      case ACTION_ADD_INDENT:
+#ifdef ACTION_ADD_INDENT_ALT2
+      case ACTION_ADD_INDENT_ALT2:
+#endif
+        insert_indent();
+        break;
       case ACTION_UNINDENT: unindent(); break;
       case ACTION_ALT_TAB_MENU_NEXT_DOCUMENT:
 #ifdef ACTION_ALT_TAB_MENU_NEXT_DOCUMENT_ALT2
@@ -1111,8 +1173,26 @@ void main_loop()
         paste_selection();
         break;
       case ACTION_TOGGLE_TEXT_SELECT_MODE:
-        textSelectionModeActive = !textSelectionModeActive;
-        print_textsel_info();
+        if (!textSelectionModeActive)
+        {
+          textSelectionModeActive = true;
+          print_textsel_info();
+        }
+        else
+          copy_selection(/*cutSelection=*/false);
+        break;
+      case ACTION_TOGGLE_TEXT_SELECT_MODE_AND_SELECT_CURRENT_LINE:
+        if (textSelectionModeActive) copy_selection(/*cutSelection=*/false);
+        else
+        {
+          textSelectionModeActive = true;
+          move_cursor_to_line_end();
+          selectionStartLineNum = selectionEndLineNum = current_line_number();
+          selectionStartColumn = 0;
+          selectionEndColumn = current_column();
+          selectionStartLine = selectionEndLine = currentLine;
+          repaint_screen_lines(selectionStartLineNum - firstDisplayedLineNumber, selectionStartLineNum + 1 - firstDisplayedLineNumber);
+        }
         break;
       case ACTION_SAVE_FILE:
       {
@@ -1180,16 +1260,19 @@ void main_loop()
 #endif
 
       default:
-        // Autocomplete: when typing a '}' character, automatically unindent the curly brace
-        // to one indent level lower.
-        if (key == RIGHT_CURLY_BRACE && all_chars_left_of_cursor_are_whitespace())
+        if (is_printable_key(key))
         {
-          // .. but only unindent if cursor is at least the x level of previous indentation.
-          if (currentLine->prevLine && find_line_indent_position(currentLine->prevLine) <= current_column())
-            unindent();
+          // Autocomplete: when typing a '}' character, automatically unindent the curly brace
+          // to one indent level lower.
+          if (key == RIGHT_CURLY_BRACE && all_chars_left_of_cursor_are_whitespace())
+          {
+            // .. but only unindent if cursor is at least the x level of previous indentation.
+            if (currentLine->prevLine && find_line_indent_position(currentLine->prevLine) <= current_column())
+              unindent();
+          }
+          if (showWhitespace && key == ' ') key = CHAR_MIDDLE_DOT;
+          insert_character(key);
         }
-        if (showWhitespace && key == ' ') key = CHAR_MIDDLE_DOT;
-        insert_character(key);
         break;
     }
     if (textSelection)

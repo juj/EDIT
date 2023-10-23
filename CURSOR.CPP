@@ -1,11 +1,14 @@
 #include "cursor.h"
 #include "state.h"
 
+void print_insert_status_text(bool print_on_clear);
+
 void toggle_insert()
 {
   insertMode = !insertMode;
   if (insertMode) set_cursor_style(CURSOR_INSERT);
   else set_cursor_style(CURSOR_NORMAL);
+  print_insert_status_text(true);
 }
 
 #if defined(__TURBOC__) && defined(__MSDOS__)

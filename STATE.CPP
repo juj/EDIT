@@ -46,12 +46,18 @@ line_num current_line_number()
   return firstDisplayedLineNumber + cursorY;
 }
 
+void repaint_screen_lines(cursor_pos yStart, cursor_pos yEnd); // TODO proper declaration location
+
 void clear_selection()
 {
   // In all cases when we end up clearing the actively selected
   // content, we also want to disable any active modal text
   // selection mode, if there is any.
-  textSelectionModeActive = 0;
+  if (textSelectionModeActive)
+  {
+    textSelectionModeActive = false;
+    repaint_screen_lines(SCREEN_HEIGHT-1, SCREEN_HEIGHT);
+  }
   selectionStartLineNum = selectionEndLineNum = -1;
   selectionStartLine = 0;
 }

@@ -19,6 +19,7 @@ int get_key_and_poll_network(); // block to wait for a key, but pump network tra
 
 bool is_shift_key_held(int key);
 int is_navigation_action_key(int key);
+bool is_printable_key(int key);
 
 void init_keyboard();
 void deinit_keyboard();

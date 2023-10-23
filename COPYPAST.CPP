@@ -73,7 +73,10 @@ void copy_selection(bool cutSelection)
   calculate_num_lines_and_chars_selected(&numLinesSelected, &numCharsSelected);
   if (numCharsSelected == 0)
   {
-    copyBufferLength = 0;
+    // If we are in text selection mode (and we must have tapped copy or cut key to enter here),
+    // do not clear the copy buffer on a redundant tap. This helps avoid frustration on accidental
+    // shortcut clicks.
+    if (!textSelectionModeActive) copyBufferLength = 0;
     return;
   }
   copy_buffer_reserve(numCharsSelected + numLinesSelected + 1);
@@ -115,12 +118,22 @@ void copy_selection(bool cutSelection)
     textSelectionModeActive = 0;
     clear_selection();
     repaint_screen(); // TODO optimize smarter repaint
+
+    if (numCharsSelected > 0)
+    {
+      char str[64];
+      if (numLinesSelected == 1)
+        sprintf(str, "copied " FILE_IDX_PRINTF_MOD " chars.", numCharsSelected);
+      else
+        sprintf(str, "copied " LINE_NUM_PRINTF_MOD " lines + " FILE_IDX_PRINTF_MOD " chars.", numLinesSelected, numCharsSelected);
+      put_string_on_screen(str, (SCREEN_WIDTH-(line_xpos)strlen(str))>>1, SCREEN_HEIGHT-1, LTBLUE);
+    }
   }
 }
 
 void erase_selected_text()
 {
-  assert(selectionStartLine);
+  if (!selectionStartLine) return;
   assert(selectionEndLine);
   clear_highlight(selectionStartLine);
   clear_highlight(selectionEndLine);
@@ -185,6 +198,7 @@ void erase_selected_text()
 void paste_selection()
 {
   if (copyBufferLength == 0) return;
+  erase_selected_text();
 
   // Find the first line of content, and paste it on the
   // current cursor line

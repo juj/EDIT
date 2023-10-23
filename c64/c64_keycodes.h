@@ -1,62 +1,10 @@
 #pragma once
-/*
-#define KEY_CTRL_A 0x01
-#define KEY_CTRL_C 0x03
-#define KEY_CTRL_G 0x07
-#define KEY_CTRL_K 0x0B
-#define KEY_CTRL_N 0x0E
-#define KEY_CTRL_O 0x0F
-#define KEY_CTRL_Q 0x11
-#define KEY_CTRL_S 0x13
-#define KEY_CTRL_V 0x16
-#define KEY_CTRL_W 0x17
-#define KEY_CTRL_X 0x18
 
-#define LEFT_CURLY_BRACE  0xAB
-#define RIGHT_CURLY_BRACE 0xB3
-#define TEXT_BACKSLASH    0xBF
-
-#define KEY_ESC        0x5F // Left Arrow key is ESC on C64
-#define KEY_F1         0x85
-#define KEY_F3         0x86
-#define KEY_F5         0x87
-#define KEY_F7         0x88
-#define KEY_F2         0x89
-#define KEY_F4         0x8A
-#define KEY_F6         0x8B
-#define KEY_F8         0x8C
-#define KEY_BACKSPACE  0x14
-#define KEY_LEFT       0x9D
-#define KEY_UP         0x91
-#define KEY_DOWN       0x11
-#define KEY_RIGHT      0x1D
-#define KEY_HOME       0x3313
-#define KEY_END        0x3393
-#define KEY_PGDN       0x5E
-#define KEY_DELETE     0x153
-
-#define KEY_INSERT     0x152
-#define KEY_SHIFT_INSERT (KEY_SHIFT_MODIFIER | KEY_INSERT)
-#define KEY_CTRL_UP    0x18d
-#define KEY_CTRL_MINUS 0x18E
-#define KEY_CTRL_PLUS  0x190
-#define KEY_CTRL_DOWN  0x191
-#define KEY_CTRL_INSERT 0x192
-#define KEY_CTRL_DELETE 0x193
-#define KEY_CTRL_TAB    0x194
-#define KEY_ENTER      0x0D
-#define KEY_TAB        0x09
-#define KEY_ALT_TAB    0x1A5
-#define KEY_SHIFT_TAB  0x10F
-*/
 #define KEY_SHIFT_MODIFIER    0x100
 #define KEY_CMDR_MODIFIER     0x200
 #define KEY_CTRL_MODIFIER     0x400
 #define KEY_SCANCODE_MODIFIER 0x800
 #define SCAN(x) ((x) | KEY_SCANCODE_MODIFIER)
-
-//#define KEY_CMDR_DELETE  (SCAN(0x94) | MATRIX(0x00) | KEY_CMDR_MODIFIER)
-//#define KEY_SHIFT_DELETE (SCAN(0x94) | MATRIX(0x00) | KEY_SHIFT_MODIFIER)
 
 #define KEY_ESC             SCAN(0x39)
 #define KEY_1               SCAN(0x38)
@@ -128,6 +76,7 @@
 #define PETSCII_THICK_UNDERSCORE    0xAF
 #define PETSCII_THIN_UNDERSCORE     0xA4
 #define PETSCII_BACKSLASH           0xAE
+#define PETSCII_EQUALS              0x3D
 
 // General character mappings:
 #define LEFT_CURLY_BRACE  PETSCII_LEFT_CURLY_BRACE
