@@ -1234,13 +1234,14 @@ void main_loop()
           selectionEndColumn = current_column();
           selectionStartLine = selectionEndLine = currentLine;
           repaint_screen_lines(selectionStartLineNum - firstDisplayedLineNumber, selectionStartLineNum + 1 - firstDisplayedLineNumber);
+          print_textsel_info();
         }
         break;
       case ACTION_SAVE_FILE:
+      case ACTION_SAVE_FILE_AS:
       {
         bool userCancelled = false;
-//        if (is_file_unnamed(currentFile) || is_shift_key_held(key))
-        if (is_file_unnamed(currentFile) || is_shift_key_currently_down()) // TODO: Replace with is_shift_key_held(key), but doesn't quite work now
+        if (is_file_unnamed(currentFile) || is_shift_key_held(key))
         {
           userCancelled = ask_name_for_file(currentFile);
           if (!userCancelled) currentFile->hasUnsavedChanges = 1;
