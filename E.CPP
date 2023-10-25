@@ -1070,8 +1070,16 @@ void main_loop()
     {
       case ACTION_CURSOR_LEFT: move_cursor_horizontally(-1); break;
       case ACTION_CURSOR_RIGHT: move_cursor_horizontally(1); break;
-      case ACTION_CURSOR_UP: move_cursor_vertically(-1); break;
-      case ACTION_CURSOR_DOWN: move_cursor_vertically(1); break;
+      case ACTION_CURSOR_UP:
+        // As a navigation aid, moving up on first line should move cursor to start of line
+        if (currentLine->prevLine) move_cursor_vertically(-1);
+        else move_cursor_to_line_start(); break;
+        break;
+      case ACTION_CURSOR_DOWN:
+        // As a navigation aid, moving down on last line should move cursor to end of line
+        if (currentLine->nextLine) move_cursor_vertically(1);
+        else move_cursor_to_line_end();
+        break;
 #ifdef ACTION_PAGE_ONE_THIRD_UP
       case ACTION_PAGE_ONE_THIRD_UP: move_viewport_vertically(-SCREEN_HEIGHT / 3, 1); break;
 #endif
