@@ -48,12 +48,26 @@ line_num current_line_number()
 
 void repaint_screen_lines(cursor_pos yStart, cursor_pos yEnd); // TODO proper declaration location
 
+void repaint_status_line()
+{
+  repaint_screen_lines(SCREEN_HEIGHT-1, SCREEN_HEIGHT);
+}
+
+void mark_insert_mode_inactive_and_repaint_status()
+{
+  if (insertMode)
+  {
+    insertMode = false;
+    repaint_status_line();
+  }
+}
+
 void mark_text_selection_mode_inactive_and_repaint_status()
 {
   if (textSelectionModeActive)
   {
     textSelectionModeActive = false;
-    repaint_screen_lines(SCREEN_HEIGHT-1, SCREEN_HEIGHT);
+    repaint_status_line();
   }
 }
 

@@ -1125,7 +1125,14 @@ void main_loop()
         else                    erase_current_line();
         break;
 #endif
-      case ACTION_TOGGLE_INSERT_MODE: toggle_insert(); break;
+      case ACTION_TOGGLE_INSERT_MODE:
+        if (textSelectionModeActive && !insertMode)
+        {
+          clear_currently_selected_text();
+          mark_text_selection_mode_inactive_and_repaint_status();
+        }
+        toggle_insert();
+        break;
       case ACTION_ESC:
         clear_currently_selected_text();
         break;
@@ -1193,6 +1200,7 @@ void main_loop()
       case ACTION_TOGGLE_TEXT_SELECT_MODE:
         if (!textSelectionModeActive)
         {
+          mark_insert_mode_inactive_and_repaint_status();
           textSelectionModeActive = true;
           print_textsel_info();
         }
