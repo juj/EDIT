@@ -744,10 +744,8 @@ void insert_new_line(bool cursorMovesToNewline)
     return;
   }
   // Copy indent
-  for(line_xpos i = 0; i < curLineIndent; ++i)
-    newLine->text[i] = currentLine->text[i];
-  for(line_xpos j = 0; j < newIndent; ++j)
-    newLine->text[curLineIndent+j] = tabChar;
+  memcpy(newLine->text, currentLine->text, curLineIndent);
+  memset(newLine->text + curLineIndent, tabChar, newIndent);
 
   // Copy leftover text from the current line to the new line
   for(line_xpos k = 0; k < newLine->length && currentCharOffset+k < currentLine->length; ++k)
@@ -772,12 +770,14 @@ void insert_new_line(bool cursorMovesToNewline)
   send_line_to_network_server(EDIT_TYPE_REPLACE_LINE, currentFile, currentLine, current_line_number());
   send_line_to_network_server(EDIT_TYPE_INSERT_LINE, currentFile, newLine, current_line_number()+1);
 
+  bool needRepaint = (viewportXOffset != 0);
+
+  Line far *repaintStartLine = currentLine;
+  uint8_t repaintStartY = cursorY;
+  // MIN(cursorX, find_line_indent_position(currentLine));
+  cursorX = virtualX = curLineIndent + newIndent;//find_line_indent_position(currentLine);
   if (cursorMovesToNewline)
   {
-    bool needRepaint = (viewportXOffset != 0);
-
-    // MIN(cursorX, find_line_indent_position(currentLine));
-    cursorX = virtualX = curLineIndent + newIndent;//find_line_indent_position(currentLine);
     if (cursorY < SCREEN_HEIGHT-1)
       ++cursorY;
     else
@@ -786,18 +786,18 @@ void insert_new_line(bool cursorMovesToNewline)
       ++firstDisplayedLineNumber;
       needRepaint = true;
     }
-    viewportXOffset = 0;
     currentLine = newLine;
-    if (needRepaint) repaint_screen();
   }
-
+  viewportXOffset = 0;
   mark_current_file_modified();
 
-  Line *prevLine = currentLine->prevLine;
-  assert(prevLine);
-  cursor_pos endY = screen_end_y_of_last_line_on_screen(prevLine, cursorY-1)+1;
-  if (endY > SCREEN_HEIGHT) endY = SCREEN_HEIGHT;
-  repaint_screen_lines(cursorY-1, endY);
+  if (needRepaint) repaint_screen();
+  else
+  {
+    cursor_pos endY = screen_end_y_of_last_line_on_screen(repaintStartLine, repaintStartY)+1;
+    assert(endY <= SCREEN_HEIGHT);
+    repaint_screen_lines(repaintStartY, endY);
+  }
 }
 
 void erase_line(Line *line)
@@ -939,6 +939,25 @@ void erase_current_line()
     cursorY += line_delta;
   }
   repaint_screen();
+}
+
+void measure_and_print_available_memory()
+{
+  uint16_t available_mem = 2*1024;
+  while(available_mem > 0)
+  {
+    void *ptr = malloc(available_mem);
+    if (ptr)
+    {
+      free(ptr);
+      break;
+    }
+    --available_mem;
+  }
+
+  char str[64];
+  sprintf(str, "%u bytes free.", available_mem);
+  put_string_on_screen(str, (SCREEN_WIDTH-(line_xpos)strlen(str))>>1, SCREEN_HEIGHT-1, LTBLUE);
 }
 
 void print_textsel_info()
@@ -1259,6 +1278,11 @@ void main_loop()
         repaint_screen();
         break;
 #endif
+#ifdef ACTION_SHOW_AVAILABLE_MEMORY
+      case ACTION_SHOW_AVAILABLE_MEMORY:
+        measure_and_print_available_memory();
+        break;
+#endif
 
       default:
         if (is_printable_key(key))
@@ -1332,8 +1356,36 @@ void main_loop()
   }
 }
 
+extern "C" size_t __heap_start;
+
 int main(int argc, char **argv)
 {
+  /*
+  __set_heap_limit(1024);
+  uint8_t *mem;
+  for(uint16_t sz = 2048; sz > 0; --sz)
+  {
+    mem = (uint8_t*)malloc(sz);
+    if (mem)
+    {
+      printf("ALLOCATED %u BYTES.\n", sz);
+      break;
+    }
+  }
+  uint16_t base = (uint16_t)&__heap_start;
+  size_t heap_size = (uint16_t)__heap_limit();
+  uint16_t heap_end = base + heap_size;
+  uint16_t stack_bottom = (uint16_t)&stack_bottom;//(uint16_t)__builtin_frame_address(0);
+  printf("BASE: 0X%04X\n", base);
+  printf("HEAP_SIZE: 0X%04X\n", heap_size);
+  printf("HEAP_END: 0X%04X\n", heap_end);
+  printf("STACK_BOTTOM: 0X%04X\n", stack_bottom);
+  get_key();
+*/
+
+
+
+
  //// query_svga_modes();
 //  set_vga_text_mode(TEXT_MODE_90x60);
 //  set_vga_text_mode(TEXT_MODE_40x25);

@@ -310,9 +310,15 @@ void paste_selection()
   if (endLine) endLine->prevLine = startLine;
   else currentFile->lastLine = startLine;
 
-  repaint_screen_lines(cursorY, MIN(SCREEN_HEIGHT, cursorY+numPastedLines));
+//  repaint_screen_lines(cursorY, MIN(SCREEN_HEIGHT, cursorY+numPastedLines));
   currentLine = endLine;
   cursorY += numPastedLines;
+  while(cursorY >= SCREEN_HEIGHT)
+  {
+    --cursorY;
+    firstDisplayedLine = firstDisplayedLine->nextLine;
+    assert(firstDisplayedLine);
+  }
   viewportXOffset = 0; // TODO proper horiz scrolling
 
   repaint_screen(); // TODO: optimize repaint

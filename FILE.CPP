@@ -274,7 +274,6 @@ File *load_file(const char *filename)
 
   for(Line *l = f->firstLine; l; l = l->nextLine)
     syntax_highlight(l);
-  get_key();
   return f;
 }
 

@@ -15,8 +15,12 @@ size_t allocatedFarMemory = 0;
 void out_of_memory(int isFarMemory, size_t bytes)
 {
   char str[64];
+#if defined(_MSC_VER) || defined(__TURBOC__)
   sprintf(str, "Unable to allocate %zu bytes of %s memory!",
     bytes, isFarMemory ? "far" : "near");
+#else
+  sprintf(str, "OOM(%u BYTES)", bytes);
+#endif
   put_string_on_screen(str, (SCREEN_WIDTH - (int)strlen(str))/2, SCREEN_HEIGHT-1,
     YELLOW | BGCOLOR(RED));
   ERROR_BEEP();
