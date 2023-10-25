@@ -181,8 +181,6 @@ void insert_character(char ch, uint8_t times, line_xpos insert_pos)
 {
   assert(currentLine);
 
-  erase_selected_text();
-
   if (insertMode && insert_pos < currentLine->length)
   {
     assert(times == 1); // this path doesn't support multiple char inserts
@@ -1296,6 +1294,7 @@ void main_loop()
               unindent();
           }
           if (showWhitespace && key == ' ') key = CHAR_MIDDLE_DOT;
+          erase_selected_text();
           insert_character(key, 1, current_column());
         }
         break;

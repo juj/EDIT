@@ -54,4 +54,6 @@ line_num current_line_number();
 // If 0, cursor is at start of line. Max value == line->length.
 line_xpos current_column();
 
+void mark_text_selection_mode_inactive_and_repaint_status();
+
 #endif

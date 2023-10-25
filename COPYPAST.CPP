@@ -133,6 +133,7 @@ void copy_selection(bool cutSelection)
 
 void erase_selected_text()
 {
+  mark_text_selection_mode_inactive_and_repaint_status();
   if (!selectionStartLine) return;
   assert(selectionEndLine);
   clear_highlight(selectionStartLine);
