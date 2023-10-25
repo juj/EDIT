@@ -1008,7 +1008,7 @@ void clear_currently_selected_text()
     repaint_screen_lines(startLine, endLine);
     repaint_screen_lines(SCREEN_HEIGHT-1, SCREEN_HEIGHT);
   }
-  textSelectionModeActive = 0;
+  mark_text_selection_mode_inactive_and_repaint_status();
 }
 
 void highlight_scroll_to_right(bool scrolled);

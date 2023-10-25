@@ -115,7 +115,7 @@ void copy_selection(bool cutSelection)
 
   if (textSelectionModeActive)
   {
-    textSelectionModeActive = 0;
+    textSelectionModeActive = false;
     clear_selection();
     repaint_screen(); // TODO optimize smarter repaint
 

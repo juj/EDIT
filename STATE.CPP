@@ -17,13 +17,13 @@ line_xpos virtualX = 0;
 line_xpos cursorX = 0;
 cursor_pos cursorY = 0;
 
-bool insertMode = 0;
-bool textSelectionModeActive = 0;
+bool insertMode = false;
+bool textSelectionModeActive = false;
 
-bool showWhitespace = 0;
+bool showWhitespace = false;
 
 // If true, tab mode is set to spaces, if false, to tabs.
-bool tabModeIsSpaces = 1;
+bool tabModeIsSpaces = true;
 
 line_xpos indentSize = 2;
 
