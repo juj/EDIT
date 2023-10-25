@@ -888,8 +888,7 @@ void run_goto_line_menu()
       }
       currentLine = get_nth_line_of_document(targetLineNumber);
       cursorY = targetLineNumber - viewportPos;
-      repaint_screen();
-      put_string_on_screen("Go to line: ", 0, SCREEN_HEIGHT-1, LTGRAY);
+      repaint_screen_lines(0, SCREEN_HEIGHT-1); // Don't repaint status line, that has the "GO TO LINE:" text
       assert(targetLineNumber >= 1);
       assert(viewportPos >= 1);
       assert(targetLineNumber - viewportPos >= 0);
