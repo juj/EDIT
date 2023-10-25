@@ -1128,7 +1128,9 @@ void main_loop()
         break;
 #ifdef ACTION_DELETE_CURRENT_LINE
       case ACTION_DELETE_CURRENT_LINE:
+#ifdef ACTION_DELETE_CURRENT_LINE_ALT2
       case ACTION_DELETE_CURRENT_LINE_ALT2:
+#endif
         if (selectionStartLine) erase_selected_text();
         else                    erase_current_line();
         break;
