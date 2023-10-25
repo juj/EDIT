@@ -1281,7 +1281,11 @@ void main_loop()
         measure_and_print_available_memory();
         break;
 #endif
-
+#ifdef ACTION_REPAINT_SCREEN
+      case ACTION_REPAINT_SCREEN:
+        repaint_screen();
+        break;
+#endif
       default:
         if (is_printable_key(key))
         {
