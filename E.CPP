@@ -389,20 +389,25 @@ void restrict_cursor_on_line();
 
 void move_viewport_vertically(cursor_pos lines, bool cursor_moves_along)
 {
-  bool scrolled = 0;
+  bool scrolled_viewport = false;
 
   while(lines < 0)
   {
-    if (firstDisplayedLine->prevLine)
+    if (cursor_moves_along && cursorY > 0)
     {
       ++lines;
-      scrolled = 1;
+      --cursorY;
+      assert(currentLine->prevLine);
+      currentLine = currentLine->prevLine;
+    }
+    else if (firstDisplayedLine->prevLine)
+    {
+      ++lines;
+      scrolled_viewport = true;
       firstDisplayedLine = firstDisplayedLine->prevLine;
       --firstDisplayedLineNumber;
-      if (cursor_moves_along || cursorY + 1 >= SCREEN_HEIGHT)
-      {
+      if (cursor_moves_along || cursorY >= SCREEN_HEIGHT-1)
         currentLine = currentLine->prevLine;
-      }
       else
         ++cursorY;
     }
@@ -416,16 +421,20 @@ void move_viewport_vertically(cursor_pos lines, bool cursor_moves_along)
 
     while(lines > 0)
     {
-      if (currentLine->nextLine && calculate_line_delta(firstDisplayedLine, lastPossibleViewportStartLine) > 0)
+      if (cursor_moves_along && cursorY < SCREEN_HEIGHT-1 && currentLine->nextLine)
       {
         --lines;
-        scrolled = 1;
+        ++cursorY;
+        currentLine = currentLine->nextLine;
+      }
+      else if (currentLine->nextLine && calculate_line_delta(firstDisplayedLine, lastPossibleViewportStartLine) > 0)
+      {
+        --lines;
+        scrolled_viewport = true;
         firstDisplayedLine = firstDisplayedLine->nextLine;
         ++firstDisplayedLineNumber;
         if (cursor_moves_along || cursorY <= 0)
-        {
           currentLine = currentLine->nextLine;
-        }
         else
           --cursorY;
       }
@@ -433,16 +442,9 @@ void move_viewport_vertically(cursor_pos lines, bool cursor_moves_along)
         break;
     }
   }
-
-  if (!scrolled && cursor_moves_along)
-  {
-    if (lines < 0) scroll_to_beginning();
-    else scroll_to_end();
-  }
-
   restrict_cursor_on_line();
 
-  if (scrolled) repaint_screen();
+  if (scrolled_viewport) repaint_screen();
 }
 
 void move_cursor_vertically(cursor_pos lines)
@@ -1080,10 +1082,15 @@ void main_loop()
         else move_cursor_to_line_end();
         break;
 #ifdef ACTION_PAGE_ONE_THIRD_UP
-      case ACTION_PAGE_ONE_THIRD_UP: move_viewport_vertically(-SCREEN_HEIGHT / 3, 1); break;
+#ifdef __C64__
+#define SMALL_PAGE_SCROLL_LINES 8
+#else
+#define SMALL_PAGE_SCROLL_LINES (SCREEN_HEIGHT/3)
+#endif
+      case ACTION_PAGE_ONE_THIRD_UP: move_viewport_vertically(-SMALL_PAGE_SCROLL_LINES, 1); break;
 #endif
 #ifdef ACTION_PAGE_ONE_THIRD_DOWN
-      case ACTION_PAGE_ONE_THIRD_DOWN: move_viewport_vertically(SCREEN_HEIGHT / 3, 1); break;
+      case ACTION_PAGE_ONE_THIRD_DOWN: move_viewport_vertically(SMALL_PAGE_SCROLL_LINES, 1); break;
 #endif
       case ACTION_PAGE_UP: move_viewport_vertically(-SCREEN_HEIGHT, 1); break;
       case ACTION_PAGE_DOWN: move_viewport_vertically(SCREEN_HEIGHT, 1); break;
