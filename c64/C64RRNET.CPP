@@ -123,7 +123,7 @@ static void discard_rx_bytes(unsigned int numBytes)
   while(numBytes-- > 0)
     rx_data_lo_hi();
 }
-
+/*
 static void debug_dump_rx_bytes(unsigned int numBytes)
 {
   numBytes = (numBytes+1)>>1;
@@ -131,7 +131,7 @@ static void debug_dump_rx_bytes(unsigned int numBytes)
     printf("%04X", ntohs(rx_data_lo_hi()));
   printf("\n");
 }
-
+*/
 void start_tx(uint16_t numBytes)
 {
   write_u16_lo_hi(cs_tx_cmd, 0x00C0); // Send Transmit command 00C0h
@@ -306,7 +306,9 @@ bool open_file_for_saving(const char *filename)
   // Oddly I am getting an error 199, so ignore too high error numbers as well. (something is very definitely wrong)
   if (error >= 20 && error <= 74)
   {
-    printf("ERROR: %d\n", (int)error);
+#ifndef NDEBUG    
+    Printf("ERROR: %d\n", (int)error);
+#endif
 // TODO: how to do this:
 //      ; check drive error channel here to test for
 //        ; FILE EXISTS error etc.
@@ -319,7 +321,9 @@ end:
   if (error)
   {
     close_file();
-    printf("FAILED %d\n", error);
+#ifndef NDEBUG    
+    Printf("FAILED %d\n", error);
+#endif
     return false;
   }
   return true;
@@ -371,7 +375,9 @@ bool poll_for_receive_file()
 
     if (!open_file_for_saving(net.recv_header.filename))
     {
-      printf("FAILED TO OPEN FILE \"%s\"\n", net.recv_header.filename);
+#ifndef NDEBUG    
+      Printf("FAILED TO OPEN FILE \"%s\"\n", net.recv_header.filename);
+#endif
       goto end;
     }
 
@@ -405,10 +411,16 @@ end_receive_file:
     _PLOT_SET(0, 0);
     clear_screen();
     if (error)
-      printf("\nFAILED TO WRITE FILE!\n");
+    {
+#ifndef NDEBUG    
+      Printf("\nFAILED TO WRITE FILE!\n");
+#endif
+    }
     else
     {
-      printf("\nWROTE %u BYTES TO FILE \"%s\"\n", size, net.recv_header.filename);
+#ifndef NDEBUG    
+      Printf("\nWROTE %u BYTES TO FILE \"%s\"\n", size, net.recv_header.filename);
+#endif
       received_file = true;
     }
   }

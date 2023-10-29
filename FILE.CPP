@@ -198,14 +198,15 @@ void close_file(File *file)
   Free(file, sizeof(File));
 }
 
-char ss[32];
+void write_status_text(const char *text, unsigned char color);
 
 File *load_file(const char *filename)
 {
   FILE *handle = fopen(filename, "r");
   if (!handle)
   {
-    printf("Failed to open %s!\n", filename);
+    write_status_text("FILE OPEN FAILED", LTRED);
+    get_key();
     return 0;
   }
 

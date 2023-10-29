@@ -1,6 +1,7 @@
 #include "../file.h"
 #include "../line.h"
 #include "../input.h"
+#include "../screen.h"
 #include "c64_kernal.h"
 #include <string.h>
 #include <stdint.h>
@@ -31,7 +32,7 @@ void save_file(File *file)
   // Oddly I am getting an error 199, so ignore too high error numbers as well. (something is very definitely wrong)
   if (error >= 20 && error <= 74)
   {
-    printf("ERROR: %d\n", (int)error);
+    Printf("ERROR: %d\n", (int)error);
 // TODO: how to do this:
 //      ; check drive error channel here to test for
 //        ; FILE EXISTS error etc.
@@ -64,17 +65,25 @@ end:
   {
     for(Line *l = file->firstLine; l; l = l->nextLine)
     {
-      //if (handle->error) { printf("EXP %d\n", (int)handle->error); }
-      //if (fputs(l->text, handle) == EOF) { printf("FPUTS %d!\n", (int)handle->error); error = true; break; }
-      if (fwrite(l->text, l->length, 1, handle) != l->length) { printf("FWRITE!\n"); error = true; break; }
-      if (fputc('\n', handle) == EOF) { printf("FPUTC!\n"); error = true; break; }
+      //if (handle->error) { Printf("EXP %d\n", (int)handle->error); }
+      //if (fputs(l->text, handle) == EOF) { Printf("FPUTS %d!\n", (int)handle->error); error = true; break; }
+      if (fwrite(l->text, l->length, 1, handle) != l->length)
+      {
+        error = true;
+        break;
+      }
+      if (fputc('\n', handle) == EOF)
+      {
+        error = true;
+        break;
+      }
     }
     fclose(handle);
   }
 
   if (error)
   {
-    printf("FAILED %d\n", error);
+    write_status_text("FILE WRITE FAILED", LTRED);
     get_key();
   }
   else

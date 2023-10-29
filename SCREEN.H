@@ -94,7 +94,8 @@ void get_string_on_screen(cursor_pos x, cursor_pos y, cursor_pos maxLength, char
 void set_chars_color(cursor_pos x, cursor_pos y, cursor_pos numChars, unsigned char color);
 void highlight_line(cursor_pos yLine, unsigned char bgColor);
 
-void log_error(const char *errorText);
+//void log_error(const char *errorText);
+void write_status_text(const char *text, unsigned char color);
 
 void clear_screen(unsigned char ch, unsigned char color);
 

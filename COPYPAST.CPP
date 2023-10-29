@@ -119,6 +119,7 @@ void copy_selection(bool cutSelection)
     clear_selection();
     repaint_screen(); // TODO optimize smarter repaint
 
+#ifndef __C64__ // TODO SPRINTF
     if (numCharsSelected > 0)
     {
       char str[64];
@@ -128,6 +129,7 @@ void copy_selection(bool cutSelection)
         sprintf(str, "copied " LINE_NUM_PRINTF_MOD " lines + " FILE_IDX_PRINTF_MOD " chars.", numLinesSelected, numCharsSelected);
       put_string_on_screen(str, (SCREEN_WIDTH-(line_xpos)strlen(str))>>1, SCREEN_HEIGHT-1, LTBLUE);
     }
+#endif
   }
 }
 
