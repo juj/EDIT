@@ -55,9 +55,22 @@ void send_line_to_network_server(uint8_t editType, File *f, Line *l, line_num li
 #endif
 }
 
+void send_ask_compiled_document_msg(uint8_t document_id)
+{
+#ifdef ENABLE_NETWORKING
+  if (!network_initialized) return;
+
+  AskCompiledDocumentMsg m;
+  m.magic = MAGIC_ASK_COMPILED_DOCUMENT_MSG;
+  m.document_id = document_id;
+  start_udp_send(sizeof(m));
+  tx_bytes(&m, sizeof(m)); // send msg
+#endif
+}
+
 void receive_data_from_network()
 {
 #ifdef ENABLE_NETWORKING
-  poll_for_receive_file();
+  process_udp_network_datagrams(0);
 #endif
 }

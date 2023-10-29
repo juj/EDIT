@@ -1,4 +1,6 @@
-import socket, struct, subprocess, os
+import socket, struct, subprocess, os, random, sys
+
+script_directory = os.path.dirname(os.path.abspath(sys.argv[0]))
 
 # Server state
 files = {} # document ID -> file contents
@@ -95,15 +97,21 @@ def prg_suffix_for_filename(fn):
 	if n_upper_chars(fn) >= n_lower_chars(fn): return '.PRG'
 	return '.prg'
 
-def compile_file(filename):
-  # TODO PATH
+def calc_output_prg_filename_from_input_cpp_filename(filename):
   if 'untitled_filename' in filename:
-    out_file = 'A.OUT.PRG'
+    return 'A.OUT.PRG'
   else:
-    out_file = replace_suffix(filename, prg_suffix_for_filename(filename))
+    return replace_suffix(filename, prg_suffix_for_filename(filename))
+
+def compile_file(filename):
+  out_file = calc_output_prg_filename_from_input_cpp_filename(filename)
+  # TODO PATH
   compiler = 'C:/code/llvm-mos-sdk/build/install/bin/mos-c64-clang.bat'
 # compiler = 'mos-c64-clang'
-  clang = subprocess.run([compiler, filename, '-Oz', '-o', out_file], capture_output=True)
+  include_dir = os.path.abspath(os.path.join(script_directory, '..', 'C64'))
+  additional_libs = [os.path.join(include_dir, 'stdio.cpp')]
+  print(include_dir)
+  clang = subprocess.run([compiler, filename, f'-I{include_dir}', '-Oz', '-o', out_file] + additional_libs, capture_output=True)
   if clang.returncode == 0:
 #    print('BUILD OK!')
     filesize = os.path.getsize(out_file)
@@ -154,7 +162,7 @@ def ascii_to_petscii_ch(ch):
 	if ch >= ord('A') and ch <= ord('Z'): return 0x61 + (ch - ord('A'))
 	if ch == ord('{'): return 0xAB
 	if ch == ord('}'): return 0xB3
-	if ch == ord('\\'): return 0xBF
+	if ch == ord('\\'): return 0xAE
 	return a2p[ch]
 '''
 	if ch == 0x08: return 0x14
@@ -189,7 +197,7 @@ def petscii_to_ascii_ch(ch): # shifted PETSCII
 	if ch >= 0x61 and ch <= 0x7A: return ord('A')+(ch-0x61)
 	if ch == 0xAB: return ord('{')
 	if ch == 0xB3: return ord('}')
-	if ch == 0xBF: return ord('\\')
+	if ch == 0xAE: return ord('\\')
 	return p2a[ch]
 '''
 	got = p2a[ch]
@@ -206,6 +214,7 @@ def remove_trailing_null_byte(s):
 
 MAGIC_UPDATE_LINE_MSG = 0x56369124
 MAGIC_NEW_DOCUMENT_MSG = 0x2395173A
+MAGIC_ASK_COMPILED_DOCUMENT_MSG = 0x69392AA2
 
 def handle_new_document_msg(data):
   clear_contents, document_id, filename_len, dummy = struct.unpack('BBBB', data[:4])
@@ -256,6 +265,83 @@ def handle_update_line_msg(data):
     print_file(file_lines)
     compile_file(filename)
 
+
+# MAX_C64_FILENAME_LEN 16
+
+RECV_FILE_DATAGRAM_MAGIC = 0x25291423
+#struct recv_file_datagram_header
+#{
+#  uint32_t magic_header;
+#  char filename[20];
+#  uint16_t file_id;
+#  uint16_t num_fragments;
+#};
+
+RECV_FILE_DATAGRAM_FRAGMENT_MAGIC = 0x53915315
+#struct recv_file_datagram_fragment_header
+#{
+#  uint32_t magic_header;
+#  uint16_t file_id;
+#  uint16_t fragment_index;
+#};
+
+def wait_to_ack_datagram_received(datagram_number):
+  print(f'wait_to_ack_datagram_received({datagram_number})')
+  data, addr = receive_datagram()
+  magic = struct.unpack('I', data[:4])[0]
+  data = data[4:]
+  FRAGMENT_RECEIVED_DATAGRAM_MAGIC = 0xEE365F02
+  if magic == FRAGMENT_RECEIVED_DATAGRAM_MAGIC:
+    fragment_index = struct.unpack('H', data[:2])[0]
+    if fragment_index == datagram_number:
+      print(f'got ack ({datagram_number})')
+      return
+
+
+def send_file_to_client(filename):
+  print(f"send_file_to_client({filename})")
+  MTU = 1300
+  FRAGMENT_PAYLOAD_SIZE = MTU - 8
+
+  file_data = open(filename, 'rb').read()
+  size = len(file_data)
+  if size > 512 * FRAGMENT_PAYLOAD_SIZE:
+    print(f"File is too large ({size} bytes) to send! Max send size={512 * FRAGMENT_PAYLOAD_SIZE} bytes")
+    return;
+  print(f'Sending file of size {size}')
+
+  file_id = random.randrange(65536)
+  num_fragments = (size + FRAGMENT_PAYLOAD_SIZE - 1) // FRAGMENT_PAYLOAD_SIZE
+  filetype = 'S'
+  if filename.upper().endswith('.PRG'):
+    filetype = 'P'
+    filename = filename[:-4]
+  out_petscii_filename = ascii_to_petscii(filename.lower())
+  recv_file_header = struct.pack('I20sHHBB', RECV_FILE_DATAGRAM_MAGIC, out_petscii_filename, file_id, num_fragments, ord(filetype), 0)
+  send_datagram(recv_file_header)
+
+  wait_to_ack_datagram_received(0xFFFF) # Wait for C64 being ready to start receiving actual data
+
+  i = 0
+  fragment_index = 0
+  while i < size:
+    fragment_payload_size = min(FRAGMENT_PAYLOAD_SIZE, size - i)
+    fragment_header = struct.pack('IHH', RECV_FILE_DATAGRAM_FRAGMENT_MAGIC, file_id, fragment_index)
+    fragment_data = file_data[i:i+fragment_payload_size]
+    print(f"sending datagram file_id={file_id} fragment_index={fragment_index} i={i}")
+    send_datagram(fragment_header + fragment_data)
+    wait_to_ack_datagram_received(fragment_index)
+    i += FRAGMENT_PAYLOAD_SIZE
+    fragment_index += 1
+  print('File sent!')
+
+def handle_ask_compiled_document_msg(data):
+  print(f"handle_ask_compiled_document_msg({data})")
+  document_id, dummy = struct.unpack('BB', data)
+  filename = filenames[document_id]
+  out_file = calc_output_prg_filename_from_input_cpp_filename(filename)
+  send_file_to_client(out_file)
+
 while True:
     in_blocking_mode = 0
 #  try:
@@ -266,6 +352,8 @@ while True:
       handle_update_line_msg(data)
     elif magic == MAGIC_NEW_DOCUMENT_MSG:
       handle_new_document_msg(data)
+    elif magic == MAGIC_ASK_COMPILED_DOCUMENT_MSG:
+      handle_ask_compiled_document_msg(data)
     else:
       print(f'Unknown magic {hex(magic)}')
     # 0x2395173A

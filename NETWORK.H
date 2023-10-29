@@ -16,8 +16,10 @@ void deinit_network();
 void send_line_to_network_server(uint8_t editType, File *f, Line *l, line_num lineno);
 
 void send_new_document_to_network_server(File *f, bool clear_contents);
+void send_ask_compiled_document_msg(uint8_t document_id);
 
 void receive_data_from_network();
+void wait_to_receive_file(char *dstFilename);
 
 // Internal:
 
@@ -33,6 +35,14 @@ void receive_data_from_network();
 #endif
 
 #pragma pack(push, 1)
+
+#define MAGIC_ASK_COMPILED_DOCUMENT_MSG 0x69392AA2
+struct AskCompiledDocumentMsg // C64 asks the build server to download the compiled .PRG file to local disk
+{
+  uint32_t magic; // == MAGIC_ASK_COMPILED_DOCUMENT_MSG
+  uint8_t document_id; // an ID of the file to get
+  uint8_t dummy; // pad to multiple of 16bits
+};
 
 #define MAGIC_NEW_DOCUMENT_MSG 0x2395173A
 struct NewDocumentMsg // Used when either opening a new document, loading an existing one, or renaming a document when saving

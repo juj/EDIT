@@ -186,6 +186,11 @@ void repaint_current_line_from_offset(cursor_pos xOffset, cursor_pos xEnd)
   //repaint_screen_lines(cursorY, cursorY+1);
 }
 
+void send_current_line_to_server()
+{
+  send_line_to_network_server(EDIT_TYPE_REPLACE_LINE, currentFile, currentLine, current_line_number());
+}
+
 void insert_character(char ch, uint8_t times, line_xpos insert_pos)
 {
   assert(currentLine);
@@ -277,7 +282,7 @@ void insert_character(char ch, uint8_t times, line_xpos insert_pos)
       verify_screen_is_painted_correctly();
     }
   }
-  send_line_to_network_server(EDIT_TYPE_REPLACE_LINE, currentFile, currentLine, current_line_number());
+  send_current_line_to_server();
 }
 
 void delete_character()
@@ -294,7 +299,7 @@ void delete_character()
     --currentLine->length;
     clear_highlight(currentLine);
     repaint_current_line_from_offset(MAX(cursorX-1, 0), currentLine->length+1);
-    send_line_to_network_server(EDIT_TYPE_REPLACE_LINE, currentFile, currentLine, current_line_number());
+    send_current_line_to_server();
   }
   else // join next line on this
   {
@@ -326,7 +331,7 @@ void delete_character()
     }
     delete_line(next);
     send_line_to_network_server(EDIT_TYPE_DELETE_LINE, currentFile, 0, current_line_number()+1);
-    send_line_to_network_server(EDIT_TYPE_REPLACE_LINE, currentFile, currentLine, current_line_number());
+    send_current_line_to_server();
     clear_highlight(currentLine);
 
     cursor_pos endY = screen_end_y_of_last_line_on_screen(currentLine, cursorY)+2;
@@ -776,7 +781,7 @@ void insert_new_line(bool cursorMovesToNewline)
   currentLine->nextLine = newLine;
   clear_highlight(currentLine);
 
-  send_line_to_network_server(EDIT_TYPE_REPLACE_LINE, currentFile, currentLine, current_line_number());
+  send_current_line_to_server();
   send_line_to_network_server(EDIT_TYPE_INSERT_LINE, currentFile, newLine, current_line_number()+1);
 
   bool needRepaint = (viewportXOffset != 0);
@@ -1269,6 +1274,7 @@ void main_loop()
           send_new_document_to_network_server(currentFile, /*clear_contents=*/false);
         }
         repaint_screen();
+        send_current_line_to_server(); // Resend the current line to server to cause a rebuild and reupdate of the status
         break;
       }
       case ACTION_OPEN_GOTO_LINE_MENU: run_goto_line_menu(); break;
@@ -1326,6 +1332,24 @@ void main_loop()
 #ifdef ACTION_REPAINT_SCREEN
       case ACTION_REPAINT_SCREEN:
         repaint_screen();
+        break;
+#endif
+#ifdef ACTION_SAVE_COMPILED_PRG_TO_DISK
+      case ACTION_SAVE_COMPILED_PRG_TO_DISK:
+        {
+        send_ask_compiled_document_msg(currentFile->document_id);
+        char filename[20];
+        wait_to_receive_file(filename);
+        repaint_screen();
+#ifndef __C64__ // TODO SPRINTF
+        char text[40];
+        sprintf(text, "program %s saved to disk", filename);
+        write_status_text(text, LTGREEN);
+#else
+        const char text[] = "program saved to disk";
+        write_status_text(text, LTGREEN);
+#endif
+        }
         break;
 #endif
       default:

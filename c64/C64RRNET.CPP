@@ -95,10 +95,24 @@ struct message_magic_header
   uint32_t magic_header; // 0x25291423
 };
 
-struct recv_file_datagram
+#define RECV_FILE_DATAGRAM_MAGIC 0x25291423
+struct recv_file_datagram_header
 {
-  char filename[MAX_C64_FILENAME_LEN+1];
-};
+//  uint32_t magic_header;
+  char filename[20];
+  uint16_t file_id;
+  uint16_t num_fragments;
+  uint8_t filetype;
+  uint8_t dummy; // pad to 16 bits
+} __attribute__((packed));
+
+#define RECV_FILE_DATAGRAM_FRAGMENT_MAGIC 0x53915315
+struct recv_file_datagram_fragment_header
+{
+//  uint32_t magic_header;
+  uint16_t file_id;
+  uint16_t fragment_index;
+} __attribute__((packed));
 
 struct build_error_msg_datagram
 {
@@ -281,7 +295,7 @@ void start_udp_send(uint16_t numBytes)
 
 // TODO REMOVE THIS FUNCTION since it is a duplicate, use fopen/fwrite instead?
 // return true on success
-bool open_file_for_saving(const char *filename)
+bool open_file_for_saving(const char *filename, uint8_t filetype)
 {
   char fn[MAX_C64_FILENAME_LEN+1+3+4]; // Add +1 for null, +3 for "@0:" prefix and +4 for ",U,W" suffix.
   // Prepend "@0:" to the filename to have any existing filename be replaced.
@@ -293,7 +307,7 @@ bool open_file_for_saving(const char *filename)
   // Append ",S,W" to filename to tell that the file type is Sequential, and that
   // we are Writing to the file.
   fn[i++] = ',';
-  fn[i++] = 'S';
+  fn[i++] = filetype;
   fn[i++] = ',';
   fn[i++] = 'W';
   fn[i] = 0;
@@ -329,14 +343,11 @@ end:
   return true;
 }
 
-bool poll_for_receive_file()
+uint32_t poll_for_udp_datagram(uint16_t *outBytesLeft)
 {
-  bool received_file = false;
-  bool error = false;
-
   // Poll if there is an Ethernet frame ready for processing
   cs_set_page(0x0124);
-  if ((cs_read_page_data() & 0x0D00) == 0) return false;
+  if ((cs_read_page_data() & 0x0D00) == 0) return 0;
 
   rx_data_hi_lo(); // dummy read to flush status word (ignored)
   uint16_t bytes_left = rx_data_hi_lo();
@@ -347,8 +358,6 @@ bool poll_for_receive_file()
     ip_frame ip;
     udp_header udp;
     message_magic_header magic;
-    recv_file_datagram recv_header;
-    build_error_msg_datagram recv_msg;
   } net;
 
 #define READ_STRUCT(s) \
@@ -363,53 +372,123 @@ bool poll_for_receive_file()
   if (net.ip.protocol != 0x11/*UDP*/) goto end;
 
   READ_STRUCT(net.udp);
-  net.udp.src_port = ntohs(net.udp.src_port);
-  net.udp.dst_port = ntohs(net.udp.dst_port);
-  net.udp.length = ntohs(net.udp.length);
 
   READ_STRUCT(net.magic);
-  if (net.magic.magic_header == 0x25291423) // Receive file from network to disk
-  {
-    READ_STRUCT(net.recv_header);
-    net.recv_header.filename[MAX_C64_FILENAME_LEN] = 0;
+  *outBytesLeft = bytes_left;
+  return net.magic.magic_header;
 
-    if (!open_file_for_saving(net.recv_header.filename))
+end:
+  discard_rx_bytes(bytes_left);
+  *outBytesLeft = 0;
+  return 0;
+}
+
+#define FRAGMENT_RECEIVED_DATAGRAM_MAGIC 0xEE365F02
+struct fragment_received
+{
+  uint32_t magic;
+  uint16_t fragment_index;
+};
+
+void send_udp_fragment_received_msg(uint16_t fragment_index)
+{
+  fragment_received recv;
+  recv.magic = FRAGMENT_RECEIVED_DATAGRAM_MAGIC;
+  recv.fragment_index = fragment_index;
+  start_udp_send(sizeof(recv));
+  tx_bytes(&recv, sizeof(recv));
+}
+
+bool receive_file_in_fragments(uint16_t file_id, uint16_t num_fragments)
+{
+  uint32_t totalBytesWritten = 0;
+  bool error = false;
+  uint16_t next_fragment_index = 0;
+
+////  clear_screen();
+  while(next_fragment_index != num_fragments)
+  {
+    uint16_t data_left;
+    uint32_t magic = poll_for_udp_datagram(&data_left);
+    if (magic != RECV_FILE_DATAGRAM_FRAGMENT_MAGIC)
     {
-#ifndef NDEBUG    
-      Printf("FAILED TO OPEN FILE \"%s\"\n", net.recv_header.filename);
-#endif
-      goto end;
+      discard_rx_bytes(data_left);
+      continue;
     }
 
-    uint16_t size;
-    size = bytes_left;
-    clear_screen();
-    uint8_t origScreenFrameColor;
-    origScreenFrameColor = *screen_frame;
-    while(bytes_left > 0)
+    recv_file_datagram_fragment_header frag;
+    read_struct(&frag, sizeof(frag));
+    data_left -= sizeof(frag);
+
+    if (frag.file_id != file_id || frag.fragment_index != next_fragment_index)
+    {
+      discard_rx_bytes(data_left);
+      continue;      
+    }
+
+    while(data_left > 0)
     {
       uint16_t data = rx_data_lo_hi();
-      --bytes_left;
+      --data_left;
       uint8_t n = 1;
-      if (bytes_left)
+      if (data_left)
       {
         ++n;
-        --bytes_left;
+        --data_left;
       }
       uint8_t ch[2] = { (char)(data), (char)(data >> 8) };
 
       for(uint8_t i = 0; i < n; ++i)
       {
         put_screen(ch[i]);
-        if (_READST()) { close_file(); error = true; goto end_receive_file; }
+        if (_READST())
+        {
+          discard_rx_bytes(data_left);
+          return false;
+        }
         _CHROUT(ch[i]);
+        ++totalBytesWritten;
       }
     }
+    send_udp_fragment_received_msg(frag.fragment_index);
+    ++next_fragment_index;
+  }
+  return true;
+}
+
+bool process_udp_network_datagrams(char *filename)
+{
+  uint16_t bytes_left;
+  uint32_t magic = poll_for_udp_datagram(&bytes_left);
+
+#define READ_STRUCT(s) \
+  if (bytes_left < sizeof(s)) goto end; \
+  bytes_left -= sizeof(s); \
+  read_struct(&s, sizeof(s));
+
+  if (magic == RECV_FILE_DATAGRAM_MAGIC) // Receive file from network to disk
+  {
+    recv_file_datagram_header recv_header;
+    READ_STRUCT(recv_header);
+    recv_header.filename[MAX_C64_FILENAME_LEN] = 0;
+
+    if (filename)
+      strcpy(filename, recv_header.filename);
+    if (!open_file_for_saving(recv_header.filename, recv_header.filetype))
+    {
+#ifndef NDEBUG    
+      Printf("FAILED TO OPEN FILE \"%s\"\n", recv_header.filename);
+#endif
+      goto end;
+    }
+
+    uint8_t origScreenFrameColor = *screen_frame;
+    send_udp_fragment_received_msg(0xFFFF); // Send back msg that we are ready to start transfer.
+    bool error = receive_file_in_fragments(recv_header.file_id, recv_header.num_fragments);
     close_file();
-end_receive_file:
     *screen_frame = origScreenFrameColor;
-    _PLOT_SET(0, 0);
-    clear_screen();
+//    _PLOT_SET(0, 0);
+//    clear_screen();
     if (error)
     {
 #ifndef NDEBUG    
@@ -419,43 +498,42 @@ end_receive_file:
     else
     {
 #ifndef NDEBUG    
-      Printf("\nWROTE %u BYTES TO FILE \"%s\"\n", size, net.recv_header.filename);
+      Printf("\nWROTE %u BYTES TO FILE \"%s\"\n", size, recv_header.filename);
 #endif
-      received_file = true;
     }
+    return true;
   }
-  else if (net.magic.magic_header == MAGIC_BUILD_ERROR_MSG) // Receive build error message from network
+  else if (magic == MAGIC_BUILD_ERROR_MSG) // Receive build error message from network
   {
-    READ_STRUCT(net.recv_msg);
+    build_error_msg_datagram recv_msg;
+    READ_STRUCT(recv_msg);
 
     uint16_t linearPos = (SCREEN_HEIGHT-1)*SCREEN_WIDTH;
-    uint8_t color = (net.recv_msg.success ? LTGREEN : LTRED) | 0x80;
-    if (net.recv_msg.msg_len > 34) net.recv_msg.msg_len = 34;
-    if (net.recv_msg.msg_len > bytes_left) net.recv_msg.msg_len = bytes_left;
+    uint8_t color = (recv_msg.success ? LTGREEN : LTRED) | 0x80;
+    if (recv_msg.msg_len > 34) recv_msg.msg_len = 34;
+    if (recv_msg.msg_len > bytes_left) recv_msg.msg_len = bytes_left;
 
-    while(net.recv_msg.msg_len > 0)
+    while(recv_msg.msg_len > 0)
     {
       uint16_t data = rx_data_lo_hi();
       put_screen(linearPos++, (char)data, color);
       --bytes_left;
-      --net.recv_msg.msg_len;
-      if (net.recv_msg.msg_len > 0)
+      --recv_msg.msg_len;
+      if (recv_msg.msg_len > 0)
       {
         put_screen(linearPos++, (char)(data>>8), color);
         --bytes_left;
-        --net.recv_msg.msg_len;
+        --recv_msg.msg_len;
       }
     }
     while(linearPos < SCREEN_HEIGHT*SCREEN_WIDTH-5) put_screen(linearPos++, ' ', LTBLUE);
   }
 end:
-
-  // Flush rest of the received bytes from the receive buffer
   discard_rx_bytes(bytes_left);
-  return received_file;
+  return false;
 }
 
-void wait_to_receive_file()
+void wait_to_receive_file(char *dst_filename)
 {
-  while(!poll_for_receive_file()) ;
+  while(!process_udp_network_datagrams(dst_filename)) ;
 }
