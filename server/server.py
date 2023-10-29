@@ -1,5 +1,9 @@
 import socket, struct, subprocess, os
 
+# Server state
+files = {} # document ID -> file contents
+filenames = {} # document ID -> filename
+
 recv_sock = None
 send_sock = None
 SERVER_PORT = 4009
@@ -32,11 +36,10 @@ def receive_datagram():
 def send_datagram(data):
   send_sock.sendto(data, ("255.255.255.255", CLIENT_PORT))
 
-files = {}
-def get_file_lines(filename):
-  if filename not in files:
-    files[filename] = ['']
-  return files[filename]
+def get_file_lines(document_id):
+  if document_id not in files:
+    files[document_id] = ['']
+  return files[document_id]
 
 def print_file(lines):
   line_no = 0
@@ -98,8 +101,9 @@ def compile_file(filename):
     out_file = 'A.PRG'
   else:
     out_file = replace_suffix(filename, prg_suffix_for_filename(filename))
-#  clang = subprocess.run(['C:/code/llvm-mos-sdk/build/install/bin/mos-c64-clang.bat', filename, '-Oz', '-o', out_file], capture_output=True)
-  clang = subprocess.run(['mos-c64-clang', filename, '-Oz', '-o', out_file], capture_output=True)
+  compiler = 'C:/code/llvm-mos-sdk/build/install/bin/mos-c64-clang.bat'
+# compiler = 'mos-c64-clang'
+  clang = subprocess.run([compiler, filename, '-Oz', '-o', out_file], capture_output=True)
   if clang.returncode == 0:
 #    print('BUILD OK!')
     filesize = os.path.getsize(out_file)
@@ -200,45 +204,71 @@ def remove_trailing_null_byte(s):
 	if len(s) > 0 and s[len(s)-1] == 0: return s[:len(s)-1]
 	return s
 
+MAGIC_UPDATE_LINE_MSG = 0x56369124
+MAGIC_NEW_DOCUMENT_MSG = 0x2395173A
+
+def handle_new_document_msg(data):
+  clear_contents, document_id, filename_len, dummy = struct.unpack('BBBB', data[:4])
+  petscii_file = remove_trailing_null_byte(data[4:4+filename_len])
+  filename = petscii_to_ascii(petscii_file)
+  if filename[0] == '<': filename = f'untitled_filename_{document_id}.cpp'
+
+  print(f'New document: id: {document_id} -> clear: {clear_contents}. Filename: {filename}')
+
+  filenames[document_id] = filename
+  if clear_contents:
+    files[document_id] = ['']
+#    print(f'PETSCII filename: {petscii_file} -> ASCII filename: "{filename}"')
+
+def handle_update_line_msg(data):
+  line_no, edit_type, document_id, line_len, dummy = struct.unpack('HBBBB', data[:6])
+  petscii_line = remove_trailing_null_byte(data[6:6+line_len])
+  line = petscii_to_ascii(petscii_line)
+  print(f'PETSCII line: {petscii_line} -> ASCII line: "{line}"')
+  print(f'Line: {line_no}, edit_type: {edit_type}, document_id: {document_id}, line: {line}')
+  file_lines = get_file_lines(document_id)
+
+  if edit_type == 0: # Insert
+#      print(f'INSERT {line_no} <- {line}')
+    file_lines = file_lines[:line_no] + [line] + file_lines[line_no:]
+  elif edit_type == 1: # Replace
+#      print(f'REPLACE {line_no} <- {line}')
+#      print(str(file_lines))
+
+    while line_no >= len(file_lines):
+      file_lines += ['']
+
+    file_lines[line_no] = line
+  elif edit_type == 2: # Delete
+#      print(f'DELETE {line_no}')
+    file_lines = file_lines[:line_no] + file_lines[line_no+1:]
+  else:
+    raise Exception(f'invalid edit type {edit_type}')
+
+  files[document_id] = file_lines
+  if document_id not in filenames:
+    filenames[document_id] = f'unknown_filename_{document_id}.cpp'
+
+  filename = filenames[document_id]
+
+  save_file(filename, file_lines)
+  if filename.lower().endswith('.c') or filename.lower().endswith('.cpp'):
+    print_file(file_lines)
+    compile_file(filename)
+
 while True:
     in_blocking_mode = 0
 #  try:
     data, addr = receive_datagram()
-    HDR_LEN = 10
-    magic, line_no, edit_type, filename_len, line_len, dummy = struct.unpack('IHBBBB', data[:HDR_LEN])
-    if magic != 0x56369124: continue # Not a datagram for us
-    petscii_file = remove_trailing_null_byte(data[HDR_LEN:HDR_LEN+filename_len])
-    filename = petscii_to_ascii(petscii_file)
-#    print(f'PETSCII filename: {petscii_file} -> ASCII filename: "{filename}"')
-    petscii_line = remove_trailing_null_byte(data[HDR_LEN+filename_len:HDR_LEN+filename_len+line_len])
-    line = petscii_to_ascii(petscii_line)#.decode('ascii')
-#    print(f'PETSCII line: {petscii_line} -> ASCII line: "{line}"')
-    #print(f'Line: {line_no}, edit_type: {edit_type}, filename: {filename}, line: {line}')
-    file_lines = get_file_lines(filename)
-
-    if edit_type == 0: # Insert
-#      print(f'INSERT {line_no} <- {line}')
-      file_lines = file_lines[:line_no] + [line] + file_lines[line_no:]
-    elif edit_type == 1: # Replace
-#      print(f'REPLACE {line_no} <- {line}')
-#      print(str(file_lines))
-
-      while line_no >= len(file_lines):
-        file_lines += ['']
-
-      file_lines[line_no] = line
-    elif edit_type == 2: # Delete
-#      print(f'DELETE {line_no}')
-      file_lines = file_lines[:line_no] + file_lines[line_no+1:]
+    magic = struct.unpack('I', data[:4])[0]
+    data = data[4:]
+    if magic == MAGIC_UPDATE_LINE_MSG:
+      handle_update_line_msg(data)
+    elif magic == MAGIC_NEW_DOCUMENT_MSG:
+      handle_new_document_msg(data)
     else:
-      raise Exception(f'invalid edit type {edit_type}')
+      print(f'Unknown magic {hex(magic)}')
+    # 0x2395173A
 
-    files[filename] = file_lines
-
-    if filename[0] == '<': filename = 'untitled_filename.cpp'
-    save_file(filename, file_lines)
-    if filename.lower().endswith('.c') or filename.lower().endswith('.cpp'):
-      print_file(file_lines)
-      compile_file(filename)
 #  except Exception as e:
 #    print(str(e))

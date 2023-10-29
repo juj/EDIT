@@ -8,6 +8,7 @@
 #include "audio.h"
 #include "iassert.h"
 #include "input.h"
+#include "network.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -126,6 +127,13 @@ void mark_current_file_modified()
   }
 }
 
+uint8_t allocate_new_document_id()
+{
+  // TODO: This is not a safe allocator, but will work in our cases (with minimal code size)
+  static uint8_t unused_document_ids = 0;
+  return ++unused_document_ids;
+
+}
 File *open_new_file()
 {
   File *f = (File*)Malloc(sizeof(File));
@@ -156,6 +164,9 @@ File *open_new_file()
   f->firstLine = f->lastLine = firstLine;
   firstLine->length = firstLine->capacity = 0;
 
+  f->document_id = allocate_new_document_id();
+
+  send_new_document_to_network_server(f, /*clear_contents=*/true);
   return f;
 }
 
@@ -181,6 +192,8 @@ void close_file(File *file)
     if (l->colors) Farfree(l->colors, l->capacity);
 #endif
   }
+
+  send_new_document_to_network_server(file, /*clear_contents=*/true);
 
   Free(file, sizeof(File));
 }
@@ -213,21 +226,12 @@ File *load_file(const char *filename)
     return 0;
   }
   bool prev_line_ended_in_newline = false;
-  int y = 0; //zz
   while(fgets(tmp_line, MAX_CHARS_PER_LINE, handle))
   {
     line_xpos len = (line_xpos)strlen(tmp_line);
-//    if (len == 1 && tmp_line[0] == 'G')
-  //    break;
-//////    sprintf(ss, "%d:%d", (int)len, (int)tmp_line[0]);
-/////////    put_string_on_screen(ss, 0, y++, 0); // xxxx
     prev_line_ended_in_newline = (len > 0 && tmp_line[len-1] == '\n');
     if (prev_line_ended_in_newline) // subtract newline from line
-    {
-      tmp_line[len-1] = 0; // xxxx
       --len;
-    }
-//////    put_string_on_screen(tmp_line, 0, y++, 9); // xxxx
 
     Line far *curLine = (Line far *)Farmalloc(sizeof(Line));
     if (!curLine) break; // TODO Alert/report malloc error
@@ -274,6 +278,14 @@ File *load_file(const char *filename)
 
   for(Line *l = f->firstLine; l; l = l->nextLine)
     syntax_highlight(l);
+
+  f->document_id = allocate_new_document_id();
+  send_new_document_to_network_server(f, /*clear_contents=*/true);
+
+  line_num lineno = 0;
+  for(Line *l = f->firstLine; l; l = l->nextLine, ++lineno)
+    send_line_to_network_server(EDIT_TYPE_REPLACE_LINE, f, l, lineno);
+
   return f;
 }
 

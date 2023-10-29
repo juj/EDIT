@@ -15,8 +15,7 @@ void deinit_network();
 #define EDIT_TYPE_DELETE_LINE 2
 void send_line_to_network_server(uint8_t editType, File *f, Line *l, line_num lineno);
 
-// N.b. this is super unsafe, the file is broadcasted to network
-int save_file_to_network(File *file);
+void send_new_document_to_network_server(File *f, bool clear_contents);
 
 void receive_data_from_network();
 
@@ -33,33 +32,28 @@ void receive_data_from_network();
 #define SENDTO_PORT SERVER_PORT
 #endif
 
-enum MessageType : uint8_t
-{
-  MessageSaveFile,
-  MessageLoadFile
-};
-
-struct SaveFileMsg
-{
-  char messageId;
-  char filename[16];
-  uint16_t dataSize;
-#pragma warning(disable : 4200)
-  char data[];
-};
-
 #pragma pack(push, 1)
+
+#define MAGIC_NEW_DOCUMENT_MSG 0x2395173A
+struct NewDocumentMsg // Used when either opening a new document, loading an existing one, or renaming a document when saving
+{
+  uint32_t magic; // == MAGIC_NEW_DOCUMENT_MSG
+  uint8_t clear_contents; // Boolean: if true, all lines of the document will be erased.
+  uint8_t document_id; // an ID to assign to the given document
+  uint8_t filename_len;
+  uint8_t dummy; // pad to multiple of 16bits
+  //char filename[filename_len];
+};
 
 #define MAGIC_UPDATE_LINE_MSG 0x56369124
 struct UpdateLineMsg
 {
   uint32_t magic; // == MAGIC_UPDATE_LINE_MSG
   uint16_t line_no;
-  uint8_t edit_type; // if 0, replace existing line
-  uint8_t filename_len;
+  uint8_t edit_type; // see EDIT_TYPE_* above
+  uint8_t document_id;
   uint8_t line_len;
   uint8_t dummy; // pad to multiple of 16bits
-  //char filename[filename_len];
   //char line[line_len];
 };
 

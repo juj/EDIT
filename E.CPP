@@ -1249,7 +1249,9 @@ void main_loop()
         if (!userCancelled && currentFile->hasUnsavedChanges)
         {
           save_file(currentFile);
-          save_file_to_network(currentFile);
+          // The file name may have gotten renamed as part of the save.
+          send_new_document_to_network_server(currentFile, /*clear_contents=*/false);
+          return;
         }
         repaint_screen();
         break;

@@ -10,11 +10,13 @@ struct Line;
 struct File
 {
   char filename[MAX_FILENAME_LEN+1];
+  bool hasUnsavedChanges;
+  uint8_t document_id;
+
 //  char huge *fileData;
 //  file_idx size;
   Line far *firstLine;
   Line far *lastLine;
-  int hasUnsavedChanges;
 
   File *prevFile;
   File *nextFile;

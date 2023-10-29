@@ -59,8 +59,6 @@ void save_file(File *file)
   }
   fclose(handle);
   file->hasUnsavedChanges = 0;
-  return;
-
 error:
   char str[64];
   sprintf(str, "Unable to save file \"%s\"!", file->filename);
