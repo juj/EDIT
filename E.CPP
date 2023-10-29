@@ -23,6 +23,7 @@
 #include "cursor.h"
 #include "smindent.h"
 #include "network.h"
+#include "c64/c64_kernal.h"
 
 void scroll_viewport_horizontally_to_display_cursor();
 
@@ -1135,7 +1136,8 @@ void main_loop()
 #ifdef ACTION_QUIT_PROGRAM_ALT3
       case ACTION_QUIT_PROGRAM_ALT3:
 #endif
-        running = 0;
+        if (ask_yes_no_prompt("QUIT? "))
+          running = 0;
         break;
       case ACTION_SELECT_ALL: select_all(); break;
       case ACTION_DELETE_LEFT:
@@ -1265,7 +1267,6 @@ void main_loop()
           save_file(currentFile);
           // The file name may have gotten renamed as part of the save.
           send_new_document_to_network_server(currentFile, /*clear_contents=*/false);
-          return;
         }
         repaint_screen();
         break;
@@ -1453,5 +1454,5 @@ int main(int argc, char **argv)
 #endif
   deinit_screen();
   deinit_network();
-  return 0;
+  _RESET();
 }
