@@ -98,7 +98,7 @@ def prg_suffix_for_filename(fn):
 def compile_file(filename):
   # TODO PATH
   if 'untitled_filename' in filename:
-    out_file = 'A.PRG'
+    out_file = 'A.OUT.PRG'
   else:
     out_file = replace_suffix(filename, prg_suffix_for_filename(filename))
   compiler = 'C:/code/llvm-mos-sdk/build/install/bin/mos-c64-clang.bat'
