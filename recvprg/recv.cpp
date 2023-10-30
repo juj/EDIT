@@ -180,10 +180,13 @@ uint16_t sum1c(uint16_t a, uint16_t b)
   return a + (a < b);
 }
 
-void start_udp_send(uint16_t numBytes)
+#define FRAGMENT_RECEIVED_DATAGRAM_MAGIC 0xEE365F02
+#define FRAGMENT_RECEIVED_DATAGRAM_SIZE 6
+
+void send_udp_fragment_received_msg(uint16_t fragment_index)
 {
   write_u16_lo_hi(cs_tx_cmd, 0x00C0); // Send Transmit command 00C0h
-  write_u16_lo_hi(cs_tx_len, ETHERNET_FRAME_SIZE + IP_FRAME_SIZE + UDP_HEADER_SIZE + numBytes);
+  write_u16_lo_hi(cs_tx_len, ETHERNET_FRAME_SIZE + IP_FRAME_SIZE + UDP_HEADER_SIZE + FRAGMENT_RECEIVED_DATAGRAM_SIZE);
   cs_set_page(0x0138);
   while (!(cs_read_page_data() & 0x0100)) ; // Wait until we are ready to transmit
 
@@ -203,7 +206,7 @@ void start_udp_send(uint16_t numBytes)
   cs = sum1c(cs, 0xFFFF); // 255.255
   cs = sum1c(cs, 0xFFFF); // 255.255
   cs = sum1c(cs, 0x4500);
-  uint16_t len = IP_FRAME_SIZE + UDP_HEADER_SIZE + numBytes;
+  uint16_t len = IP_FRAME_SIZE + UDP_HEADER_SIZE + FRAGMENT_RECEIVED_DATAGRAM_SIZE;
   cs = sum1c(cs, len);
 
   write_u16_lo_hi(cs_rxtx_data, 0x0045); // versionAndHeaderLength
@@ -220,18 +223,10 @@ void start_udp_send(uint16_t numBytes)
 
   write_u16_lo_hi(cs_rxtx_data, 0); // src port (0, unused)
   write_u16_lo_hi(cs_rxtx_data, ntohs(4019)); // dst port
-  write_u16_lo_hi(cs_rxtx_data, ntohs(UDP_HEADER_SIZE + numBytes)); // UDP packet length
+  write_u16_lo_hi(cs_rxtx_data, ntohs(UDP_HEADER_SIZE + FRAGMENT_RECEIVED_DATAGRAM_SIZE)); // UDP packet length
   write_u16_lo_hi(cs_rxtx_data, 0); // checksum (0, unused)
-  // The only thing left now is to fill the actual UDP payload data,
-  // which is the caller's side to do.
-}
 
-#define FRAGMENT_RECEIVED_DATAGRAM_MAGIC 0xEE365F02
-#define FRAGMENT_RECEIVED_DATAGRAM_SIZE 6
-
-void send_udp_fragment_received_msg(uint16_t fragment_index)
-{
-  start_udp_send(FRAGMENT_RECEIVED_DATAGRAM_SIZE);
+  // The only thing left now is to fill the actual UDP payload data.
   write_u16_lo_hi(cs_rxtx_data, (uint16_t)FRAGMENT_RECEIVED_DATAGRAM_MAGIC);
   write_u16_lo_hi(cs_rxtx_data, FRAGMENT_RECEIVED_DATAGRAM_MAGIC>>16);
   write_u16_lo_hi(cs_rxtx_data, fragment_index);
