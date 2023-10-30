@@ -63,7 +63,7 @@ int get_key()
   unsigned char keyCode = 0, ch;
   while(!keyCode)
     keyCode = _GETIN();
-  uint8_t modifiers = *key_modifiers & 7;
+  uint8_t modifiers = *key_modifiers & 7; // bit 0: shift, bit 1: Commodore key, bit 2: Ctrl
 
   // Replace a thicker underscore character with the thinnest underscore to avoid causing
   // confusion which character represents an underscore symbol. (both can be used interchangeably)
@@ -75,6 +75,7 @@ int get_key()
   else if (keyCode == PETSCII_GREAT_BRITAIN_POUND) keyCode = PETSCII_BACKSLASH;
   else if (keyCode == 0xC0) keyCode = PETSCII_LEFT_CURLY_BRACE; // Shift-* -> '{'
   else if (keyCode == 0xDE) keyCode = PETSCII_RIGHT_CURLY_BRACE; // Shift-UpArrow -> '}'
+  else if (keyCode == 0xA0 && modifiers == 1) keyCode = 0x20; // Treat Shift-Space as just Space since it eases typing all uppercase text
   else if ((keyCode == 0x3C || keyCode == 0x3E) && (modifiers & 2)) keyCode = 0; // Cmdr-, and Cmdr-. indent and unindent
   else if (keyCode == PETSCII_EQUALS && modifiers) keyCode = 0; // Do not treat Shift-= and Cmdr-= as printable
 
