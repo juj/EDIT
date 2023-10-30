@@ -59,8 +59,11 @@ def parse_first_clang_error(stderr):
   lines = stderr.split('\n')
   for l in lines:
     if 'error:' in l:
+      print(l)
       if l.count(':') >= 4:
         parts = l.split(':')
+        if len(parts[0]) == 1 and parts[0].isalpha():
+          parts = [f'{parts[0]}:{parts[1]}'] + parts[2:]
         file = parts[0]
         line = int(parts[1])
         column = int(parts[2])
@@ -158,12 +161,13 @@ p2a = [
 	0xb0,0xb1,0xb2,0xb3,0xb4,0xb5,0xb6,0xb7,0xb8,0xb9,0xba,0xbb,0xbc,0xbd,0xbe,0xbf]
 
 def ascii_to_petscii_ch(ch):
-	if ch >= ord('a') and ch <= ord('z'): return 0x41 + (ch - ord('a'))
-	if ch >= ord('A') and ch <= ord('Z'): return 0x61 + (ch - ord('A'))
-	if ch == ord('{'): return 0xAB
-	if ch == ord('}'): return 0xB3
-	if ch == ord('\\'): return 0xAE
-	return a2p[ch]
+  if ch >= ord('a') and ch <= ord('z'): return 0x41 + (ch - ord('a'))
+  if ch >= ord('A') and ch <= ord('Z'): return 0x61 + (ch - ord('A'))
+  if ch == ord('_'): return 0xA4
+  if ch == ord('{'): return 0xAB
+  if ch == ord('}'): return 0xB3
+  if ch == ord('\\'): return 0xAE
+  return a2p[ch]
 '''
 	if ch == 0x08: return 0x14
 	if ch == 0x0A: return 0x0D
@@ -193,12 +197,13 @@ for i in range(256):
 #	print(f'PETSCII {ascii_to_petscii_ch(i)} -> ASCII {i} {chr(i)}')
 
 def petscii_to_ascii_ch(ch): # shifted PETSCII
-	if ch >= 0x41 and ch <= 0x5A: return ord('a')+(ch-0x41)
-	if ch >= 0x61 and ch <= 0x7A: return ord('A')+(ch-0x61)
-	if ch == 0xAB: return ord('{')
-	if ch == 0xB3: return ord('}')
-	if ch == 0xAE: return ord('\\')
-	return p2a[ch]
+  if ch >= 0x41 and ch <= 0x5A: return ord('a')+(ch-0x41)
+  if ch >= 0x61 and ch <= 0x7A: return ord('A')+(ch-0x61)
+  if ch == 0xA4: return ord('_')
+  if ch == 0xAB: return ord('{')
+  if ch == 0xB3: return ord('}')
+  if ch == 0xAE: return ord('\\')
+  return p2a[ch]
 '''
 	got = p2a[ch]
 	print(f'ch {ch}/{hex(ch)} -> {got}')
