@@ -102,7 +102,7 @@ void print_dos_error(uint8_t error, const char *operation)
 // testing for drive status errors
 #define DRIVE_STATUS_ERROR() (_READST() & ~0x20)
 
-uint8_t read_next_char(FILE *f, bool *error)
+static uint8_t read_next_char(FILE *f, bool *error)
 {
   if (f->nextCharAvailable)
   {
@@ -120,7 +120,7 @@ uint8_t read_next_char(FILE *f, bool *error)
   // when at end of file, so if that happens, we then call READST to confirm if we
   // are actually at EOF.
   uint8_t ch = _CHRIN_GET_ERROR(error);
-  if (error) _STDIO_DEBUG2("FREAD ERR");
+  if (*error) _STDIO_DEBUG2("FREAD ERR");
   if (ch == 199 && DRIVE_STATUS_ERROR())
     *error = true;
   return ch;
@@ -211,7 +211,7 @@ static int fscanf_read_int(FILE *f)
   {
     intstr[i++] = ch;
     if (i >= 5) i = 0; // if i gets this large, read will overflow (will read garbage)
-    f->nextChar = read_next_char(f, &error);
+    ch = read_next_char(f, &error);
     if (error) goto end;
   }
   put_char_back(f, ch);
@@ -247,12 +247,7 @@ int fscanf(FILE *f, const char *format, ...)
 
   for(; *format; ++format)
   {
-    if (isspace(*format))
-    {
-      fscanf_skip_whitespace(f);
-      while(isspace(*format)) ++format;
-    }
-    else if (*format != '%')
+    if (*format != '%')
     {
       ch = read_next_char(f, &error);
       if (error) goto end;
@@ -261,6 +256,9 @@ int fscanf(FILE *f, const char *format, ...)
         put_char_back(f, ch);
         goto end;
       }
+      // A single space character in format should
+      // consume as many whitespaces from input as possible
+      if (isspace(*format)) fscanf_skip_whitespace(f);
     }
     else
     {
@@ -268,10 +266,11 @@ int fscanf(FILE *f, const char *format, ...)
       switch(*format)
       {
       case 'd':
+      case 'u': // TODO test if this actually works?
       {
         ch = read_next_char(f, &error);
-        if (error) goto end;
         put_char_back(f, ch);
+        if (error) goto end;
         if (!isdigit(ch)) goto end;
         int *dst = va_arg(args, int*);
         *dst = fscanf_read_int(f);
@@ -577,4 +576,70 @@ char *strstr(const char *str1, const char *str2)
     ++str1;
   }
   return 0;
+}
+
+static unsigned char petscii_to_screen_code(unsigned char petscii)
+{
+  if (petscii <= 31) return 32;//petscii + 128;
+  if (petscii <= 63) return petscii;
+  if (petscii <= 95) return petscii - 64;
+  if (petscii <= 127) return petscii - 32;
+  if (petscii <= 159) return 32;//petscii + 64;
+  if (petscii <= 191) return petscii - 64;
+  if (petscii <= 254) return petscii - 128;
+  return 0x5E;
+}
+
+char *gets_s(char *str, rsize_t n)
+{
+  assert(str);
+  assert(n > 0);
+  str[n-1] = 0; // Null-terminate input early
+  --n;
+  uint8_t x, y; _PLOT_READ(&x, &y);
+  uint8_t w, h; _SCREEN(&w, &h);
+  // TODO: Read the base address (it can be configured to change)
+  const uint16_t cursor_ofs = (uint16_t)y*w+x;
+  volatile uint8_t * const cursor_start_addr = (uint8_t*)0x0400 + cursor_ofs;
+  volatile uint8_t * const color_ram = (uint8_t*)0xD800 + cursor_ofs;
+  volatile uint8_t * const cursor_blink = (uint8_t *)0xCC;
+  uint8_t old_cursor_blink = *cursor_blink;
+  *cursor_blink = 0; // blink cursor
+
+  uint8_t color = *(volatile uint8_t *)0x286; // Use the cursor color
+  color_ram[0] = color; // Default LTBLUE
+
+  int8_t i = 0;
+  for(;;)
+  {
+    _PLOT_SET(x+i, y);
+    uint8_t keyCode = 0;
+    while(!keyCode) keyCode = _GETIN();
+    switch(keyCode)
+    {
+    case 0x5F: *cursor_blink = old_cursor_blink; return 0; // ESC
+    case 0x14: case 0x94: // DEL_INST
+      if (i > 0)
+      {
+        cursor_start_addr[--i] = ' ';
+        _PLOT_SET(x+i, y);
+        cursor_start_addr[i+1] &= 0x7F;
+      }
+      break;
+    case 0x0D: case 0x8D:
+      str[i] = 0;
+      _PLOT_SET(0, y+1); // Move cursor to next line
+      cursor_start_addr[i] &= 0x7F;
+      *cursor_blink = old_cursor_blink; 
+      return str; // 0D: RETURN, 8D: RETURN while holding down shift (or shift-lock)
+    default:
+      if (i < n)
+      {
+        cursor_start_addr[i] = petscii_to_screen_code(keyCode);
+        str[i++] = keyCode;
+        color_ram[i] = color;
+      }
+      break;
+    }
+  }
 }

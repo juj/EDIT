@@ -11,7 +11,6 @@
 #include <ctype.h>
 
 //#include_next <stdio.h>
-#include <stdio.h>
 
 #ifndef _STDIO_DEBUG_LEVEL
 #define _STDIO_DEBUG_LEVEL 0
@@ -61,6 +60,9 @@ void __assert(bool condition, const char *str, const char *file, int line, const
 #else
 #define assert(x) __assert((x), #x, __FILE__, __LINE__, __func__);
 #endif
+
+typedef uint8_t rsize_t;
+char *gets_s(char *str, rsize_t n);
 
 #if 0
 static volatile uint8_t * const rrnet_ctl      = (uint8_t *)0xDE01;
