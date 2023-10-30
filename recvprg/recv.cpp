@@ -140,6 +140,7 @@ static void discard_rx_bytes(unsigned int numBytes)
   while(numBytes-- > 0)
     (void)cs_rxtx_data[1];
 #else
+  uint8_t clob_a, clob_x;
   // This is a hot function, so implement a tight discard loop
   // manually.
   asm(R"(
@@ -169,7 +170,7 @@ times_128%=:      // Loop just like before
     DEX
     BNE loop_hi%= // If we still have multiples of 256 left, do it again
 end%=:
-  )"::"a"((uint8_t)numBytes), "x"((uint8_t)(numBytes>>8)));
+  )":"=a"(clob_a),"=x"(clob_x):"a"((uint8_t)numBytes), "x"((uint8_t)(numBytes>>8)):"y","c");
 #endif
 }
 /*
@@ -209,30 +210,33 @@ uint16_t poll_for_udp_file_transfer_fragment(bool first_fragment)
   rx_data_hi_lo(); // dummy read to flush status word (ignored)
   uint16_t bytes_left = rx_data_hi_lo();
 
-  union
-  {
-    eth_frame frame;
-    ip_frame ip;
-    udp_header udp;
-    udp_magic magic;
-  } net;
+  if (bytes_left < sizeof(eth_frame)) goto end;
+  bytes_left -= sizeof(eth_frame);
+  for(int i = 0; i < 6; ++i) rx_data_lo_hi();
+  if (rx_data_lo_hi() != 0x0008/*IPV4*/) goto end;
 
-#define READ_STRUCT(s) \
-  if (bytes_left < sizeof(s)) goto end; \
-  bytes_left -= sizeof(s); \
-  read_struct(&s, sizeof(s));
+  if (bytes_left < sizeof(ip_frame)) goto end;
+  bytes_left -= sizeof(ip_frame);
+  for(int i = 0; i < 4; ++i) rx_data_lo_hi();
+  uint8_t protocol;
+  protocol = rx_data_lo_hi()>>8;
+  for(int i = 0; i < 5; ++i) rx_data_lo_hi();
+  if (protocol != 0x11/*UDP*/) goto end;
 
-  READ_STRUCT(net.frame);
-  if (net.frame.etherType != 0x0008/*IPV4*/) goto end;
+  if (bytes_left < sizeof(udp_header)) goto end;
+  bytes_left -= sizeof(udp_header);
 
-  READ_STRUCT(net.ip);
-  if (net.ip.protocol != 0x11/*UDP*/) goto end;
+  for(int i = 0; i < 4; ++i) rx_data_lo_hi();
 
-  READ_STRUCT(net.udp);
-
-  READ_STRUCT(net.magic);
-  if ((first_fragment && net.magic.magic_header == RECV_FILE_DATAGRAM_MAGIC && bytes_left == sizeof(recv_file_datagram_header))
-    || (!first_fragment && net.magic.magic_header == RECV_FILE_DATAGRAM_FRAGMENT_MAGIC && bytes_left > sizeof(recv_file_datagram_fragment_header)))
+  if (bytes_left < 4) goto end;
+  bytes_left -= 4;
+  uint16_t lo;
+  uint32_t magic;
+  lo = rx_data_lo_hi();
+  magic = rx_data_lo_hi();
+  magic = (magic << 16) | lo;
+  if ((first_fragment && magic == RECV_FILE_DATAGRAM_MAGIC && bytes_left == sizeof(recv_file_datagram_header))
+    || (!first_fragment && magic == RECV_FILE_DATAGRAM_FRAGMENT_MAGIC && bytes_left > sizeof(recv_file_datagram_fragment_header)))
     return bytes_left; // this is interesting data, return it for processing
 
 end:
