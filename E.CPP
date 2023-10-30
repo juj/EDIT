@@ -1195,9 +1195,11 @@ void main_loop()
         insert_new_line(/*cursorMovesToNewLine=*/1);
         break;
 #endif
+#ifdef ACTION_INSERT_INDENT
       case ACTION_INSERT_INDENT:
         insert_indent(/*line_start=*/false);
         break;
+#endif
       case ACTION_ADD_INDENT_TO_LINE_START:
         insert_indent(/*line_start=*/true);
         break;
