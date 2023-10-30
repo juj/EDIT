@@ -246,78 +246,19 @@ uint16_t sum1c(uint16_t a, uint16_t b)
   return a + (a < b);
 }
 
-uint16_t calculate_one1c_checksum(void *data, uint16_t numBytes)
-{
-  assert(numBytes % 2 == 0);
-  numBytes >>= 1;
-  uint16_t *d = (uint16_t *)data;
-  uint16_t checksum = 0;
-  while(numBytes--)
-    checksum = sum1c(checksum, ntohs(*d++));
-  return ~checksum;
-}
-
 void start_udp_send(uint16_t numBytes)
 {
-  union
-  {
-    eth_frame frame;
-    ip_frame ip;
-    udp_header udp;
-  } net;
-
   uint16_t numBytesRoundedUpToEven = numBytes + (numBytes&1);
-  start_tx(sizeof(net.frame) + sizeof(net.ip) + sizeof(net.udp) + numBytesRoundedUpToEven);
+  start_tx(sizeof(eth_frame) + sizeof(ip_frame) + sizeof(udp_header) + numBytesRoundedUpToEven);
 
   // Perform UDP broadcast
-#if 0
-  for(int i = 0; i < 6; ++i)
-    net.frame.dst_mac[i] = 0xFF;
-
-  // http://wiki.icomp.de/wiki/RRNet
-  net.frame.src_mac[0] = 0x28;
-  net.frame.src_mac[1] = 0xCD;
-  net.frame.src_mac[2] = 0x4C;
-  net.frame.src_mac[3] = 0xFF;
-  net.frame.src_mac[4] = *(volatile unsigned char *)0xDE0E;
-  net.frame.src_mac[5] = *(volatile unsigned char *)0xDE0F;
-  net.frame.etherType = 0x0008;
-  tx_bytes(&net.frame, sizeof(net.frame));
-#else
-  write_u16_lo_hi(cs_rxtx_data, 0xFFFF);
-  write_u16_lo_hi(cs_rxtx_data, 0xFFFF);
-  write_u16_lo_hi(cs_rxtx_data, 0xFFFF);
-  write_u16_lo_hi(cs_rxtx_data, 0xCD28);
-  write_u16_lo_hi(cs_rxtx_data, 0xFF4C);
-  uint16_t srcmac = *(uint16_t *)0xDE0E;
-  write_u16_lo_hi(cs_rxtx_data, ntohs(srcmac));
-  write_u16_lo_hi(cs_rxtx_data, 0x0008);
-#endif
-
-#if 0
-  net.ip.versionAndHeaderLength = 0x45;
-  net.ip.typeOfService = 0;
-  net.ip.packetLength = ntohs(sizeof(net.ip) + sizeof(net.udp) + numBytesRoundedUpToEven);
-  net.ip.identification = 0;
-  net.ip.flagsAndFragmentOffset = 0;
-  net.ip.timeToLive = 128;
-  net.ip.protocol = 17; // udp
-  net.ip.headerChecksum = 0; // temporary, will be filled later
-
-  net.ip.src_ip[0] = 192;
-  net.ip.src_ip[1] = 168;
-  net.ip.src_ip[2] = 0;
-  net.ip.src_ip[3] = 255;
-
-  net.ip.dst_ip[0] = 255;
-  net.ip.dst_ip[1] = 255;
-  net.ip.dst_ip[2] = 255;
-  net.ip.dst_ip[3] = 255;
-
-  net.ip.headerChecksum = ntohs(calculate_one1c_checksum(&net.ip, sizeof(net.ip))); // Calculate the IP checksum (this is not optional)
-
-  tx_bytes(&net.ip, sizeof(net.ip));
-#else
+  write_u16_lo_hi(cs_rxtx_data, 0xFFFF); // dst mac 0,1
+  write_u16_lo_hi(cs_rxtx_data, 0xFFFF); // dst mac 2,3
+  write_u16_lo_hi(cs_rxtx_data, 0xFFFF); // dst mac 4,5
+  write_u16_lo_hi(cs_rxtx_data, 0xCD28); // src mac 0,1
+  write_u16_lo_hi(cs_rxtx_data, 0xFF4C); // src mac 2,3
+  write_u16_lo_hi(cs_rxtx_data, ntohs(*(uint16_t *)0xDE0E)); // src mac 4,5
+  write_u16_lo_hi(cs_rxtx_data, 0x0008); // EtherType
 
   uint16_t cs = 0;
   cs = sum1c(cs, 0x8011); // TTL + protocol
@@ -326,56 +267,37 @@ void start_udp_send(uint16_t numBytes)
   cs = sum1c(cs, 0xFFFF); // 255.255
   cs = sum1c(cs, 0xFFFF); // 255.255
   cs = sum1c(cs, 0x4500);
-  uint16_t len = sizeof(net.ip) + sizeof(net.udp) + numBytesRoundedUpToEven;
+  uint16_t len = sizeof(ip_frame) + sizeof(udp_header) + numBytesRoundedUpToEven;
   cs = sum1c(cs, len);
-  cs = ~ntohs(cs);
 
-  write_u16_lo_hi(cs_rxtx_data, 0x0045);
-  write_u16_lo_hi(cs_rxtx_data, ntohs(len));
-  write_u16_lo_hi(cs_rxtx_data, 0);
-  write_u16_lo_hi(cs_rxtx_data, 0);
-  write_u16_lo_hi(cs_rxtx_data, 0x1180);
-  write_u16_lo_hi(cs_rxtx_data, cs);
+  write_u16_lo_hi(cs_rxtx_data, 0x0045); // versionAndHeaderLength
+  write_u16_lo_hi(cs_rxtx_data, ntohs(len)); // IP packet length
+  write_u16_lo_hi(cs_rxtx_data, 0); // identification (0, unused)
+  write_u16_lo_hi(cs_rxtx_data, 0); // flagsAndFragmentOffset (0, unused)
+  write_u16_lo_hi(cs_rxtx_data, 0x1180); // TTL (128) + Protocol (17 - UDP)
+  write_u16_lo_hi(cs_rxtx_data, ~ntohs(cs)); // Checksum
 
-  write_u16_lo_hi(cs_rxtx_data, 0xA8C0);
-  write_u16_lo_hi(cs_rxtx_data, 0xFF00);
-  write_u16_lo_hi(cs_rxtx_data, 0xFFFF);
-  write_u16_lo_hi(cs_rxtx_data, 0xFFFF);
+  write_u16_lo_hi(cs_rxtx_data, 0xA8C0); // src ip 0,1
+  write_u16_lo_hi(cs_rxtx_data, 0xFF00); // src ip 2,3
+  write_u16_lo_hi(cs_rxtx_data, 0xFFFF); // dst ip 0,1
+  write_u16_lo_hi(cs_rxtx_data, 0xFFFF); // dst ip 2,3
 
-#endif
-
-#if 0
-  net.udp.src_port = ntohs(49739);
-  net.udp.dst_port = ntohs(4019);
-  net.udp.length = ntohs(sizeof(net.udp) + numBytesRoundedUpToEven);
-  net.udp.checksum = 0; // Skip computing UDP checksum - that is optional. (tricky to compute since checksum extends over user payload)
-  tx_bytes(&net.udp, sizeof(net.udp));
-#else
-  write_u16_lo_hi(cs_rxtx_data, 0);
-  write_u16_lo_hi(cs_rxtx_data, ntohs(4019));
-  write_u16_lo_hi(cs_rxtx_data, ntohs(sizeof(net.udp) + numBytesRoundedUpToEven));
-  write_u16_lo_hi(cs_rxtx_data, 0);
-#endif
+  write_u16_lo_hi(cs_rxtx_data, 0); // src port (0, unused)
+  write_u16_lo_hi(cs_rxtx_data, ntohs(4019)); // dst port
+  write_u16_lo_hi(cs_rxtx_data, ntohs(sizeof(udp_header) + numBytesRoundedUpToEven)); // UDP packet length
+  write_u16_lo_hi(cs_rxtx_data, 0); // checksum (0, unused)
   // The only thing left now is to fill the actual UDP payload data,
   // which is the caller's side to do.
 }
 
 #define FRAGMENT_RECEIVED_DATAGRAM_MAGIC 0xEE365F02
-struct fragment_received
-{
-  uint32_t magic;
-  uint16_t fragment_index;
-};
+#define FRAGMENT_RECEIVED_DATAGRAM_SIZE 6
 
 void send_udp_fragment_received_msg(uint16_t fragment_index)
 {
-//  fragment_received recv;
-  //recv.magic = FRAGMENT_RECEIVED_DATAGRAM_MAGIC;
-  //recv.fragment_index = fragment_index;
-  start_udp_send(sizeof(fragment_received));
-  //tx_bytes(&recv, sizeof(recv));
-  write_u16_lo_hi(cs_rxtx_data, 0x5F02);
-  write_u16_lo_hi(cs_rxtx_data, 0xEE36);
+  start_udp_send(FRAGMENT_RECEIVED_DATAGRAM_SIZE);
+  write_u16_lo_hi(cs_rxtx_data, (uint16_t)FRAGMENT_RECEIVED_DATAGRAM_MAGIC);
+  write_u16_lo_hi(cs_rxtx_data, FRAGMENT_RECEIVED_DATAGRAM_MAGIC>>16);
   write_u16_lo_hi(cs_rxtx_data, fragment_index);
 }
 
@@ -407,22 +329,8 @@ const char *poll_to_receive_file()
       {
         uint16_t data = rx_data_lo_hi();
         --data_left;
-        uint8_t n = 1;
-        if (data_left)
-        {
-          ++n;
-          --data_left;
-        }
-//        uint8_t ch[2] = { (char)(data), (char)(data >> 8) };
-
+        if (data_left) --data_left;
         *screen_frame = data;
-        /*
-        for(uint8_t i = 0; i < n; ++i)
-        {
-          put_screen(ch[i]);
-          ++totalBytesWritten;
-        }
-        */
       }
       send_udp_fragment_received_msg(frag.fragment_index);
       ++next_fragment_index;
