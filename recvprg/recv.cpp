@@ -1,5 +1,3 @@
-#include <stdio.h>
-#include <string.h>
 #include <stdint.h>
 
 static volatile uint8_t * const rrnet_ctl      = (uint8_t *)0xDE01;
@@ -9,19 +7,19 @@ static volatile uint8_t * const cs_rxtx_data   = (uint8_t *)0xDE08;
 static volatile uint8_t * const cs_tx_cmd      = (uint8_t *)0xDE0C;
 static volatile uint8_t * const cs_tx_len      = (uint8_t *)0xDE0E;
 
-static __inline__ __attribute__((__always_inline__, __nodebug__)) void write_u16_lo_hi(volatile uint8_t *dst, uint16_t value)
+static void write_u16_lo_hi(volatile uint8_t *dst, uint16_t value)
 {
   dst[0] = (uint8_t)value;
   dst[1] = (uint8_t)(value>>8);
 }
 
-static __inline__ __attribute__((__always_inline__, __nodebug__)) uint16_t read_u16_lo_hi(volatile uint8_t *ptr)
+static uint16_t read_u16_lo_hi(volatile uint8_t *ptr)
 {
   uint8_t lo = ptr[0];
   return (((uint16_t)ptr[1]) << 8) | lo;
 }
 
-static __inline__ __attribute__((__always_inline__, __nodebug__)) uint16_t read_u16_hi_lo(volatile uint8_t *ptr)
+static uint16_t read_u16_hi_lo(volatile uint8_t *ptr)
 {
   uint8_t hi = ptr[1];
   return (((uint16_t)hi) << 8) | ptr[0];
@@ -37,57 +35,6 @@ static void cs_write_page_data(uint16_t page, uint16_t data)
 {
   cs_set_page(page);
   write_u16_lo_hi(cs_packet_data, data);
-}
-
-int rrnet_init(bool enable_promiscuous_mode)
-{
-  *rrnet_ctl |= 1; // enable clock port on the C64 to access RR-Net through a carrier cartridge
-
-  // Detect RR-Net
-  cs_set_page(0);
-  if (cs_read_page_data() != 0x630E) return 0;
-
-  // Configure chip
-  cs_write_page_data(0x0114/*pp_self_ctl*/, 0x0055); // reset chip
-  uint16_t mode = 0x0D05; // accept individual and broadcast packets
-  if (enable_promiscuous_mode) mode |= 0x80; // and maybe enable promiscuous mode
-  cs_write_page_data(0x0104/*pp_rx_ctl*/, mode);
-  cs_write_page_data(0x0112/*pp_line_ctl*/, 0xD3); // Enable RX and TX
-  return 1;
-}
-
-#define ETHERNET_FRAME_SIZE 14
-#define IP_FRAME_SIZE 20
-#define UDP_HEADER_SIZE 8
-
-struct udp_magic
-{
-  uint32_t magic_header;
-};
-
-#define RECV_FILE_DATAGRAM_MAGIC 0x25291423
-struct recv_file_datagram_header
-{
-//  uint32_t magic_header;
-  char filename[20];
-  uint16_t file_id;
-  uint16_t num_fragments;
-} __attribute__((packed));
-
-#define RECV_FILE_DATAGRAM_FRAGMENT_MAGIC 0x53915315
-struct recv_file_datagram_fragment_header
-{
-//  uint32_t magic_header;
-  uint16_t file_id;
-  uint16_t fragment_index;
-} __attribute__((packed));
-
-static void read_struct(void *dst, uint16_t numBytes)
-{
-  uint16_t *frame = (uint16_t *)dst;
-  numBytes = (numBytes+1)>>1;
-  while(numBytes--)
-    *frame++ = rx_data_lo_hi();
 }
 
 static void discard_rx_bytes(unsigned int numBytes)
@@ -133,11 +80,11 @@ end%=:
 #endif
 }
 
-static void start_tx(uint16_t numBytes)
-{
-}
-
 static volatile unsigned char * const screen_frame = (unsigned char *)0xD020;
+
+#define ETHERNET_FRAME_SIZE 14
+#define IP_FRAME_SIZE 20
+#define UDP_HEADER_SIZE 8
 
 uint16_t recv_udp_file_transfer_fragment(bool first_fragment)
 {
@@ -164,9 +111,14 @@ uint16_t recv_udp_file_transfer_fragment(bool first_fragment)
   lo = rx_data_lo_hi();
   magic = ((uint32_t)rx_data_lo_hi() << 16) | lo;
 
+#define RECV_FILE_DATAGRAM_MAGIC 0x25291423
+#define RECV_FILE_DATAGRAM_FRAGMENT_MAGIC 0x53915315
+
+#define RECV_FILE_DATAGRAM_SIZE 24
+#define RECV_FILE_DATAGRAM_FRAGMENT_HEADER_SIZE 4
   if (eth_type == 0x0008/*IPV4*/ && protocol == 0x11/*UDP*/ &&
-     ((first_fragment && magic == RECV_FILE_DATAGRAM_MAGIC && bytes_left == sizeof(recv_file_datagram_header))
-    || (!first_fragment && magic == RECV_FILE_DATAGRAM_FRAGMENT_MAGIC && bytes_left > sizeof(recv_file_datagram_fragment_header))))
+     ((first_fragment && magic == RECV_FILE_DATAGRAM_MAGIC && bytes_left == RECV_FILE_DATAGRAM_SIZE)
+    || (!first_fragment && magic == RECV_FILE_DATAGRAM_FRAGMENT_MAGIC && bytes_left > RECV_FILE_DATAGRAM_FRAGMENT_HEADER_SIZE)))
     return bytes_left; // this is interesting data, return it for processing
 
 end:
@@ -234,34 +186,39 @@ void send_udp_fragment_received_msg(uint16_t fragment_index)
 
 int main()
 {
-  rrnet_init(/*promiscuous:*/false);
+  *rrnet_ctl |= 1; // enable clock port on the C64 to access RR-Net through a carrier cartridge
+
+  // Configure RR-Net
+  cs_write_page_data(0x0114/*pp_self_ctl*/, 0x0055); // reset chip
+  cs_write_page_data(0x0104/*pp_rx_ctl*/, 0x0D05); // accept individual and broadcast packets
+  cs_write_page_data(0x0112/*pp_line_ctl*/, 0xD3); // Enable RX and TX
+
   uint16_t bytes_left = recv_udp_file_transfer_fragment(true);
 
-  recv_file_datagram_header header;
-  read_struct(&header, sizeof(header));
-
+  for(int i = 0; i < 10; ++i) rx_data_lo_hi();
+  uint16_t tx_file_id = rx_data_lo_hi();
+  uint16_t num_fragments = rx_data_lo_hi();
   uint16_t next_fragment_index = 0;
 
   send_udp_fragment_received_msg(0xFFFF); // Send back msg that we are ready to start transfer.
 
-  while(next_fragment_index != header.num_fragments)
+  while(next_fragment_index != num_fragments)
   {
     uint16_t data_left = recv_udp_file_transfer_fragment(false);
+    uint16_t file_id = rx_data_lo_hi();
+    uint16_t fragment_index = rx_data_lo_hi();
+    data_left -= 4;
 
-    recv_file_datagram_fragment_header frag;
-    read_struct(&frag, sizeof(frag));
-    data_left -= sizeof(frag);
-
-    if (frag.file_id == header.file_id && frag.fragment_index == next_fragment_index)
+    if (file_id == tx_file_id && fragment_index == next_fragment_index)
     {
-      while(data_left > 0)
+      data_left = (data_left+1)>>1;
+      while(data_left)
       {
         uint16_t data = rx_data_lo_hi();
         --data_left;
-        if (data_left) --data_left;
         *screen_frame = data;
       }
-      send_udp_fragment_received_msg(frag.fragment_index);
+      send_udp_fragment_received_msg(fragment_index);
       ++next_fragment_index;
     }
     else
