@@ -85,7 +85,10 @@ void run_open_file_menu()
   bool isOnlyEmptyFile = (maybeDummyFile->nextFile == 0 && maybeDummyFile->prevFile == 0 && calculate_file_byte_size(maybeDummyFile) <= 1);
   open_file(filename);
   if (isOnlyEmptyFile) // Close dummy initial "<untitled>" file if user opens a new file to replace that
+  {
+    maybeDummyFile->hasUnsavedChanges = false; // Make close_file() not ask about unsaved modifications before closing.
     close_file(maybeDummyFile);
+  }
 }
 
 #endif
