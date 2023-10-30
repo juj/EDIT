@@ -210,33 +210,25 @@ uint16_t poll_for_udp_file_transfer_fragment(bool first_fragment)
   rx_data_hi_lo(); // dummy read to flush status word (ignored)
   uint16_t bytes_left = rx_data_hi_lo();
 
-  if (bytes_left < sizeof(eth_frame)) goto end;
-  bytes_left -= sizeof(eth_frame);
-  for(int i = 0; i < 6; ++i) rx_data_lo_hi();
-  if (rx_data_lo_hi() != 0x0008/*IPV4*/) goto end;
+  const uint8_t min_size = sizeof(eth_frame) + sizeof(ip_frame) + sizeof(udp_header) + 4;
+  if (bytes_left < min_size) goto end;
+  bytes_left -= min_size;
 
-  if (bytes_left < sizeof(ip_frame)) goto end;
-  bytes_left -= sizeof(ip_frame);
+  for(int i = 0; i < 6; ++i) rx_data_lo_hi();
+  uint16_t eth_type;
+  eth_type = rx_data_lo_hi();
   for(int i = 0; i < 4; ++i) rx_data_lo_hi();
   uint8_t protocol;
   protocol = rx_data_lo_hi()>>8;
-  for(int i = 0; i < 5; ++i) rx_data_lo_hi();
-  if (protocol != 0x11/*UDP*/) goto end;
-
-  if (bytes_left < sizeof(udp_header)) goto end;
-  bytes_left -= sizeof(udp_header);
-
-  for(int i = 0; i < 4; ++i) rx_data_lo_hi();
-
-  if (bytes_left < 4) goto end;
-  bytes_left -= 4;
+  for(int i = 0; i < 9; ++i) rx_data_lo_hi();
   uint16_t lo;
   uint32_t magic;
   lo = rx_data_lo_hi();
-  magic = rx_data_lo_hi();
-  magic = (magic << 16) | lo;
-  if ((first_fragment && magic == RECV_FILE_DATAGRAM_MAGIC && bytes_left == sizeof(recv_file_datagram_header))
-    || (!first_fragment && magic == RECV_FILE_DATAGRAM_FRAGMENT_MAGIC && bytes_left > sizeof(recv_file_datagram_fragment_header)))
+  magic = ((uint32_t)rx_data_lo_hi() << 16) | lo;
+
+  if (eth_type == 0x0008/*IPV4*/ && protocol == 0x11/*UDP*/ &&
+     ((first_fragment && magic == RECV_FILE_DATAGRAM_MAGIC && bytes_left == sizeof(recv_file_datagram_header))
+    || (!first_fragment && magic == RECV_FILE_DATAGRAM_FRAGMENT_MAGIC && bytes_left > sizeof(recv_file_datagram_fragment_header))))
     return bytes_left; // this is interesting data, return it for processing
 
 end:
