@@ -283,7 +283,7 @@ File *load_file(const char *filename)
   f->document_id = allocate_new_document_id();
   send_new_document_to_network_server(f, /*clear_contents=*/true);
 
-  line_num lineno = 0;
+  line_num lineno = 1;
   for(Line *l = f->firstLine; l; l = l->nextLine, ++lineno)
     send_line_to_network_server(EDIT_TYPE_REPLACE_LINE, f, l, lineno);
 
