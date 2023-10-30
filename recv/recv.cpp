@@ -407,7 +407,7 @@ void start_udp_send(uint16_t numBytes)
   tx_bytes(&net.ip, sizeof(net.ip));
 
   net.udp.src_port = ntohs(49739);
-  net.udp.dst_port = ntohs(4009);
+  net.udp.dst_port = ntohs(4019);
   net.udp.length = ntohs(sizeof(net.udp) + numBytesRoundedUpToEven);
   net.udp.checksum = 0; // Skip computing UDP checksum - that is optional. (tricky to compute since checksum extends over user payload)
   tx_bytes(&net.udp, sizeof(net.udp));
