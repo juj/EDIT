@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
-#include "../c64/c64_kernal.h"
 
 static volatile uint8_t * const rrnet_ctl      = (uint8_t *)0xDE01;
 static volatile uint8_t * const cs_packet_page = (uint8_t *)0xDE02;
@@ -46,21 +45,8 @@ int rrnet_init(bool enable_promiscuous_mode)
 
   // Detect RR-Net
   cs_set_page(0);
-  if (cs_read_page_data() != 0x630E)
-  {
-//    printf("RR-NET/CS8900A WAS NOT DETECTED.");
-    return 0;
-  }
+  if (cs_read_page_data() != 0x630E) return 0;
 
-  // Detect RR-Net MK3 by calculating a checksum. See http://wiki.icomp.de/wiki/RRNet
-  /*
-  volatile uint8_t * const mk3_eeprom = (uint8_t *)0xDE0C;
-  if ((mk3_eeprom[0] ^ mk3_eeprom[1] ^ 0x55) != mk3_eeprom[2] ||
-     ((mk3_eeprom[0] + mk3_eeprom[1] + mk3_eeprom[2]) ^ 0xAA) != mk3_eeprom[3])
-  {
-    printf("RR-NET MK3 NOT DETECTED (CKSUM ERROR)\n");
-  }
-*/
   // Configure chip
   cs_write_page_data(0x0114/*pp_self_ctl*/, 0x0055); // reset chip
   uint16_t mode = 0x0D05; // accept individual and broadcast packets
@@ -70,36 +56,9 @@ int rrnet_init(bool enable_promiscuous_mode)
   return 1;
 }
 
-struct eth_frame
-{
-  unsigned char dst_mac[6];
-  unsigned char src_mac[6];
-  uint16_t etherType; // Big Endian: https://en.wikipedia.org/wiki/EtherType#Values
-};
-
-struct ip_frame
-{
-  uint8_t versionAndHeaderLength;
-  uint8_t typeOfService;
-  uint16_t packetLength;
-  uint16_t identification;
-  uint16_t flagsAndFragmentOffset;
-  uint8_t timeToLive;
-  uint8_t protocol;
-  uint16_t headerChecksum;
-  uint8_t src_ip[4];
-  uint8_t dst_ip[4];
-};
-
-struct udp_header
-{
-  uint16_t src_port;
-  uint16_t dst_port;
-  uint16_t length;
-  uint16_t checksum;
-};
-
-#define MAX_C64_FILENAME_LEN 16
+#define ETHERNET_FRAME_SIZE 14
+#define IP_FRAME_SIZE 20
+#define UDP_HEADER_SIZE 8
 
 struct udp_magic
 {
@@ -173,44 +132,23 @@ end%=:
   )":"=a"(clob_a),"=x"(clob_x):"a"((uint8_t)numBytes), "x"((uint8_t)(numBytes>>8)):"y","c");
 #endif
 }
-/*
-static void debug_dump_rx_bytes(unsigned int numBytes)
-{
-  numBytes = (numBytes+1)>>1;
-  while(numBytes-- > 0)
-    printf("%04X", ntohs(rx_data_lo_hi()));
-  printf("\n");
-}
-*/
+
 static void start_tx(uint16_t numBytes)
 {
-  write_u16_lo_hi(cs_tx_cmd, 0x00C0); // Send Transmit command 00C0h
-  write_u16_lo_hi(cs_tx_len, numBytes);
-  cs_set_page(0x0138);
-  while (!(cs_read_page_data() & 0x0100))
-    ; // Wait until we are ready to transmit
-}
-
-static void tx_bytes(const void *msg, uint16_t numBytes)
-{
-  numBytes = (numBytes+1)>>1;
-  const uint16_t *m16 = (const uint16_t*)msg;
-  while(numBytes--)
-    write_u16_lo_hi(cs_rxtx_data, *m16++);
 }
 
 static volatile unsigned char * const screen_frame = (unsigned char *)0xD020;
 
-uint16_t poll_for_udp_file_transfer_fragment(bool first_fragment)
+uint16_t recv_udp_file_transfer_fragment(bool first_fragment)
 {
   // Poll if there is an Ethernet frame ready for processing
   cs_set_page(0x0124);
-  if ((cs_read_page_data() & 0x0D00) == 0) return false;
+  while((cs_read_page_data() & 0x0D00) == 0);
 
   rx_data_hi_lo(); // dummy read to flush status word (ignored)
   uint16_t bytes_left = rx_data_hi_lo();
 
-  const uint8_t min_size = sizeof(eth_frame) + sizeof(ip_frame) + sizeof(udp_header) + 4;
+  const uint8_t min_size = ETHERNET_FRAME_SIZE + IP_FRAME_SIZE + UDP_HEADER_SIZE + 4;
   if (bytes_left < min_size) goto end;
   bytes_left -= min_size;
 
@@ -244,8 +182,10 @@ uint16_t sum1c(uint16_t a, uint16_t b)
 
 void start_udp_send(uint16_t numBytes)
 {
-  uint16_t numBytesRoundedUpToEven = numBytes + (numBytes&1);
-  start_tx(sizeof(eth_frame) + sizeof(ip_frame) + sizeof(udp_header) + numBytesRoundedUpToEven);
+  write_u16_lo_hi(cs_tx_cmd, 0x00C0); // Send Transmit command 00C0h
+  write_u16_lo_hi(cs_tx_len, ETHERNET_FRAME_SIZE + IP_FRAME_SIZE + UDP_HEADER_SIZE + numBytes);
+  cs_set_page(0x0138);
+  while (!(cs_read_page_data() & 0x0100)) ; // Wait until we are ready to transmit
 
   // Perform UDP broadcast
   write_u16_lo_hi(cs_rxtx_data, 0xFFFF); // dst mac 0,1
@@ -263,7 +203,7 @@ void start_udp_send(uint16_t numBytes)
   cs = sum1c(cs, 0xFFFF); // 255.255
   cs = sum1c(cs, 0xFFFF); // 255.255
   cs = sum1c(cs, 0x4500);
-  uint16_t len = sizeof(ip_frame) + sizeof(udp_header) + numBytesRoundedUpToEven;
+  uint16_t len = IP_FRAME_SIZE + UDP_HEADER_SIZE + numBytes;
   cs = sum1c(cs, len);
 
   write_u16_lo_hi(cs_rxtx_data, 0x0045); // versionAndHeaderLength
@@ -280,7 +220,7 @@ void start_udp_send(uint16_t numBytes)
 
   write_u16_lo_hi(cs_rxtx_data, 0); // src port (0, unused)
   write_u16_lo_hi(cs_rxtx_data, ntohs(4019)); // dst port
-  write_u16_lo_hi(cs_rxtx_data, ntohs(sizeof(udp_header) + numBytesRoundedUpToEven)); // UDP packet length
+  write_u16_lo_hi(cs_rxtx_data, ntohs(UDP_HEADER_SIZE + numBytes)); // UDP packet length
   write_u16_lo_hi(cs_rxtx_data, 0); // checksum (0, unused)
   // The only thing left now is to fill the actual UDP payload data,
   // which is the caller's side to do.
@@ -297,15 +237,13 @@ void send_udp_fragment_received_msg(uint16_t fragment_index)
   write_u16_lo_hi(cs_rxtx_data, fragment_index);
 }
 
-const char *poll_to_receive_file()
+int main()
 {
-  uint16_t bytes_left = poll_for_udp_file_transfer_fragment(true);
-  if (!bytes_left)
-    return 0;
+  rrnet_init(/*promiscuous:*/false);
+  uint16_t bytes_left = recv_udp_file_transfer_fragment(true);
 
   recv_file_datagram_header header;
   read_struct(&header, sizeof(header));
-  assert(bytes_left == sizeof(header));
 
   uint16_t next_fragment_index = 0;
 
@@ -313,7 +251,7 @@ const char *poll_to_receive_file()
 
   while(next_fragment_index != header.num_fragments)
   {
-    uint16_t data_left = poll_for_udp_file_transfer_fragment(false);
+    uint16_t data_left = recv_udp_file_transfer_fragment(false);
 
     recv_file_datagram_fragment_header frag;
     read_struct(&frag, sizeof(frag));
@@ -333,17 +271,5 @@ const char *poll_to_receive_file()
     }
     else
       discard_rx_bytes(data_left);
-  }
-
-end:
-  return 0;
-}
-
-int main()
-{
-  int success = rrnet_init(/*promiscuous:*/false);
-  for(;;)
-  {
-    poll_to_receive_file();
   }
 }
