@@ -57,6 +57,8 @@ void repaint_screen();
 
 void insert_indent(bool line_start)
 {
+  // TODO: This does not seem to work correctly if line_start == false?
+  // (although that is not currently used on C64)
   assert(currentLine);
 
   line_xpos currentCharOffset = current_column();
