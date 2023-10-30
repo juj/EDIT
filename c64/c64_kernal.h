@@ -241,8 +241,8 @@ _KERNAL void _UDTIM()    { NEED_STACK(2);  _ASM volatile("JSR $FFEA":::"a","x");
 _KERNAL void _SCREEN(uint8_t *width, uint8_t *height) { NEED_STACK(2); _ASM("JSR $FFED":"=x"(*width),"=y"(*height)::"a","memory"); }
 
 // Read/Set current text cursor position
-_KERNAL void _PLOT_READ(uint8_t *x, uint8_t *y)       { NEED_STACK(2); _ASM("SEC\nJSR $FFF0":"=x"(*x),"=y"(*y)::"c","memory"); }
-_KERNAL void _PLOT_SET(uint8_t x, uint8_t y)          { NEED_STACK(2); _ASM volatile("CLC\nJSR $FFF0"::"x"(y),"y"(x):"c"); }
+_KERNAL void _PLOT_READ(uint8_t *x, uint8_t *y)       { NEED_STACK(2); _ASM("SEC\nJSR $FFF0":"=x"(*y),"=y"(*x)::"c","memory"); }
+_KERNAL void _PLOT_SET(uint8_t x, uint8_t y)          { NEED_STACK(2); _ASM volatile("CLC\nJSR $FFF0"::"x"(y),"y"(x):"a","c"); }
 
 // Fetch CIA #1 base address
 _KERNAL uintptr_t _IOBASE() { NEED_STACK(2); uint8_t lo, hi; _ASM("JSR $FFF3":"=x"(lo),"=y"(hi)::); return _U16(lo, hi); }
