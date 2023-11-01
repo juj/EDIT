@@ -37,27 +37,27 @@ static void cs_write_page_data(uint16_t page, uint16_t data)
   write_u16_lo_hi(cs_packet_data, data);
 }
 
-static void discard_rx_bytes(unsigned int numBytes)
+static void discard_rx_bytes(uint16_t numBytes)
 {
-  // Read the hardware port cs_rxtx_data[1] numBytes/2 times (rounded up)
+  // Read the hardware port cs_rxtx_data numBytes/2 times (rounded up)
   // to discard received uint16s that are uninteresting.
 #if 0
   numBytes = (numBytes+1)>>1;
-  while(numBytes-- > 0)
-    (void)cs_rxtx_data[1];
+  while(numBytes-- > 0) rx_data_lo_hi();
 #else
   uint8_t clob_a, clob_x;
   // This is a hot function, so implement a tight discard loop
   // manually.
-  asm(R"(
+  asm volatile(R"(
     // A and X contain number of bytes to discard
     CMP #0        // Test if A is zero (have an even multiple of 256 bytes to discard)
     BEQ high_part%= // Jump to deal directly with high part
 
-    ROR A         // Calculate (A+1)/2 by shifting once right, and
+    LSR A         // Calculate (A+1)/2 by shifting once right, and
     ADC #0        // adding the lowest bit (now in Carry) back to A.
     TAY           // Move A to Y, since A cannot be used as a loop counter
 loop_lo%=:        // Loop Y times to read the $DE09 hardware port
+    LDA $DE08     // Discards one uint16 from CS8900A receive buffer
     LDA $DE09     // Discards one uint16 from CS8900A receive buffer
     DEY
     BNE loop_lo%=
@@ -69,7 +69,8 @@ high_part%=:      // Now discard full multiples of 256 bytes
 loop_hi%=:
     LDY #128      // 256 bytes == 128 uint16s
 times_128%=:      // Loop just like before
-    LDA $DE09     // Discard a uint16 from CS8900A receive bufer
+    LDA $DE08     // Discard a uint16 from CS8900A receive buffer
+    LDA $DE09     // Discard a uint16 from CS8900A receive buffer
     DEY
     BNE times_128%=
    
@@ -86,7 +87,7 @@ static volatile unsigned char * const screen_frame = (unsigned char *)0xD020;
 #define IP_FRAME_SIZE 20
 #define UDP_HEADER_SIZE 8
 
-uint16_t recv_udp_file_transfer_fragment(bool first_fragment)
+uint16_t poll_udp_file_transfer_fragment(bool first_fragment)
 {
   // Poll if there is an Ethernet frame ready for processing
   cs_set_page(0x0124);
@@ -99,20 +100,24 @@ uint16_t recv_udp_file_transfer_fragment(bool first_fragment)
   if (bytes_left < min_size) goto end;
   bytes_left -= min_size;
 
-  for(int i = 0; i < 6; ++i) rx_data_lo_hi();
+  //for(int i = 0; i < 6; ++i) rx_data_lo_hi();
+  discard_rx_bytes(12);
   uint16_t eth_type;
   eth_type = rx_data_lo_hi();
   for(int i = 0; i < 4; ++i) rx_data_lo_hi();
+  //discard_rx_bytes(8); // BUG: Would want to do this, but https://github.com/llvm-mos/llvm-mos/issues/399 prevents
   uint8_t protocol;
   protocol = rx_data_lo_hi()>>8;
   for(int i = 0; i < 9; ++i) rx_data_lo_hi();
+  //discard_rx_bytes(18); // BUG: Would want to do this, but https://github.com/llvm-mos/llvm-mos/issues/399 prevents
   uint16_t lo;
   uint32_t magic;
   lo = rx_data_lo_hi();
   magic = ((uint32_t)rx_data_lo_hi() << 16) | lo;
 
 #define RECV_FILE_DATAGRAM_MAGIC 0x25291423
-#define RECV_FILE_DATAGRAM_FRAGMENT_MAGIC 0x53915315
+#define RECV_FILE_DATAGRAM_FRAGMENT_MAGIC 0x25291424
+//#define RECV_FILE_DATAGRAM_FRAGMENT_MAGIC 0x53915315
 
 #define RECV_FILE_DATAGRAM_SIZE 24
 #define RECV_FILE_DATAGRAM_FRAGMENT_HEADER_SIZE 4
@@ -124,6 +129,13 @@ uint16_t recv_udp_file_transfer_fragment(bool first_fragment)
 end:
   discard_rx_bytes(bytes_left);
   return 0;
+}
+
+uint16_t recv_udp_file_transfer_fragment(bool first_fragment)
+{
+  uint16_t bytes_left = 0;
+  while(!bytes_left) bytes_left = poll_udp_file_transfer_fragment(first_fragment);
+  return bytes_left;
 }
 
 uint16_t sum1c(uint16_t a, uint16_t b)
@@ -196,6 +208,7 @@ int main()
   uint16_t bytes_left = recv_udp_file_transfer_fragment(true);
 
   for(int i = 0; i < 10; ++i) rx_data_lo_hi();
+  //discard_rx_bytes(20); // BUG: Would want to do this, but https://github.com/llvm-mos/llvm-mos/issues/399 prevents
   uint16_t tx_file_id = rx_data_lo_hi();
   uint16_t num_fragments = rx_data_lo_hi();
   uint16_t next_fragment_index = 0;
