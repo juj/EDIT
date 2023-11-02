@@ -130,19 +130,19 @@ packet_large_enough:
   LDA CS_RXTX_DATA      ; Read EtherType
   LDX CS_RXTX_DATA+1    ;
   CMP #0                ; Test if EtherType equals $0800
-  BEQ pass1
+  BEQ 1f
   CPX #8
-  BEQ pass1
+  BEQ 1f
   INY                   ; EtherType test failed
-pass1:
+1:
 
   discard_n_rx_bytes #8
   LDA CS_RXTX_DATA      ; Read Protocol
   LDX CS_RXTX_DATA+1    ;
   CPX #$11              ; Test against $11 (UDP)
-  BEQ pass2
+  BEQ 1f
   INY                   ; Protocol test failed
-pass2:
+1:
 
   discard_n_rx_bytes #18
   LDA CS_RXTX_DATA      ; Read low u16 of magic
@@ -152,25 +152,25 @@ pass2:
   ADC waiting_for_first_packet
 
   CMP #$24               ; Test if low u16 of magic matches
-  BEQ pass3
+  BEQ 1f
   INY                   ; magic test failed
-pass3:
+1:
   CPX #$14
-  BEQ pass32
+  BEQ 1f
   INY                   ; magic test failed
-pass32:
+1:
 
   LDA CS_RXTX_DATA      ; Read high u16 of magic
   LDX CS_RXTX_DATA+1    ;
 
   CMP #$29               ; Test if high u16 of magic matches
-  BEQ pass4
+  BEQ 1f
   INY                   ; magic test failed
-pass4:
+1:
   CPX #$25
-  BEQ pass42
+  BEQ 1f
   INY                   ; magic test failed
-pass42:
+1:
 
   LDA waiting_for_first_packet ; Finally, test if the datagram size is as expected
   BNE size_good                ; If this is a datagram continuation packet, size is already validated to be good above
@@ -210,9 +210,25 @@ recv_prg:
 
   JSR wait_for_msg ; Wait for the first header
 
+  DEBUG_BORDER #4
+
   LDA #0
   STA waiting_for_first_packet ; Record that we are now waiting for subsequent datagram packets
 
-  DEBUG_BORDER #4
+  discard_n_rx_bytes #20
+
+  LDA CS_RXTX_DATA      ; Read tx file id
+  LDX CS_RXTX_DATA+1    ;
+  STA tx_file_id
+  STX tx_file_id+1
+
+  LDA CS_RXTX_DATA      ; Read # of fragments
+  LDX CS_RXTX_DATA+1    ;
+  STA num_fragments
+
+  ; TODO: send_udp_fragment_received_msg(0xFFFF);
+
+
+
 
   RTS
