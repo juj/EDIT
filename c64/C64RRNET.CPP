@@ -112,6 +112,7 @@ struct recv_file_datagram_fragment_header
 //  uint32_t magic_header;
   uint16_t file_id;
   uint16_t fragment_index;
+  uint16_t file_load_start_offset;
 } __attribute__((packed));
 
 struct build_error_msg_datagram

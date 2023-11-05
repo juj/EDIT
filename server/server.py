@@ -32,7 +32,7 @@ init_network()
 def receive_datagram():
   global recv_sock
   data, addr = recv_sock.recvfrom(1400)
-  #print("received message: %s, len: %d" % (data, len(data)))
+  print("received message: %s, len: %d from %s" % (data, len(data), str(addr)))
   return (data, addr)
 
 def send_datagram(data):
@@ -280,9 +280,12 @@ RECV_FILE_DATAGRAM_MAGIC = 0x25291423
 #  char filename[20];
 #  uint16_t file_id;
 #  uint16_t num_fragments;
+#  uint16_t file_start_address;
+#  uint8_t filetype;
+#  uint8_t dummy0;
 #};
 
-RECV_FILE_DATAGRAM_FRAGMENT_MAGIC = 0x53915315
+RECV_FILE_DATAGRAM_FRAGMENT_MAGIC = 0x25291424
 #struct recv_file_datagram_fragment_header
 #{
 #  uint32_t magic_header;
@@ -292,23 +295,28 @@ RECV_FILE_DATAGRAM_FRAGMENT_MAGIC = 0x53915315
 
 def wait_to_ack_datagram_received(datagram_number):
   print(f'wait_to_ack_datagram_received({datagram_number})')
-  data, addr = receive_datagram()
-  magic = struct.unpack('I', data[:4])[0]
-  data = data[4:]
-  FRAGMENT_RECEIVED_DATAGRAM_MAGIC = 0xEE365F02
-  if magic == FRAGMENT_RECEIVED_DATAGRAM_MAGIC:
-    fragment_index = struct.unpack('H', data[:2])[0]
-    if fragment_index == datagram_number:
-      print(f'got ack ({datagram_number})')
-      return
+  while True:
+    data, addr = receive_datagram()
+    print(f'Received {data} from {addr}')
+    magic = struct.unpack('I', data[:4])[0]
+    data = data[4:]
+    FRAGMENT_RECEIVED_DATAGRAM_MAGIC = 0xEE365F02
+    if magic == FRAGMENT_RECEIVED_DATAGRAM_MAGIC:
+      fragment_index = struct.unpack('BB', data[:2])[0]
+      if fragment_index == datagram_number:
+        print(f'got ack ({datagram_number})')
+        return
 
 
-def send_file_to_client(filename):
+def send_file_to_client(filename, crop_first_two_bytes):
   print(f"send_file_to_client({filename})")
   MTU = 1300
   FRAGMENT_PAYLOAD_SIZE = MTU - 8
 
   file_data = open(filename, 'rb').read()
+  memory_start_address = struct.unpack('H', file_data[0:2])[0]
+  if crop_first_two_bytes:
+    file_data = file_data[2:]
   size = len(file_data)
   if size > 512 * FRAGMENT_PAYLOAD_SIZE:
     print(f"File is too large ({size} bytes) to send! Max send size={512 * FRAGMENT_PAYLOAD_SIZE} bytes")
@@ -322,10 +330,11 @@ def send_file_to_client(filename):
     filetype = 'P'
     filename = filename[:-4]
   out_petscii_filename = ascii_to_petscii(filename.lower())
-  recv_file_header = struct.pack('I20sHHBB', RECV_FILE_DATAGRAM_MAGIC, out_petscii_filename, file_id, num_fragments, ord(filetype), 0)
+  recv_file_header = struct.pack('I20sHHHBB', RECV_FILE_DATAGRAM_MAGIC, out_petscii_filename,
+    file_id, num_fragments, memory_start_address, ord(filetype), 0)
   send_datagram(recv_file_header)
 
-  wait_to_ack_datagram_received(0xFFFF) # Wait for C64 being ready to start receiving actual data
+  wait_to_ack_datagram_received(0xFF) # Wait for C64 being ready to start receiving actual data
 
   i = 0
   fragment_index = 0
@@ -342,14 +351,13 @@ def send_file_to_client(filename):
 
 def handle_ask_compiled_document_msg(data):
   print(f"handle_ask_compiled_document_msg({data})")
-  document_id, dummy = struct.unpack('BB', data)
+  document_id, crop_first_two_bytes = struct.unpack('BB', data)
   filename = filenames[document_id]
   out_file = calc_output_prg_filename_from_input_cpp_filename(filename)
-  send_file_to_client(out_file)
+  send_file_to_client(out_file, crop_first_two_bytes)
 
-while True:
-    in_blocking_mode = 0
-#  try:
+def server_main():
+  while True:
     data, addr = receive_datagram()
     magic = struct.unpack('I', data[:4])[0]
     data = data[4:]
@@ -361,7 +369,8 @@ while True:
       handle_ask_compiled_document_msg(data)
     else:
       print(f'Unknown magic {hex(magic)}')
-    # 0x2395173A
 
-#  except Exception as e:
-#    print(str(e))
+if 'send' in sys.argv:
+  send_file_to_client(sys.argv[-1], True)
+else:
+  server_main()

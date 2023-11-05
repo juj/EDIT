@@ -16,7 +16,7 @@ void deinit_network();
 void send_line_to_network_server(uint8_t editType, File *f, Line *l, line_num lineno);
 
 void send_new_document_to_network_server(File *f, bool clear_contents);
-void send_ask_compiled_document_msg(uint8_t document_id);
+void send_ask_compiled_document_msg(uint8_t document_id, bool for_loading_to_memory);
 
 void receive_data_from_network();
 void wait_to_receive_file(char *dstFilename);
@@ -41,7 +41,7 @@ struct AskCompiledDocumentMsg // C64 asks the build server to download the compi
 {
   uint32_t magic; // == MAGIC_ASK_COMPILED_DOCUMENT_MSG
   uint8_t document_id; // an ID of the file to get
-  uint8_t dummy; // pad to multiple of 16bits
+  uint8_t for_loading_to_memory; // Boolean: if true, first two bytes of the .PRG file data are cropped to ease loading to memory
 };
 
 #define MAGIC_NEW_DOCUMENT_MSG 0x2395173A

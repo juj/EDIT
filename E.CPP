@@ -1339,7 +1339,7 @@ void main_loop()
 #ifdef ACTION_SAVE_COMPILED_PRG_TO_DISK
       case ACTION_SAVE_COMPILED_PRG_TO_DISK:
         {
-        send_ask_compiled_document_msg(currentFile->document_id);
+        send_ask_compiled_document_msg(currentFile->document_id, /*for_loading_to_memory=*/false);
         char filename[20];
         wait_to_receive_file(filename);
         repaint_screen();

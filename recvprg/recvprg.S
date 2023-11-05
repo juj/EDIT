@@ -9,8 +9,17 @@ CS_TX_LEN      = $DE0E
 packet_length            = $57  ; uint16
 tx_file_id               = $59  ; uint16
 num_fragments            = $5B  ; uint16
-next_fragment_idx        = $5D  ; uint16
+next_fragment_idx        = $5D  ; uint8
+mem_dst_address          = $5F  ; uint16
 waiting_for_first_packet = 2    ; uint8
+
+
+.macro discard_n_rx_bytes num
+  LDA \num
+  LDX #0
+  JSR discard_rx_bytes
+.endmacro
+
 
 
 .macro DEBUG_BORDER color
@@ -20,36 +29,132 @@ waiting_for_first_packet = 2    ; uint8
 
 
 
-
-.macro CS_SET_PAGE addr
-  LDA #<\addr
-  STA CS_PACKET_PAGE
-  LDA #>\addr
-  STA CS_PACKET_PAGE+1
+.macro WRITE_U16 addr, value
+  LDA #<\value
+  STA \addr
+  LDA #>\value
+  STA \addr+1
 .endmacro
 
 
 
 .macro CS_WRITE_PAGE addr, value
-  CS_SET_PAGE \addr
-  LDA #<\value
-  STA CS_PACKET_DATA
-  LDA #>\value
-  STA CS_PACKET_DATA+1
+  WRITE_U16 CS_PACKET_PAGE, \addr
+  WRITE_U16 CS_PACKET_DATA, \value
+.endmacro
+
+
+
+.macro ADD_U16_U8 addr, value
+  CLC
+  LDA \addr
+  ADC \value
+  STA \addr
+  LDA \addr+1
+  ADC #0
+  STA \addr+1
 .endmacro
 
 
 
 .macro SUB_U16_U8 addr, value
   SEC
-  LDA \value
-  SBC \addr
-  SBC \addr+1
+  LDA \addr
+  SBC \value
+  STA \addr
+  LDA \addr+1
+  SBC #0
+  STA \addr+1
 .endmacro
 
 
+.section .restore_irq_overlay.1,"axR",@progbits
 
-; Discards given number of bytes from RR-Net incoming packet queue
+.globl recv_prg
+.type recv_prg, @function
+recv_prg:
+  LDA #1
+  ORA RRNET_CTL
+  STA RRNET_CTL ; Enable clock port
+
+  CS_WRITE_PAGE $0114, $0055 ; Reset RR-Net
+  CS_WRITE_PAGE $0104, $0D05 ; Accept individual and broadcast packets
+  CS_WRITE_PAGE $0112, $00D3 ; Enable RX and TX
+
+  LDA #01
+  STA waiting_for_first_packet ; Record that we are waiting for the first header packet to arrive
+  JSR wait_for_msg ; Wait for the first header
+  LDA #0
+  STA waiting_for_first_packet ; Record that we are now waiting for subsequent datagram packets
+
+  discard_n_rx_bytes #20 ; Discard filename
+
+  LDA CS_RXTX_DATA      ; Read tx file id
+  LDX CS_RXTX_DATA+1    ;
+  STA tx_file_id
+  STX tx_file_id+1
+
+  LDA CS_RXTX_DATA      ; Read # of fragments
+  LDX CS_RXTX_DATA+1    ;
+  STA num_fragments
+
+  LDA CS_RXTX_DATA      ; Read copy destination start address
+  STA mem_dst_address
+  LDA CS_RXTX_DATA+1
+  STA mem_dst_address+1
+
+  LDA CS_RXTX_DATA      ; Discard filetype and dummy padding byte
+  LDA CS_RXTX_DATA+1
+
+  LDA #$FF                            ; Send ACK for the header
+  STA next_fragment_idx
+  JSR ack_received_udp_fragment
+
+fragments_still_left_to_receive:
+
+  JSR wait_for_msg ; Wait for a datagram
+
+  LDA CS_RXTX_DATA     ; Get file ID
+  LDX CS_RXTX_DATA+1
+
+  LDA CS_RXTX_DATA     ; Get fragment index
+  LDX CS_RXTX_DATA+1
+
+  SUB_U16_U8 packet_length, #4
+  LSR packet_length+1  ; Divide packet length by two to convert from bytes to words (assume it was even)
+  ROR packet_length
+
+bytes_left_to_read:
+  LDY #0
+  LDA CS_RXTX_DATA     ; Read data word
+  STA (mem_dst_address),y
+  INY
+  LDA CS_RXTX_DATA+1
+  STA (mem_dst_address),y
+  STA $D020
+  ADD_U16_U8 mem_dst_address, #2
+
+  SUB_U16_U8 packet_length, #1
+  LDA packet_length
+  ORA packet_length+1
+  BNE bytes_left_to_read
+
+  ; all bytes from this datagram have been read, ack the transfer
+  JSR ack_received_udp_fragment
+
+  LDA next_fragment_idx
+  CMP num_fragments
+  BNE fragments_still_left_to_receive
+
+  ; All data has been received! Clear the stack pointer
+  ; and start the program
+  LDX #$FF
+  TXS
+  JMP 2061
+
+
+
+; #FUNCTION: Discards given number of bytes from RR-Net incoming packet queue
 discard_rx_bytes:
   ; A and X contain number of bytes to discard
   CMP #0          ; Test if A is zero (have an even multiple of 256 bytes to discard)
@@ -83,14 +188,7 @@ end:
 
 
 
-.macro discard_n_rx_bytes num
-  LDA \num
-  LDX #0
-  JSR discard_rx_bytes
-.endmacro
-
-
-
+;# FUNCTION
 discard_all_rx_bytes:
   LDA packet_length
   LDX packet_length+1
@@ -98,8 +196,90 @@ discard_all_rx_bytes:
 
 
 
+;# FUNCTION
+ack_received_udp_fragment:
+  WRITE_U16 CS_TX_CMD, $00c0
+  WRITE_U16 CS_TX_LEN, 48
+  WRITE_U16 CS_PACKET_PAGE, $0138
+
+wait_for_tx_ready:
+  LDA CS_PACKET_DATA+1
+  ROR A
+  BCC wait_for_tx_ready
+
+  LDY #$FF
+  STY CS_RXTX_DATA   ; Write the 6-byte dst MAC address (FF:FF:FF:FF:FF:FF for broadcast)
+  STY CS_RXTX_DATA+1
+  STY CS_RXTX_DATA
+  STY CS_RXTX_DATA+1
+  STY CS_RXTX_DATA
+  STY CS_RXTX_DATA+1
+
+  WRITE_U16 CS_RXTX_DATA, $CD28 ; Write src MAC address
+  LDA #$4C
+  STA CS_RXTX_DATA
+  STY CS_RXTX_DATA+1
+  LDA $DE0E
+  STA CS_RXTX_DATA
+  LDA $DE0F
+  STA CS_RXTX_DATA+1
+
+  LDA #8                  ; Write EtherType
+  STA CS_RXTX_DATA
+  LDX #0
+  STX CS_RXTX_DATA+1
+
+  LDA #$45                ; Write versionAndHeaderLength
+  STA CS_RXTX_DATA
+  STX CS_RXTX_DATA+1
+
+  STX CS_RXTX_DATA        ; Write IP packet length
+  LDA #$22
+  STA CS_RXTX_DATA+1
+
+  STX CS_RXTX_DATA        ; Write identification (0, unused)
+  STX CS_RXTX_DATA+1
+
+  STX CS_RXTX_DATA        ; Write flagsAndFragmentOffset (0, unused)
+  STX CS_RXTX_DATA+1
+
+  WRITE_U16 CS_RXTX_DATA, $1180 ; Write TTL (128) + Protocol (17 - UDP)
+
+  WRITE_U16 CS_RXTX_DATA, $2479 ; Write IP checksum (this is precomputed, see recv.cpp for the calculation)
+
+  WRITE_U16 CS_RXTX_DATA, $A8C0 ; Write src IP (182.168.0.255)
+  STX CS_RXTX_DATA
+  STY CS_RXTX_DATA+1
+
+  STY CS_RXTX_DATA   ; Write dst IP (255.255.255.255)
+  STY CS_RXTX_DATA+1
+  STY CS_RXTX_DATA
+  STY CS_RXTX_DATA+1
+
+  STX CS_RXTX_DATA   ; Write src port (0, unused)
+  STX CS_RXTX_DATA+1
+
+  WRITE_U16 CS_RXTX_DATA, $A90F ; Write dst port (4009)
+
+  STX CS_RXTX_DATA ; Write UDP packet length (14)
+  LDA #$0E
+  STA CS_RXTX_DATA+1
+
+  STX CS_RXTX_DATA    ; Write UDP checksum (0, unused)
+  STX CS_RXTX_DATA+1
+
+  WRITE_U16 CS_RXTX_DATA, $5F02 ; Write FRAGMENT_RECEIVED_DATAGRAM_MAGIC low word
+  WRITE_U16 CS_RXTX_DATA, $EE36 ; Write FRAGMENT_RECEIVED_DATAGRAM_MAGIC high word
+  LDA next_fragment_idx ; Write the acked fragment index
+  STA CS_RXTX_DATA
+  STA CS_RXTX_DATA+1    ; Dummy padding
+  INC next_fragment_idx ; Auto-increment next_fragment_idx
+  RTS
+
+
+;# FUNCTION
 wait_for_msg:           ; Wait until RR-Net ethernet frame is available
-  CS_SET_PAGE $0124
+  WRITE_U16 CS_PACKET_PAGE, $0124
   LDA CS_PACKET_DATA+1
   AND #$0D
   BEQ wait_for_msg
@@ -128,7 +308,7 @@ packet_large_enough:
   LDY #0                ; Y receives result of all testing
 
   LDA CS_RXTX_DATA      ; Read EtherType
-  LDX CS_RXTX_DATA+1    ;
+  LDX CS_RXTX_DATA+1
   CMP #0                ; Test if EtherType equals $0800
   BEQ 1f
   CPX #8
@@ -192,43 +372,4 @@ size_good:
   JMP wait_for_msg         ; And loop back to start the wait again.
 
 good_datagram:
-  RTS
-
-.globl recv_prg
-.type recv_prg, @function
-recv_prg:
-  LDA #1
-  ORA RRNET_CTL
-  STA RRNET_CTL ; Enable clock port
-
-  CS_WRITE_PAGE $0114, $0055 ; Reset RR-Net
-  CS_WRITE_PAGE $0104, $0D05 ; Accept individual and broadcast packets
-  CS_WRITE_PAGE $0112, $00D3 ; Enable RX and TX
-
-  LDA #01
-  STA waiting_for_first_packet ; Record that we are waiting for the first header packet to arrive
-
-  JSR wait_for_msg ; Wait for the first header
-
-  DEBUG_BORDER #4
-
-  LDA #0
-  STA waiting_for_first_packet ; Record that we are now waiting for subsequent datagram packets
-
-  discard_n_rx_bytes #20
-
-  LDA CS_RXTX_DATA      ; Read tx file id
-  LDX CS_RXTX_DATA+1    ;
-  STA tx_file_id
-  STX tx_file_id+1
-
-  LDA CS_RXTX_DATA      ; Read # of fragments
-  LDX CS_RXTX_DATA+1    ;
-  STA num_fragments
-
-  ; TODO: send_udp_fragment_received_msg(0xFFFF);
-
-
-
-
   RTS

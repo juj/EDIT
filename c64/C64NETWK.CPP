@@ -55,7 +55,7 @@ void send_line_to_network_server(uint8_t editType, File *f, Line *l, line_num li
 #endif
 }
 
-void send_ask_compiled_document_msg(uint8_t document_id)
+void send_ask_compiled_document_msg(uint8_t document_id, bool for_loading_to_memory)
 {
 #ifdef ENABLE_NETWORKING
   if (!network_initialized) return;
@@ -63,6 +63,7 @@ void send_ask_compiled_document_msg(uint8_t document_id)
   AskCompiledDocumentMsg m;
   m.magic = MAGIC_ASK_COMPILED_DOCUMENT_MSG;
   m.document_id = document_id;
+  m.for_loading_to_memory = for_loading_to_memory;
   start_udp_send(sizeof(m));
   tx_bytes(&m, sizeof(m)); // send msg
 #endif
