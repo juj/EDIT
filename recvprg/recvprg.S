@@ -198,6 +198,13 @@ bytes_left_to_read:
   STA $318
   LDA #>continue_after_program_finish
   STA $319
+  JSR $E544 ; Call CLRSCR to clear the screen
+  LDA #14
+  STA $D020 ; Set border color to default Light Blue
+  LDA #6
+  STA $D021 ; Set background color to default Dark Blue
+  LDA #1
+  STA $CC   ; Disable blinking cursor
   CLI
   JSR 2061 ; Start the downloaded program
 
