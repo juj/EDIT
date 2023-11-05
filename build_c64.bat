@@ -5,10 +5,13 @@ SET FLAGS=-DNDEBUG -Oz -Wno-nonportable-include-path
 
 C:\code\llvm-mos-sdk\build\install\bin\mos-clang --config mos-c64.cfg -o e.prg %FLAGS% %SOURCES%
 
+C:\code\llvm-mos-sdk\build\install\bin\mos-clang --config mos-c64.cfg -c %FLAGS% %SOURCES%
+
 ::C:\code\llvm-mos-sdk\build\install\bin\mos-clang --config mos-c64.cfg -Wl,--lto-emit-asm -g -o test.s %FLAGS% %SOURCES%
 
+SET OBJS=AUDIO.O COPYPAST.O CURSOR.O E.O FILE.O HIGHLITE.O INPUT.O LINE.O SMINDENT.O MEMORY.O OPENFILE.O SCREEN.O STATE.O UTIL.O VGA.O VIEWPORT.O SAVEFILE.O C64NETWK.O C64SAVE.O c64.O c64key.O stdio.O C64RRNET.O
 
-
+C:\code\llvm-mos-sdk\build\install\bin\ld.lld %OBJS% -o editor.O
 
 
 
