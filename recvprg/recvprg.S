@@ -13,6 +13,46 @@ next_fragment_idx        = $5D  ; uint8
 mem_dst_address          = $5F  ; uint16
 waiting_for_first_packet = 2    ; uint8
 
+prev_sp                  = $CFFD ; uint8
+
+
+.macro REU_SNAPSHOT value
+  LDA #0
+  STA $DF0A ; Set flags (transfer address increments on both C64 and REU side)
+
+  ; # Copy $0000 - $CFFD area
+  STA $DF02 ; Set copy src address in C64 memory
+  STA $DF03
+
+  STA $DF04 ; Set copy dst address in REU memory
+  STA $DF05
+  STA $DF06
+
+  LDA #$FD  ; Set transfer length
+  STA $DF07
+  LDA #$CF
+  STA $DF08
+
+  LDA \value ; #Kick off the transfer immediately (this will be synchronous, C64 CPU halts until transfer is complete)
+  STA $DF01
+
+  ; # Copy $D000 - $DC00 area
+  LDA #$D0
+  STA $DF03
+  STA $DF05
+
+  LDA #$04
+  STA $DF07
+  LDA #$0C
+  STA $DF08
+
+  LDA \value ; #Kick off the transfer immediately (this will be synchronous, C64 CPU halts until transfer is complete)
+  STA $DF01
+
+
+.endmacro
+
+
 
 .macro discard_n_rx_bytes num
   LDA \num
@@ -73,13 +113,15 @@ waiting_for_first_packet = 2    ; uint8
 .globl receive_and_run_prg
 .type receive_and_run_prg, @function
 receive_and_run_prg:
-  LDA #1
-  ORA RRNET_CTL
-  STA RRNET_CTL ; Enable clock port
+  REU_SNAPSHOT #$90 ; Snapshot memory from C64 to REU
 
-  CS_WRITE_PAGE $0114, $0055 ; Reset RR-Net
-  CS_WRITE_PAGE $0104, $0D05 ; Accept individual and broadcast packets
-  CS_WRITE_PAGE $0112, $00D3 ; Enable RX and TX
+;  LDA #1
+;  ORA RRNET_CTL
+;  STA RRNET_CTL ; Enable clock port
+
+;  CS_WRITE_PAGE $0114, $0055 ; Reset RR-Net
+;  CS_WRITE_PAGE $0104, $0D05 ; Accept individual and broadcast packets
+;  CS_WRITE_PAGE $0112, $00D3 ; Enable RX and TX
 
   LDA #01
   STA waiting_for_first_packet ; Record that we are waiting for the first header packet to arrive
@@ -111,7 +153,6 @@ receive_and_run_prg:
   JSR ack_received_udp_fragment
 
 fragments_still_left_to_receive:
-
   JSR wait_for_msg ; Wait for a datagram
 
   LDA CS_RXTX_DATA     ; Get file ID
@@ -146,11 +187,33 @@ bytes_left_to_read:
   CMP num_fragments
   BNE fragments_still_left_to_receive
 
-  ; All data has been received! Clear the stack pointer
-  ; and start the program
-  LDX #$FF
+  ; All data has been received!
+  SEI
+  TSX         ; Save old stack pointer
+  STX prev_sp
+
+  LDX #$FF ; Clear the stack pointer for the child program
   TXS
-  JMP 2061
+
+  LDA #<continue_after_program_finish ; Install IRQ handler for RESTORE key to resume execution
+  STA $318
+  LDA #>continue_after_program_finish
+  STA $319
+  CLI
+  JSR 2061 ; Start the downloaded program
+
+continue_after_program_finish:
+  SEI
+  REU_SNAPSHOT #$91 ; Restore memory from REU to C64
+
+  LDX prev_sp ; Restore old stack pointer
+  TXS
+
+  ; Set $314 to $EA31 ; Execution address of interrupt service routine.
+  ; JSR $FF81 ; Call CINT, Initialize screen editor & 6567 video chip
+  ; JSR $FF84 ; Call IOINIT, Initialize I/O devices
+  CLI ; Restore interrupts
+  RTS ; Return back to caller as usual
 
 
 
@@ -284,8 +347,6 @@ wait_for_msg:           ; Wait until RR-Net ethernet frame is available
   AND #$0D
   BEQ wait_for_msg
 
-  DEBUG_BORDER #1
-
   LDA CS_RXTX_DATA+1    ; Ignore RR-Net status uint16
   LDA CS_RXTX_DATA
 
@@ -373,3 +434,9 @@ size_good:
 
 good_datagram:
   RTS
+
+
+
+.globl restore_key_interrupt_handler
+.type restore_key_interrupt_handler, @function
+restore_key_interrupt_handler:
