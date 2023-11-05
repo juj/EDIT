@@ -1338,6 +1338,9 @@ void main_loop()
 #endif
 #ifdef ACTION_SAVE_COMPILED_PRG_TO_DISK
       case ACTION_SAVE_COMPILED_PRG_TO_DISK:
+#ifdef ACTION_SAVE_COMPILED_PRG_TO_DISK_ALT2
+      case ACTION_SAVE_COMPILED_PRG_TO_DISK_ALT2:
+#endif
         {
         send_ask_compiled_document_msg(currentFile->document_id, /*for_loading_to_memory=*/false);
         char filename[20];
@@ -1354,6 +1357,18 @@ void main_loop()
         }
         break;
 #endif
+
+#ifdef ACTION_RUN_COMPILED_PRG
+      case ACTION_RUN_COMPILED_PRG:
+#ifdef ACTION_RUN_COMPILED_PRG_ALT2
+      case ACTION_RUN_COMPILED_PRG_ALT2:
+#endif
+        send_ask_compiled_document_msg(currentFile->document_id, /*for_loading_to_memory=*/true);
+        receive_and_run_prg();
+        repaint_screen();
+#endif
+        break;
+
       default:
         if (is_printable_key(key))
         {

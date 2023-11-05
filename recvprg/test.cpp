@@ -1,6 +1,6 @@
 #include <string.h>
 
-extern "C" void recv_prg();
+extern "C" void receive_and_run_prg();
 
 int main()
 {
@@ -12,5 +12,5 @@ int main()
 //  memcpy((volatile void*)0xCC00, (void*)recv_prg, 1024);
   asm volatile("JMP $CC00");
 */
-  recv_prg();
+  receive_and_run_prg();
 }

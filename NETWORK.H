@@ -21,6 +21,10 @@ void send_ask_compiled_document_msg(uint8_t document_id, bool for_loading_to_mem
 void receive_data_from_network();
 void wait_to_receive_file(char *dstFilename);
 
+#ifdef __C64__
+extern "C" void receive_and_run_prg();
+#endif
+
 // Internal:
 
 #define SERVER_PORT 4009

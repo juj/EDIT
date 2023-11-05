@@ -70,9 +70,9 @@ waiting_for_first_packet = 2    ; uint8
 
 .section .restore_irq_overlay.1,"axR",@progbits
 
-.globl recv_prg
-.type recv_prg, @function
-recv_prg:
+.globl receive_and_run_prg
+.type receive_and_run_prg, @function
+receive_and_run_prg:
   LDA #1
   ORA RRNET_CTL
   STA RRNET_CTL ; Enable clock port
