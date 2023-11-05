@@ -310,7 +310,7 @@ def wait_to_ack_datagram_received(datagram_number):
 
 def send_file_to_client(filename, crop_first_two_bytes):
   print(f"send_file_to_client({filename})")
-  MTU = 1300
+  MTU = 1300 ##644
   FRAGMENT_PAYLOAD_SIZE = MTU - 8
 
   file_data = open(filename, 'rb').read()

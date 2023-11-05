@@ -161,7 +161,6 @@ fragments_still_left_to_receive:
   LDA CS_RXTX_DATA     ; Get fragment index
   LDX CS_RXTX_DATA+1
 
-  SUB_U16_U8 packet_length, #4
   LSR packet_length+1  ; Divide packet length by two to convert from bytes to words (assume it was even)
   ROR packet_length
 
@@ -355,6 +354,9 @@ wait_for_msg:           ; Wait until RR-Net ethernet frame is available
   LDA CS_RXTX_DATA
   STA packet_length
 
+  ; # Ethernet frame = 14 bytes, IP frame = 20 bytes, UDP header = 8 bytes
+  ; # UDP payload has 4 bytes of magic + fragment message is at minimum 4 bytes extra, total of 50 bytes
+  ; # file transfer header is 24 bytes extra on top of that
   CMP #50                  ; if incoming packet is too small (< 50 bytes), it can't be intended for us
   BPL packet_large_enough
   CPX #0
@@ -364,7 +366,9 @@ wait_for_msg:           ; Wait until RR-Net ethernet frame is available
 
 packet_large_enough:
   SUB_U16_U8 packet_length, #50
-  discard_n_rx_bytes #12
+
+  ; # Parse Ethernet frame
+  discard_n_rx_bytes #12 ; Discard SRC and DST MAC address fields of the Ethernet frame
 
   LDY #0                ; Y receives result of all testing
 
@@ -377,7 +381,8 @@ packet_large_enough:
   INY                   ; EtherType test failed
 1:
 
-  discard_n_rx_bytes #8
+  ; # Parse IP frame
+  discard_n_rx_bytes #8 ; Discard early parts of IP frame
   LDA CS_RXTX_DATA      ; Read Protocol
   LDX CS_RXTX_DATA+1    ;
   CPX #$11              ; Test against $11 (UDP)
@@ -385,7 +390,7 @@ packet_large_enough:
   INY                   ; Protocol test failed
 1:
 
-  discard_n_rx_bytes #18
+  discard_n_rx_bytes #18 ; Discard remaining 10 bytes of IP frame, and 8 bytes of UDP header
   LDA CS_RXTX_DATA      ; Read low u16 of magic
   LDX CS_RXTX_DATA+1    ;
 
@@ -417,7 +422,7 @@ packet_large_enough:
   BNE size_good                ; If this is a datagram continuation packet, size is already validated to be good above
 
   LDA packet_length
-  CMP #20
+  CMP #24
   BPL size_good
 
   LDX packet_length+1
