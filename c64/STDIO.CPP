@@ -532,7 +532,6 @@ void Printf(const char *format, ...)
     break;
     case 'u':
       dst = va_arg(args, unsigned int);
-print_unsigned:
       chrout_u16(dst);
       __asm__("NOP":::"memory"); // xxx random fix to mask/avoid bug https://github.com/llvm-mos/llvm-mos/issues/393
     break;
