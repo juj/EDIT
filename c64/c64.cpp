@@ -6,13 +6,16 @@
 
 // Color RAM: https://www.c64-wiki.com/wiki/Color_RAM
 static volatile unsigned char * const color_ram = (unsigned char*)0xD800;
-static volatile unsigned char * const screen_mem = (unsigned char*)0x0400;
+static volatile unsigned char * const screen_ram = (unsigned char*)0x0400;
 static volatile unsigned char * const cursor_blink = (unsigned char *)0xCC;
+static volatile unsigned char * const cursor_blink_delay = (unsigned char *)0xCD;
 static volatile unsigned char * const cursor_delay = (unsigned char *)0xCD;
 static volatile unsigned char * const char_under_cursor = (unsigned char *)0xCE;
 static volatile unsigned char * const cursor_blink_phase = (unsigned char *)0xCF;
 static volatile unsigned char * const cursor_color = (unsigned char*)0x0286;
 static volatile unsigned char * const color_under_cursor = (unsigned char*)0x0287;
+static volatile unsigned char * const cursor_x = (unsigned char*)0xCA;
+static volatile unsigned char * const cursor_y = (unsigned char*)0xC9;
 
 #define CURSOR_NONE   0
 #define CURSOR_NORMAL 1
@@ -22,94 +25,52 @@ void set_cursor_style(uint8_t style)
   *cursor_blink = (style == CURSOR_NONE) ? 1 : 0;
 }
 
-static unsigned char cx, cy;
-unsigned char colorUnderCursor = 7;
-uint16_t cursorLinearPos;
+static uint16_t cursorLinearPos;
 
 void set_cursor_pos(uint8_t x, uint8_t y)
 {
-///  while (*cursor_blink_phase) ;
-  uint16_t old_pos = (uint16_t)cy*SCREEN_WIDTH+cx;
-//  while(!*cursor_blink && (*cursor_delay <= 10 || *cursor_delay >= 17)) ;
   _DISABLE_INTR();
-  uint8_t reverse_on = *cursor_blink_phase;
-  uint8_t charc = *char_under_cursor; // restore character under cursor
-  uint8_t colorc = *color_under_cursor; // and its color
-  if (reverse_on)
+  if (*cursor_blink_phase) // If cursor is showing a reverse image right now, clear the reverse
   {
-    *cursor_blink_phase = 0; // hide cursor
-//    screen_mem[old_pos] = 
-//    color_ram[old_pos] = 
+    screen_ram[cursorLinearPos] = *char_under_cursor;
+    color_ram[cursorLinearPos] = *color_under_cursor;
   }
-//  uint8_t cuc = *color_under_cursor;
   cursorLinearPos = (uint16_t)y*SCREEN_WIDTH+x;
-  *cursor_color = color_ram[cursorLinearPos];
-//  uint8_t new_cursor_color = color_ram[(uint16_t)y*SCREEN_WIDTH+x];
+  *cursor_color = color_ram[cursorLinearPos]; // Set new cursor color based on the color on new square
   _PLOT_SET(x, y);
 
-  if (reverse_on)
-  {
-    screen_mem[old_pos] = charc;
-    color_ram[old_pos] = colorc;
-  }
-
-//  *cursor_color = new_cursor_color;
-  // After changing cursor position, we need to clean up the old character, which
-  // might have been left inverted by the blinking cursor in the old location
-  /*
-  if (reverse_on)
-  {
-    color_ram[pos] = cuc;
-  }
-  if (reverse_on)
-  {
-    uint16_t pos = (uint16_t)cy*SCREEN_WIDTH+cx;
-    screen_mem[pos] = screen_mem[pos] & 0x7F;    
-  }
-  */
+  // When moving the cursor, it is more visually pleasing to make it immediately appear to the
+  // new position. This helps distinguish where it is located while moving.
+  *cursor_blink_phase = 1; // Make reverse character visible
+  *cursor_blink_delay = 20; // And restore time until next blink
+  *char_under_cursor = screen_ram[cursorLinearPos];
+  *color_under_cursor = color_ram[cursorLinearPos];
+  screen_ram[cursorLinearPos] |= 0x80; // Inverse char at cursor to make it visible
   _ENABLE_INTR();
-  cx = x;
-  cy = y;
-
-/*
-  // After changing cursor position, we need to clean up the old character, which
-  // might have been left inverted by the blinking cursor in the old location
-  uint16_t pos = (uint16_t)cy*SCREEN_WIDTH+cx;
-  screen_mem[pos] = screen_mem[pos] & 0x7F;
-  //color_ram[pos] = colorUnderCursor;
-  cx = x;
-  cy = y;
-  //colorUnderCursor = *cursor_color = color_ram[y*SCREEN_WIDTH+x];
-  *cursor_color = color_ram[y*SCREEN_WIDTH+x];
-*/
 }
 
 unsigned char petscii_to_screen_code(unsigned char petscii);
-/*
-{
-  if (petscii <= 31) return 32;//petscii + 128;
-  if (petscii <= 63) return petscii;
-  if (petscii <= 95) return petscii - 64;
-  if (petscii <= 127) return petscii - 32;
-  if (petscii <= 159) return 32;//petscii + 64;
-  if (petscii <= 191) return petscii - 64;
-  if (petscii <= 254) return petscii - 128;
-  return 0x5E;
-}
-*/
 
 void put_screen(uint16_t linearPos, char ch, unsigned char color)
 {
-  _DISABLE_INTR();
   uint8_t newChar = petscii_to_screen_code(ch) ^ (color&0x80);
+
+  // Gotcha: if we are setting the character under the cursor, we must
+  // be super careful, or otherwise the C64 built-in cursor logic will
+  // smear the wrong character on screen.
   if (linearPos == cursorLinearPos)
   {
-    *char_under_cursor = newChar;
-    *color_under_cursor = color;
+    _DISABLE_INTR();
+    // Odd C64 timing issue: must reset blink counter, or otherwise
+    // C64 might smear the old character on screen.
+    *cursor_blink_delay = 20;
+    *char_under_cursor = screen_ram[linearPos] = newChar;
+    *color_under_cursor = color_ram[linearPos] = color;
+    _ENABLE_INTR();
+    return;
   }
-  screen_mem[linearPos] = newChar;
+  screen_ram[linearPos] = newChar;
   color_ram[linearPos] = color;
-  _ENABLE_INTR();
 }
 
 void put_screen(uint16_t linearPos, char ch)
@@ -119,7 +80,10 @@ void put_screen(uint16_t linearPos, char ch)
 
 char get_screen(uint16_t linearPos)
 {
-  return screen_mem[linearPos]; // TODO: screen code to PETSCII
+  // Gotcha: when reading the screen position where cursor
+  // is currently at, must read the character under cursor instead.
+  if (linearPos == cursorLinearPos) return *char_under_cursor;
+  return screen_ram[linearPos]; // TODO: screen code to PETSCII
 }
 
 void put_screen_color(uint16_t linearPos, unsigned char color)
@@ -129,6 +93,9 @@ void put_screen_color(uint16_t linearPos, unsigned char color)
 
 unsigned char get_screen_color(uint16_t linearPos)
 {
+  // Gotcha: when reading the screen position where cursor
+  // is currently at, must read the color under cursor instead.
+  if (linearPos == cursorLinearPos) return *color_under_cursor;
   return color_ram[linearPos];
 }
 
@@ -153,5 +120,5 @@ static volatile unsigned char * const screen_frame = (unsigned char *)0xD020;
 
 void highlight_scroll_to_right(bool scrolled)
 {
-  *screen_frame = scrolled ? 6 : 14;
+  *screen_frame = scrolled ? /*DARKBLUE*/6 : /*LIGHTBLUE*/14;
 }
