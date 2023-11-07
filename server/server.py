@@ -29,10 +29,11 @@ def init_network():
 
 init_network()
 
-def receive_datagram():
+def receive_datagram(timeout=None):
   global recv_sock
+  recv_sock.settimeout(timeout)
   data, addr = recv_sock.recvfrom(1400)
-  print("received message: %s, len: %d from %s" % (data, len(data), str(addr)))
+#  print("received message: %s, len: %d from %s" % (data, len(data), str(addr)))
   return (data, addr)
 
 def send_datagram(data):
@@ -59,7 +60,7 @@ def parse_first_clang_error(stderr):
   lines = stderr.split('\n')
   for l in lines:
     if 'error:' in l:
-      print(l)
+#      print(l)
       if l.count(':') >= 4:
         parts = l.split(':')
         if len(parts[0]) == 1 and parts[0].isalpha():
@@ -106,23 +107,27 @@ def calc_output_prg_filename_from_input_cpp_filename(filename):
   else:
     return replace_suffix(filename, prg_suffix_for_filename(filename))
 
+# contains the Popen object representing the current compilation, if
+# one is running on the background, or None if no active compilation.
+current_subprocess_build = None
+pending_subprocess_build = None # filename to a pending build
+build_output_file = None
+
 def compile_file(filename):
-  out_file = calc_output_prg_filename_from_input_cpp_filename(filename)
+  global current_subprocess_build, pending_subprocess_build, build_output_file
+  if current_subprocess_build:
+    pending_subprocess_build = filename
+    return
+  pending_subprocess_build = None
+
+  build_output_file = calc_output_prg_filename_from_input_cpp_filename(filename)
   # TODO PATH
   compiler = 'C:/code/llvm-mos-sdk/build/install/bin/mos-c64-clang.bat'
 # compiler = 'mos-c64-clang'
   include_dir = os.path.abspath(os.path.join(script_directory, '..', 'C64'))
   additional_libs = [os.path.join(include_dir, 'stdio.cpp')]
-  print(include_dir)
-  clang = subprocess.run([compiler, filename, f'-I{include_dir}', '-Oz', '-o', out_file] + additional_libs, capture_output=True)
-  if clang.returncode == 0:
-#    print('BUILD OK!')
-    filesize = os.path.getsize(out_file)
-    send_build_error(0, 0, 1, f'OK. {out_file}: {filesize} bytes.')
-  else:
-    line, column, first_error = parse_first_clang_error(clang.stderr.decode('utf-8'))
-#    print(first_error)
-    send_build_error(line, column, 0, first_error)
+#  print(include_dir)
+  current_subprocess_build = subprocess.Popen([compiler, filename, f'-I{include_dir}', '-Oz', '-o', build_output_file] + additional_libs, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 a2p = [
 	0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x14,0x20,0x0d,0x11,0x93,0x0a,0x0e,0x0f,
@@ -238,8 +243,8 @@ def handle_update_line_msg(data):
   line_no, edit_type, document_id, line_len, dummy = struct.unpack('HBBBB', data[:6])
   petscii_line = remove_trailing_null_byte(data[6:6+line_len])
   line = petscii_to_ascii(petscii_line)
-  print(f'PETSCII line: {petscii_line} -> ASCII line: "{line}"')
-  print(f'Line: {line_no}, edit_type: {edit_type}, document_id: {document_id}, line: {line}')
+#  print(f'PETSCII line: {petscii_line} -> ASCII line: "{line}"')
+#  print(f'Line: {line_no}, edit_type: {edit_type}, document_id: {document_id}, line: {line}')
   file_lines = get_file_lines(document_id)
 
   if edit_type == 0: # Insert
@@ -267,7 +272,7 @@ def handle_update_line_msg(data):
 
   save_file(filename, file_lines)
   if filename.lower().endswith('.c') or filename.lower().endswith('.cpp'):
-    print_file(file_lines)
+#    print_file(file_lines)
     compile_file(filename)
 
 
@@ -356,19 +361,44 @@ def handle_ask_compiled_document_msg(data):
   out_file = calc_output_prg_filename_from_input_cpp_filename(filename)
   send_file_to_client(out_file, crop_first_two_bytes)
 
+def poll_compilation_finished():
+  global current_subprocess_build, pending_subprocess_build, build_output_file
+  if not current_subprocess_build: return
+
+  current_subprocess_build.poll()
+  if current_subprocess_build.returncode is not None:
+    stdout = current_subprocess_build.stdout.read().decode('utf-8')
+    stderr = current_subprocess_build.stderr.read().decode('utf-8')
+    if current_subprocess_build.returncode == 0:
+      print('BUILD OK!')
+      send_build_error(0, 0, 1, f'OK. {build_output_file}: {os.path.getsize(build_output_file)} bytes.')
+    else:
+      line, column, first_error = parse_first_clang_error(stderr)
+      print(first_error)
+      send_build_error(line, column, 0, first_error)
+
+    current_subprocess_build = None
+    if pending_subprocess_build:
+      compile_file(pending_subprocess_build)
+
+
 def server_main():
   while True:
-    data, addr = receive_datagram()
-    magic = struct.unpack('I', data[:4])[0]
-    data = data[4:]
-    if magic == MAGIC_UPDATE_LINE_MSG:
-      handle_update_line_msg(data)
-    elif magic == MAGIC_NEW_DOCUMENT_MSG:
-      handle_new_document_msg(data)
-    elif magic == MAGIC_ASK_COMPILED_DOCUMENT_MSG:
-      handle_ask_compiled_document_msg(data)
-    else:
-      print(f'Unknown magic {hex(magic)}')
+    try:
+      data, addr = receive_datagram(0.1)
+      magic = struct.unpack('I', data[:4])[0]
+      data = data[4:]
+      if magic == MAGIC_UPDATE_LINE_MSG:
+        handle_update_line_msg(data)
+      elif magic == MAGIC_NEW_DOCUMENT_MSG:
+        handle_new_document_msg(data)
+      elif magic == MAGIC_ASK_COMPILED_DOCUMENT_MSG:
+        handle_ask_compiled_document_msg(data)
+      else:
+        print(f'Unknown magic {hex(magic)}')
+    except TimeoutError:
+      pass
+    poll_compilation_finished()
 
 if 'send' in sys.argv:
   send_file_to_client(sys.argv[-1], True)
