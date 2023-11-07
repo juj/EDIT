@@ -272,7 +272,7 @@ def handle_update_line_msg(data):
 
   save_file(filename, file_lines)
   if filename.lower().endswith('.c') or filename.lower().endswith('.cpp'):
-#    print_file(file_lines)
+    print_file(file_lines)
     compile_file(filename)
 
 

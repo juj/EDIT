@@ -8,6 +8,7 @@
 #include "screen.h"
 #include "audio.h" // TODO REMOVE THIS
 #include "iassert.h"
+#include "network.h"
 #include <string.h>
 
 char huge *copyBuffer = 0;
@@ -133,6 +134,8 @@ void copy_selection(bool cutSelection)
   }
 }
 
+void send_current_line_to_server();
+
 void erase_selected_text()
 {
   mark_text_selection_mode_inactive_and_repaint_status();
@@ -149,6 +152,7 @@ void erase_selected_text()
     cursorX = virtualX = MIN(cursorX, selectionStartColumn);
     clear_selection();
     repaint_screen_lines(cursorY, cursorY+1);
+    send_current_line_to_server();
     return;
   }
 
@@ -165,6 +169,8 @@ void erase_selected_text()
   selectionStartLine->length = newLen;
   for(size_t i = 0; i < endLenRemain; ++i)
     selectionStartLine->text[selectionStartColumn+i] = selectionEndLine->text[selectionEndColumn+i];
+
+  send_line_to_network_server(EDIT_TYPE_REPLACE_LINE, currentFile, selectionStartLine, get_line_number(selectionStartLine));
 /*
   // Cut end line
   line_xpos newEndLineLength = selectionEndLine->length - selectionEndColumn;
@@ -185,6 +191,7 @@ void erase_selected_text()
       firstDisplayedLineNumber = selectionStartLineNum;
       cursorY = 0;
     }
+    send_line_to_network_server(EDIT_TYPE_DELETE_LINE, currentFile, 0, selectionStartLineNum+1);
     delete_line(l);
     l = next;
   }
