@@ -2,17 +2,17 @@
 #include "c64_kernal.h"
 
 static volatile unsigned char * const queued_key_buffer_length = (unsigned char *)0x00C6;
-
 static volatile unsigned char * const key_matrix_code = (unsigned char *)0x00CB;
 static volatile unsigned char * const key_modifiers = (unsigned char *)0x028D;
 
+#if 0
 static volatile unsigned char * const jiffy_lsb = (unsigned char*)0xA2;
-
 static void delay(int num_frames)
 {
   unsigned char val = *jiffy_lsb;
   while(*jiffy_lsb - val < num_frames) /*nop*/;
 }
+#endif
 
 static unsigned char key_is_repeating = 0;
 

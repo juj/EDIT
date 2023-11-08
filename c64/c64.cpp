@@ -9,13 +9,10 @@ static volatile unsigned char * const color_ram = (unsigned char*)0xD800;
 static volatile unsigned char * const screen_ram = (unsigned char*)0x0400;
 static volatile unsigned char * const cursor_blink = (unsigned char *)0xCC;
 static volatile unsigned char * const cursor_blink_delay = (unsigned char *)0xCD;
-static volatile unsigned char * const cursor_delay = (unsigned char *)0xCD;
 static volatile unsigned char * const char_under_cursor = (unsigned char *)0xCE;
 static volatile unsigned char * const cursor_blink_phase = (unsigned char *)0xCF;
 static volatile unsigned char * const cursor_color = (unsigned char*)0x0286;
 static volatile unsigned char * const color_under_cursor = (unsigned char*)0x0287;
-static volatile unsigned char * const cursor_x = (unsigned char*)0xCA;
-static volatile unsigned char * const cursor_y = (unsigned char*)0xC9;
 
 #define CURSOR_NONE   0
 #define CURSOR_NORMAL 1
