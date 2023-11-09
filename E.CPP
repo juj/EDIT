@@ -24,6 +24,7 @@
 #include "smindent.h"
 #include "network.h"
 #include "c64/c64_kernal.h"
+#include "c64/c64_char_rom.h"
 
 void scroll_viewport_horizontally_to_display_cursor();
 
@@ -1446,8 +1447,13 @@ extern "C" size_t __heap_start;
 
 int main(int argc, char **argv)
 {
+/////////////  setup_cpp_programming_font();
+  unsigned int heap_size = 0xCB00 - (unsigned int)&__heap_start;
+  __set_heap_limit(heap_size);
+
+//  printf("%uB OF DOC MEM\n", heap_size);
+//  get_key();
   /*
-  __set_heap_limit(1024);
   uint8_t *mem;
   for(uint16_t sz = 2048; sz > 0; --sz)
   {
