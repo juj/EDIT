@@ -43,6 +43,13 @@ bool string_contains_char(const char *str, char ch)
   return false;
 }
 
+static uint8_t extract_device_number_from_string(const char *str)
+{
+  assert(str);
+  while(*str) if (isdigit(*str)) return atoi(str);
+  return 8; // Default to first disk drive
+}
+
 void print_dos_error(uint8_t error, const char *operation)
 {
 #if _STDIO_DEBUG_LEVEL >= 1
@@ -109,6 +116,12 @@ static uint8_t read_next_char(FILE *f, bool *error)
     f->nextCharAvailable = *error = false;
     return f->nextChar;
   }
+
+  if (f->error) // Possibly at EOF?
+  {
+    *error = true;
+    return f->error;
+  }
   // For best performance, we would like to keep calling CHRIN() in as tight loop
   // as possible, and observe disk errors only via the carry flag returned by CHRIN.
   // However, if a disk is at EOF, issuing a CHRIN will not raise the
@@ -119,10 +132,44 @@ static uint8_t read_next_char(FILE *f, bool *error)
   // we proceed to CHRIN without READST. CHRIN is observed to return decimal 199
   // when at end of file, so if that happens, we then call READST to confirm if we
   // are actually at EOF.
+  // (todo: while the above worked for disk drives, looks like it didn't go so well
+  // for Datasette. Consolidate this code between Datasette and disk drive)
+  /*
+  uint8_t err = DRIVE_STATUS_ERROR();
+  if (err)
+  {
+    f->error = err;
+    *error = true;
+    return 0;
+  }
+  */
   uint8_t ch = _CHRIN_GET_ERROR(error);
   if (*error) _STDIO_DEBUG2("FREAD ERR");
-  if (ch == 199 && DRIVE_STATUS_ERROR())
-    *error = true;
+/////  if (ch == 199)
+  {
+    uint8_t err = DRIVE_STATUS_ERROR();
+    if (err)
+    {
+      // On C64 Datasette, the EOF error flag behaves maybe
+      // slightly counterintuitively:
+      // when we see EOF after a CHRIN, it means that the character
+      // returned by CHRIN is still actually valid, and EOF is right
+      // after this character. In such case, we should not perform
+      // any subsequent reads to the file.
+      // As a subtle gotcha, calling CLRCHN after Datasette EOF
+      // will make the C64 not remember that the Datasette was at
+      // EOF, so attempting a subsequent CHKIN+CHRIN will cause
+      // the C64 to display a "Press Play On Tape" message to
+      // continue reading. Therefore we must locally record
+      // the EOF flag in memory to mark this file handle at EOF,
+      // but not react to the EOF right here. Then subsequent read
+      // attempts can look at the error flag (including EOF flag)
+      // and observe that the tape is now at EOF.
+      f->error = err;
+      if (err & ~0x40) // If we have any other error than EOF?
+        *error = true;
+    }
+  }
   return ch;
 }
 
@@ -135,29 +182,35 @@ void put_char_back(FILE *f, uint8_t ch)
 
 FILE *fopen(const char *filename, const char *mode)
 {
-  static uint8_t fileHandleCounter = 3;
+  assert(filename);
+  assert(mode);
+  static uint8_t fileHandleCounter = 1;
 
   char fn[MAX_FILENAME_LEN+3+4]; // Add +3 for "@0:" prefix and +4 for ",U,W" suffix.
   // Prepend "@0:" to the filename to have any existing filename be replaced.
   fn[0] = 64; // '@' in PETSCII
   fn[1] = '0';
   fn[2] = ':';
-  uint8_t i = 3;
-  assert(filename);
+  uint8_t device_number = extract_device_number_from_string(mode);
+  bool reading_file = string_contains_char(mode, 'r');
+  bool accessing_disk_drive = (device_number >= 8);
+  uint8_t i = accessing_disk_drive ? 3 : 0;
   for(uint8_t j = 0; filename[j]; ++j) { fn[i++] = filename[j]; }
-  // Append ",S,R" or ",S,W" to filename to tell that the file type is Sequential, and that
-  // we are either reading or writing to the file.
-  fn[i++] = ',';
-  fn[i++] = 'S';
-  fn[i++] = ',';
-  bool readingFile = string_contains_char(mode, 'r');
-  fn[i++] = readingFile ? 'R' : 'W';
+  if (accessing_disk_drive)
+  {
+    // Append ",S,R" or ",S,W" to filename to tell that the file type is Sequential, and that
+    // we are either reading or writing to the file.
+    fn[i++] = ',';
+    fn[i++] = 'S';
+    fn[i++] = ',';
+    fn[i++] = reading_file ? 'R' : 'W';
+  }
   _SETNAM(fn, i);
-  _SETLFS(fileHandleCounter, 8, fileHandleCounter); // todo file ID
+  _SETLFS(fileHandleCounter, device_number, accessing_disk_drive ? 2 : (reading_file ? 0 : 1));
   uint8_t error = _OPEN();
   print_dos_error(error, "FOPEN");
 
-  error = readingFile ? _CHKIN(fileHandleCounter) : _CHKOUT(fileHandleCounter);
+  error = reading_file ? _CHKIN(fileHandleCounter) : _CHKOUT(fileHandleCounter);
   print_dos_error(error, "FOPEN/CHKINOUT");
 
   if ((error = _READST()))
@@ -177,7 +230,8 @@ FILE *fopen(const char *filename, const char *mode)
   }
   f->nextCharAvailable = false;
   f->handle = fileHandleCounter++; // TODO multiple handles
-  if (fileHandleCounter == 255) fileHandleCounter = 2;
+  f->error = 0;
+  if (fileHandleCounter >= 127) fileHandleCounter = 1;
 
   _CLRCHN();
   return f;
@@ -302,6 +356,7 @@ char *fgets(char *str, int count, FILE *f)
   assert(count > 0);
   assert(f);
 
+  if (f->error) return 0;
   if (_CHKIN(f->handle)) return 0;
 
   --count; // account early for null terminating byte

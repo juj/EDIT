@@ -65,7 +65,10 @@ _KERNAL void _MEMTOP_SET(uint16_t membot) { NEED_STACK(2); uint8_t x,y; _ASM vol
 _KERNAL uint16_t _MEMBOT_READ() { uint8_t lo, hi; _ASM("SEC\nJSR $FF9C":"=x"(lo),"=y"(hi)::"c"); return _U16(lo, hi); }
 _KERNAL void _MEMBOT_SET(uint16_t membot) { uint8_t x,y; _ASM volatile("CLC\nJSR $FF9C":CLOB_X,CLOB_Y:"x"(_LO(membot)),"y"(_HI(membot)):"c"); }
 
-// Scan keyboard
+// Scans the keyboard matrix.
+// Normally this is done automatically by the C64 KERNAL default IRQ handler so this function does
+// not need to be manually called. However if you implement your own IRQ ISR, you may want to call this
+// as part of that interrupt service routine.
 _KERNAL void _SCNKEY() { NEED_STACK(5); _ASM volatile("JSR $FF9F":::"a","x","y"); }
 
 // Set time-out flag on serial bus
@@ -92,9 +95,10 @@ _KERNAL void _TALK(uint8_t device)   { NEED_STACK(8); uint8_t a; _ASM volatile("
 // Return I/O status byte
 _KERNAL uint8_t _READST() { NEED_STACK(2); uint8_t status; _ASM volatile("JSR $FFB7":"=a"(status)::); return status; }
 
-// Set logical file number, device number, secondary address for I/O
-// If secondary address is 0: default file type is PRG, and file is opened for reading
-// If secondary address is 1: default file type is PRG, and file is opened for writing
+// Set logical file number, device number, secondary address for I/O.
+// Logical file number: A unique number to associate with the file, in range 1-127.
+// If secondary address is 0: default file type is PRG, and file is opened for reading. "Relocating" load is performed.
+// If secondary address is 1: default file type is PRG, and file is opened for writing. Nonrelocating load is performed.
 // If secondary address >= 2: use the information present in SETNAM in format ",S,R" or ",P,W" etc. to determine file type and read/write
 _KERNAL void _SETLFS(uint8_t file_no, uint8_t device_address, uint8_t secondary_address) { NEED_STACK(2); _ASM volatile("JSR $FFBA"::"a"(file_no),"x"(device_address),"y"(secondary_address):); }
 
@@ -102,6 +106,7 @@ _KERNAL void _SETLFS(uint8_t file_no, uint8_t device_address, uint8_t secondary_
 _KERNAL void _SETNAM(const char *filename, uint8_t length) { NEED_STACK(2); assert(filename || !length); _ASM volatile("JSR $FFBD"::"a"(length), "x"(_LO(filename)), "y"(_HI(filename)):); }
 
 // Open a Logical File. Returns error code (0=no error).
+// C64 supports up to 10 simultaneously loaded files.
 _KERNAL uint8_t _OPEN() { uint8_t error; _ASM volatile("JSR $FFC0\nBCS error_open%=\nLDA #0\nerror_open%=:":"=a"(error)::"x","y","c"); return error; }
 
 // Close a Logical File. Returns error code (0=no error).

@@ -23,6 +23,7 @@ struct FILE
   uint8_t nextChar; // for read streams, the next character to come out from the file.
   bool nextCharAvailable; // If true, nextChar is present. If false, must read first.
   uint8_t handle;
+  uint8_t error;
 };
 
 #define MAX_FILENAME_LEN 16
@@ -41,6 +42,7 @@ void read_string_from_file(FILE *f, char *dst);
 
 char *strstr(const char *str1, const char *str2);
 
+// Call fopen("", "1r"); to load any next file from cassette, or fopen("FOO.TXT", "1r"); to load the next filename that matches this file.
 FILE *fopen(const char *filename, const char *mode);
 int fscanf(FILE *f, const char *format, ...);
 int fgetc(FILE *f);
