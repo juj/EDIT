@@ -286,8 +286,9 @@ RECV_FILE_DATAGRAM_MAGIC = 0x25291423
 #  uint16_t file_id;
 #  uint16_t num_fragments;
 #  uint16_t file_start_address;
-#  uint8_t filetype;
+#  uint16_t file_size;
 #  uint8_t dummy0;
+#  uint8_t filetype;
 #};
 
 RECV_FILE_DATAGRAM_FRAGMENT_MAGIC = 0x25291424
@@ -315,10 +316,19 @@ def wait_to_ack_datagram_received(datagram_number):
 
 def send_file_to_client(filename, crop_first_two_bytes):
   print(f"send_file_to_client({filename})")
+  file_data = open(filename, 'rb').read()
+  return send_file_data_to_client(filename, file_data, crop_first_two_bytes)
+
+
+def send_file_data_to_client(filename, file_data, crop_first_two_bytes):
+  print(f"send_file_data_to_client({filename})")
   MTU = 1300 ##644
   FRAGMENT_PAYLOAD_SIZE = MTU - 8
 
-  file_data = open(filename, 'rb').read()
+  print(str(len(file_data)))
+  if len(file_data) % 2:
+    file_data += bytes([0]) # Make file lengths always even
+  print(str(len(file_data)))
   memory_start_address = struct.unpack('H', file_data[0:2])[0]
   if crop_first_two_bytes:
     file_data = file_data[2:]
@@ -335,8 +345,8 @@ def send_file_to_client(filename, crop_first_two_bytes):
     filetype = 'P'
     filename = filename[:-4]
   out_petscii_filename = ascii_to_petscii(filename.lower())
-  recv_file_header = struct.pack('I20sHHHBB', RECV_FILE_DATAGRAM_MAGIC, out_petscii_filename,
-    file_id, num_fragments, memory_start_address, ord(filetype), 0)
+  recv_file_header = struct.pack('I20sHHHHBB', RECV_FILE_DATAGRAM_MAGIC, out_petscii_filename,
+    file_id, num_fragments, memory_start_address, len(file_data), 0, ord(filetype))
   send_datagram(recv_file_header)
 
   wait_to_ack_datagram_received(0xFF) # Wait for C64 being ready to start receiving actual data
@@ -347,6 +357,7 @@ def send_file_to_client(filename, crop_first_two_bytes):
     fragment_payload_size = min(FRAGMENT_PAYLOAD_SIZE, size - i)
     fragment_header = struct.pack('IHH', RECV_FILE_DATAGRAM_FRAGMENT_MAGIC, file_id, fragment_index)
     fragment_data = file_data[i:i+fragment_payload_size]
+#    print(str(file_data))
     print(f"sending datagram file_id={file_id} fragment_index={fragment_index} i={i}")
     send_datagram(fragment_header + fragment_data)
     wait_to_ack_datagram_received(fragment_index)
@@ -382,6 +393,45 @@ def poll_compilation_finished():
       compile_file(pending_subprocess_build)
 
 
+
+MAGIC_ASK_AOC_CALENDAR = 0x39DE312B
+def handle_ask_aoc_calendar(data):
+  print(f"handle_ask_aoc_calendar({data})")
+  year = struct.unpack('H', data)[0]
+  cmd = ['aoc', 'calendar']
+  if year:
+    cmd += ['-y', str(year)]
+  print(str(cmd))
+  output = subprocess.run(cmd, capture_output=True)
+  print(str(output.returncode))
+  print(str(output.stderr))
+  if output.returncode == 0:
+    stdout = output.stdout
+    print(str(stdout))
+    send_file_data_to_client('', stdout, False)
+
+
+MAGIC_ASK_AOC_DAY = 0x910532EF
+def handle_ask_aoc_day_desc(data):
+  print(f"handle_ask_aoc_day_desc({data})")
+  year, day, column_width = struct.unpack('HBB', data)
+  cmd = ['aoc', 'read', '-w', str(column_width)]
+  if year:
+    cmd += ['-y', str(year)]
+  if day:
+    cmd += ['-d', str(day)]
+  print(str(cmd))
+  output = subprocess.run(cmd, capture_output=True)
+  print(str(output.returncode))
+  print(str(output.stdout))
+  print(str(output.stderr))
+  if output.returncode == 0:
+    stdout = output.stdout
+    print(str(stdout))
+    send_file_data_to_client('', stdout, False)
+
+
+
 def server_main():
   while True:
     try:
@@ -394,11 +444,17 @@ def server_main():
         handle_new_document_msg(data)
       elif magic == MAGIC_ASK_COMPILED_DOCUMENT_MSG:
         handle_ask_compiled_document_msg(data)
+      elif magic == MAGIC_ASK_AOC_CALENDAR:
+        handle_ask_aoc_calendar(data)
+      elif magic == MAGIC_ASK_AOC_DAY:
+        handle_ask_aoc_day_desc(data)
       else:
         print(f'Unknown magic {hex(magic)}')
     except TimeoutError:
       pass
     poll_compilation_finished()
+
+
 
 if 'send' in sys.argv:
   send_file_to_client(sys.argv[-1], True)
