@@ -12,6 +12,8 @@
 size_t allocatedNearMemory = 0;
 size_t allocatedFarMemory = 0;
 
+void repaint_status_line();
+
 void out_of_memory(int isFarMemory, size_t bytes)
 {
   char str[64];
@@ -31,6 +33,7 @@ void out_of_memory(int isFarMemory, size_t bytes)
     YELLOW | BGCOLOR(RED));
   ERROR_BEEP();
   get_key();
+  repaint_status_line();
 }
 
 void far *Farmalloc(size_t bytes)
