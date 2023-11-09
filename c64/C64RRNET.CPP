@@ -102,18 +102,19 @@ struct recv_file_datagram_header
   char filename[20];
   uint16_t file_id;
   uint16_t num_fragments;
+  uint16_t file_start_address;
+  uint16_t file_size;
   uint8_t filetype;
-  uint8_t dummy; // pad to 16 bits
-} __attribute__((packed));
+  uint8_t dummy0;
+};
 
-#define RECV_FILE_DATAGRAM_FRAGMENT_MAGIC 0x53915315
+#define RECV_FILE_DATAGRAM_FRAGMENT_MAGIC 0x25291424
 struct recv_file_datagram_fragment_header
 {
 //  uint32_t magic_header;
   uint16_t file_id;
   uint16_t fragment_index;
-  uint16_t file_load_start_offset;
-} __attribute__((packed));
+};
 
 struct build_error_msg_datagram
 {
