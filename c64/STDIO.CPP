@@ -46,7 +46,7 @@ bool string_contains_char(const char *str, char ch)
 static uint8_t extract_device_number_from_string(const char *str)
 {
   assert(str);
-  while(*str) if (isdigit(*str)) return atoi(str);
+  while(*str) { if (isdigit(*str)) return atoi(str); ++str; }
   return 8; // Default to first disk drive
 }
 
@@ -462,6 +462,20 @@ extern "C" void *memcpy(void *dest, const void *src, size_t count) // TODO: opti
   return dest;
 }
 
+extern "C" void putchar(char c) // TODO: optimize
+{
+  if (__builtin_expect(c == '\n', 0))
+    c = '\r';
+  _CHROUT(c);
+}
+
+extern "C" char *strcat(char *s1, const char *s2) // TODO: optimize
+{
+  size_t len = strlen(s1);
+  strcpy(s1 + len, s2);
+  return s1;
+}
+
 extern "C" void *memset(void *ptr, int value, size_t num) // TODO: optimize
 {
   char *p = (char*)ptr;
@@ -469,7 +483,7 @@ extern "C" void *memset(void *ptr, int value, size_t num) // TODO: optimize
   return ptr;
 }
 
-extern "C" void __memset(char *ptr, char value, size_t num)
+extern "C" void __memset(char *ptr, char value, size_t num) __attribute__((optnone))
 {
   for(; num; --num) *ptr++ = value;
 }
@@ -613,6 +627,52 @@ two:   _CHROUT('0'+(zp0>>4));
 one:   _CHROUT('0'+(zp0&0xF));
 }
 
+char *itoa_u16(char *dst, uint16_t num)
+{
+  uint8_t zp0, zp1, zp2;
+  // Convert 'num' to 3x2 BCD digits.
+  __asm__(R"(
+    SED // Enter Binary Coded Decimal (BCD) mode (affects ADC commands below)
+
+    LDA #0
+    STA %[zp0] // zp0-zp2 will store the output BCD digits, 0-65535.
+    STA %[zp1] // Initialize these all to zero to start
+    STA %[zp2]
+
+    LDX #16 // Loop each of the 16 bits of the u16 input
+loop%=:
+    ROL %[input]   // Shift the input u16 one bit to the left
+    ROL %[input]+1 // rotating the next MSB bit of input into Carry
+
+    LDA %[zp0] // Multiply the three BCD number pairs by two, and add the input bit from carry to the BCD
+    ADC %[zp0]
+    STA %[zp0]
+    LDA %[zp1]
+    ADC %[zp1]
+    STA %[zp1]
+    LDA %[zp2]
+    ADC %[zp2]
+    STA %[zp2]
+
+    DEX     // Loop back to next input bit
+    BNE loop%=
+
+    CLD // Exit BCD mode
+  )":[zp0]"=r"(zp0), [zp1]"=r"(zp1), [zp2]"=r"(zp2), [input]"+r"(num)::"a","x","c");
+
+  if (zp2)     goto five;
+  if (zp1 > 9) goto four;
+  if (zp1)     goto three;
+  if (zp0 > 9) goto two;
+  goto one;
+five:  *dst++ = '0'+zp2;
+four:  *dst++ = '0'+(zp1>>4);
+three: *dst++ = '0'+(zp1&0xF);
+two:   *dst++ = '0'+(zp0>>4);
+one:   *dst++ = '0'+(zp0&0xF);
+  return dst;
+}
+
 void chrout_x16(uint16_t num)
 {
   const uint8_t ch[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' };
@@ -626,6 +686,20 @@ two:   _CHROUT(ch[(num>>4)&15]);
 one:   _CHROUT(ch[num&15]);
 }
 
+char *itox_x16(char *dst, uint16_t num)
+{
+  const uint8_t ch[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' };
+  if (num >= 0x1000) goto four;
+  if (num >= 0x100) goto three;
+  if (num >= 0x10) goto two;
+  goto one;
+four:  *dst++ = ch[num>>12];
+three: *dst++ = ch[(num>>8)&15];
+two:   *dst++ = ch[(num>>4)&15];
+one:   *dst++ = ch[num&15];
+  return dst;
+}
+
 void chrout_X16(uint16_t num)
 {
   const uint8_t ch[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
@@ -637,6 +711,20 @@ four:  _CHROUT(ch[num>>12]);
 three: _CHROUT(ch[(num>>8)&15]);
 two:   _CHROUT(ch[(num>>4)&15]);
 one:   _CHROUT(ch[num&15]);
+}
+
+char *itoX_X16(char *dst, uint16_t num)
+{
+  const uint8_t ch[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
+  if (num >= 0x1000) goto four;
+  if (num >= 0x100) goto three;
+  if (num >= 0x10) goto two;
+  goto one;
+four:  *dst++ = ch[num>>12];
+three: *dst++ = ch[(num>>8)&15];
+two:   *dst++ = ch[(num>>4)&15];
+one:   *dst++ = ch[num&15];
+  return dst;
 }
 
 extern "C" int printf(const char *format, ...)
@@ -689,6 +777,59 @@ extern "C" int printf(const char *format, ...)
     }
   }
   va_end(args);
+  return 1;
+}
+
+extern "C" int sprintf(char *s, const char *format, ...)
+{
+  va_list args;
+  va_start(args, format);
+  int dst;
+  const char *str;
+
+  for(; *format; ++format)
+  {
+    if (*format != '%')
+    {
+      *s++ = (*format == '\n' ? '\r' : *format);
+      continue;
+    }
+
+    ++format;
+    switch(*format)
+    {
+    // TODO: %x/%X/%04X/%lu/%ld
+    case '%': *s++ = '%'; break;
+    case 'c': *s++ = va_arg(args, int/*char*/); break;
+    case 'd':
+      dst = va_arg(args, int);
+      if (dst < 0) { *s++ = '-'; dst = -dst; }
+      s = itoa_u16(s, dst);
+      __asm__("NOP":::"memory"); // xxx random fix to mask/avoid bug https://github.com/llvm-mos/llvm-mos/issues/393
+    break;
+    case 'u':
+      dst = va_arg(args, unsigned int);
+      s = itoa_u16(s, dst);
+      __asm__("NOP":::"memory"); // xxx random fix to mask/avoid bug https://github.com/llvm-mos/llvm-mos/issues/393
+    break;
+    case 'x':
+      s = itox_x16(s, va_arg(args, unsigned int));
+      __asm__("NOP":::"memory"); // xxx random fix to mask/avoid bug https://github.com/llvm-mos/llvm-mos/issues/393
+      break;
+    case 'X':
+      s = itoX_X16(s, va_arg(args, unsigned int));
+      __asm__("NOP":::"memory"); // xxx random fix to mask/avoid bug https://github.com/llvm-mos/llvm-mos/issues/393
+      break;
+    case 's':
+      str = va_arg(args, const char *);
+      assert(str);
+      while(*str) *s++ = *str++;
+    break;
+    default: assert(false); break;
+    }
+  }
+  va_end(args);
+  *s++ = 0;
   return 1;
 }
 

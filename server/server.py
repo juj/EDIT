@@ -62,7 +62,7 @@ def parse_first_clang_error(stderr):
   lines = stderr.split('\n')
   for l in lines:
     if 'error:' in l:
-#      print(l)
+      print(l)
       if l.count(':') >= 4:
         parts = l.split(':')
         if len(parts[0]) == 1 and parts[0].isalpha():
@@ -138,7 +138,7 @@ def compile_file(filename):
 #  printf("HELLO, WORLD!\\n");
 #}
 #''')
-  cmd = [compiler, filename, f'-I{include_dir}', '-Oz', '-o', build_output_file, '-nolibc', '-nostdlib++'] + additional_libs
+  cmd = [compiler, filename, f'-I{include_dir}', '-Oz', '-o', build_output_file, '-nolibc', '-nostdlib++', 'C:/code/llvm-mos-sdk/mos-platform/common/c/new.cc'] + additional_libs
   print(str(cmd))
   current_subprocess_build = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
@@ -221,7 +221,7 @@ def petscii_to_ascii_ch(ch): # shifted PETSCII
   if ch == 0xAB: return ord('{')
   if ch == 0xB3: return ord('}')
   if ch == 0xAE: return ord('\\')
-  if ch >= 0xC1 and ch <= 0xDA: return ord('a') +(ch-0xC1)
+#  if ch >= 0xC1 and ch <= 0xDA: return ord('a') +(ch-0xC1)
   return p2a[ch]
 '''
 	got = p2a[ch]
@@ -252,7 +252,7 @@ def petscii_to_ascii(s):
     if not in_single_quotes and not in_double_quotes:
       asc += chr(petscii_to_ascii_ch(s[i]))
     else:
-      if i > 0 and s[i-1] == 0xAE: # HACK: If previous character was a backspace '\', then do convert next char so that \n works
+      if i > 0 and (s[i-1] == 0xAE or s[i-1] == ord('%')): # HACK: If previous character was a backspace '\', then do convert next char so that \n works
         asc += chr(petscii_to_ascii_ch(s[i]))
       else:
         asc += chr(petscii_to_ascii_ch_inside_quotes(s[i]))

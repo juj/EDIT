@@ -114,6 +114,7 @@ struct recv_file_datagram_header
   uint16_t file_id;
   uint16_t num_fragments;
   uint16_t file_start_address;
+  uint16_t prg_entry_func_address;
   uint16_t file_size;
   uint8_t dummy0;
   uint8_t filetype;
@@ -909,7 +910,7 @@ int main()
   if (!success) printf("RR-NET NOT FOUND!\n");
 
   bool for_printing = false;
-  int year = 2022;
+  int year = 2020;
   for(;;)
   {
     send_ask_aoc_calendar(year);
@@ -929,6 +930,7 @@ int main()
         send_ask_aoc_input(year, selected_day, 250);
         char *text = receive_file_in_memory();
         view_file(text, VIEW_INPUT);
+        ret = -1;
       }
     }
   }
