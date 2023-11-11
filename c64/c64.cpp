@@ -7,8 +7,8 @@
 
 // Color RAM: https://www.c64-wiki.com/wiki/Color_RAM
 static volatile unsigned char * const color_ram = (unsigned char*)0xD800;
-static volatile unsigned char * const screen_ram = (unsigned char*)0x0400;
-//static volatile unsigned char * const screen_ram = (unsigned char*)0xCC00; // If using custom font
+//static volatile unsigned char * const screen_ram = (unsigned char*)0x0400;
+static volatile unsigned char * const screen_ram = (unsigned char*)0xCC00; // If using custom font
 static volatile unsigned char * const cursor_blink = (unsigned char *)0xCC;
 static volatile unsigned char * const cursor_blink_delay = (unsigned char *)0xCD;
 static volatile unsigned char * const char_under_cursor = (unsigned char *)0xCE;
@@ -84,7 +84,8 @@ bool init_screen()
 
   // Switch charset into text mode, where both lower case and upper case characters
   // are available. Default register value at boot is 0x15.
-  *mem_setup_register = 0x17;
+  // Disabled due to custom programming font
+//  *mem_setup_register = 0x17;
 
   return true;
 }

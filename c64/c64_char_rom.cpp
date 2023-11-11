@@ -88,3 +88,12 @@ void setup_cpp_programming_font()
 
   asm volatile("CLI");
 }
+
+extern "C" char __restore_overlay_start, __restore_overlay_dst, __restore_overlay_dst_end;
+
+void deploy_restore_overlay_memory()
+{
+  char *s = &__restore_overlay_start;
+  for(char *d = &__restore_overlay_dst; d != &__restore_overlay_dst_end;)
+    *d++ = *s++;
+}

@@ -33,7 +33,8 @@ def receive_datagram(timeout=None):
   global recv_sock
   recv_sock.settimeout(timeout)
   data, addr = recv_sock.recvfrom(1400)
-#  print("received message: %s, len: %d from %s" % (data, len(data), str(addr)))
+  s = [hex(i) for i in data]
+  print("received message: %s, len: %d from %s" % (s, len(data), str(addr)))
   return (data, addr)
 
 def send_datagram(data):
@@ -127,6 +128,13 @@ def compile_file(filename):
   include_dir = os.path.abspath(os.path.join(script_directory, '..', 'C64'))
   additional_libs = [os.path.join(include_dir, 'stdio.cpp')]
 #  print(include_dir)
+############### XXXXXXXXXXXX DEBUG
+  open(filename, 'w').write('''
+  #include <stdio.h>
+  int main()
+  {
+    for(;;) printf("hello, world!\\n");
+  }''')
   current_subprocess_build = subprocess.Popen([compiler, filename, f'-I{include_dir}', '-Oz', '-o', build_output_file] + additional_libs, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 a2p = [
@@ -284,7 +292,7 @@ RECV_FILE_DATAGRAM_MAGIC = 0x25291423
 #  uint32_t magic_header;
 #  char filename[20];
 #  uint16_t file_id;
-#  uint16_t num_fragments;
+#  uint16_t num_fragments;         # Actually just a u8, max range 0-254
 #  uint16_t file_start_address;
 #  uint16_t file_size;
 #  uint8_t dummy0;
@@ -431,6 +439,26 @@ def handle_ask_aoc_day_desc(data):
     send_file_data_to_client('', stdout, False)
 
 
+MAGIC_ASK_AOC_INPUT = 0x12985331
+def handle_ask_aoc_input(data):
+  print(f"handle_ask_aoc_input({data})")
+  year, day, column_width = struct.unpack('HBB', data)
+  cmd = ['aoc', 'download', '--input-only', '--overwrite']
+  if year:
+    cmd += ['-y', str(year)]
+  if day:
+    cmd += ['-d', str(day)]
+  print(str(cmd))
+  output = subprocess.run(cmd, capture_output=True)
+  print(str(output.returncode))
+  print(str(output.stdout))
+  print(str(output.stderr))
+  if output.returncode == 0:
+    day_inp = open('input', 'rb').read()
+    print(str(day_inp))
+    send_file_data_to_client('', day_inp, False)
+
+
 
 def server_main():
   while True:
@@ -448,6 +476,8 @@ def server_main():
         handle_ask_aoc_calendar(data)
       elif magic == MAGIC_ASK_AOC_DAY:
         handle_ask_aoc_day_desc(data)
+      elif magic == MAGIC_ASK_AOC_INPUT:
+        handle_ask_aoc_input(data)
       else:
         print(f'Unknown magic {hex(magic)}')
     except TimeoutError:
@@ -457,6 +487,8 @@ def server_main():
 
 
 if 'send' in sys.argv:
-  send_file_to_client(sys.argv[-1], True)
+  fn = sys.argv[-1]
+  crop_first_two_bytes = fn.lower().endswith('.prg')
+  send_file_to_client(fn, crop_first_two_bytes)
 else:
   server_main()

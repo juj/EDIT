@@ -97,6 +97,11 @@ _KERNAL uint8_t _READST() { NEED_STACK(2); uint8_t status; _ASM volatile("JSR $F
 
 // Set logical file number, device number, secondary address for I/O.
 // Logical file number: A unique number to associate with the file, in range 1-127.
+// Meaning of Secondary Address from C64 1530 Datasette manual for cassette tape operation:
+// - 0: Read from tape. >0: Write to tape.
+// - bit 0: If set, denote a nonrelocatable program. If clear, denote a relocatable program.
+// - bit 1: If set, write an End-Of-Tape marker after the file to denote the end of all data on the tape.
+// Meaning of Secondary Address for disks(?):
 // If secondary address is 0: default file type is PRG, and file is opened for reading. "Relocating" load is performed.
 // If secondary address is 1: default file type is PRG, and file is opened for writing. Nonrelocating load is performed.
 // If secondary address >= 2: use the information present in SETNAM in format ",S,R" or ",P,W" etc. to determine file type and read/write

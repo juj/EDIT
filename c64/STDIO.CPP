@@ -201,7 +201,7 @@ FILE *fopen(const char *filename, const char *mode)
     // Append ",S,R" or ",S,W" to filename to tell that the file type is Sequential, and that
     // we are either reading or writing to the file.
     fn[i++] = ',';
-    fn[i++] = 'S';
+    fn[i++] = string_contains_char(mode, 'p') ? 'P' : 'S';
     fn[i++] = ',';
     fn[i++] = reading_file ? 'R' : 'W';
   }

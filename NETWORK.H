@@ -22,7 +22,7 @@ void receive_data_from_network();
 void wait_to_receive_file(char *dstFilename);
 
 #ifdef __C64__
-extern "C" void receive_and_run_prg();
+extern "C" void receive_and_run_prg(bool run_prg);
 #endif
 
 // Internal:

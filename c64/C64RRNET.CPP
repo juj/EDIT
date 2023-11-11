@@ -167,7 +167,8 @@ void tx_bytes(const void *msg, uint16_t numBytes)
   if (odd_data) write_u16_lo_hi(cs_rxtx_data, *(uint8_t*)m16);
 }
 
-static volatile unsigned char * const screen_mem = (unsigned char*)0x0400;
+//static volatile unsigned char * const screen_mem = (unsigned char*)0x0400;
+static volatile unsigned char * const screen_mem = (unsigned char*)0xCC00; // Using custom font
 static volatile unsigned char * const screen_frame = (unsigned char *)0xD020;
 
 unsigned char ascii_to_petscii(unsigned char ch)

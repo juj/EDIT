@@ -1,3 +1,9 @@
+; Application memory is at $0000-$C6FF (saved to REU)
+; LLVM stack is at $C700-$C7FF         (saved to REU)
+; The contents of this file are located at $C800-$CBFF (not saved to REU)
+; Screen RAM is located at $CC00-CFFF  (not saved to REU)
+; $D000 - $DC00 memory area is also saved and restored from REU
+
 RRNET_CTL = $DE01
 CS_PACKET_PAGE = $DE02
 CS_PACKET_DATA = $DE04
@@ -11,16 +17,18 @@ tx_file_id               = $59  ; uint16
 num_fragments            = $5B  ; uint16
 next_fragment_idx        = $5D  ; uint8
 mem_dst_address          = $5F  ; uint16
+save_start_address       = $61  ; uint16, zero page address where we store save start for SAVE KERNAL call
 waiting_for_first_packet = 2    ; uint8
 
-prev_sp                  = $CFFD ; uint8
+prev_sp                  = $CBFF ; uint8
+choose_run_prg           = $CBFE ; bool, if true, we will run the downloaded PRG, otherwise we are saving it to datassette
 
-
+; # Clobbers A
 .macro REU_SNAPSHOT value
   LDA #0
   STA $DF0A ; Set flags (transfer address increments on both C64 and REU side)
 
-  ; # Copy $0000 - $CFFD area
+  ; # Copy $0000 - $C7FF area
   STA $DF02 ; Set copy src address in C64 memory
   STA $DF03
 
@@ -28,9 +36,9 @@ prev_sp                  = $CFFD ; uint8
   STA $DF05
   STA $DF06
 
-  LDA #$FD  ; Set transfer length
+  LDA #$FF  ; Set transfer length
   STA $DF07
-  LDA #$CF
+  LDA #$C7
   STA $DF08
 
   LDA \value ; #Kick off the transfer immediately (this will be synchronous, C64 CPU halts until transfer is complete)
@@ -48,12 +56,10 @@ prev_sp                  = $CFFD ; uint8
 
   LDA \value ; #Kick off the transfer immediately (this will be synchronous, C64 CPU halts until transfer is complete)
   STA $DF01
-
-
 .endmacro
 
 
-
+; # Clobbers A and X
 .macro discard_n_rx_bytes num
   LDA \num
   LDX #0
@@ -63,12 +69,21 @@ prev_sp                  = $CFFD ; uint8
 
 
 .macro DEBUG_BORDER color
+PHA
   LDA \color
   STA $D020
+PLA
 .endmacro
 
 
+.macro DEBUG_CHAR ch
+PHA
+  LDA \ch
+  JSR $FFD2
+PLA
+.endmacro
 
+; # Clobbers A
 .macro WRITE_U16 addr, value
   LDA #<\value
   STA \addr
@@ -77,14 +92,14 @@ prev_sp                  = $CFFD ; uint8
 .endmacro
 
 
-
+; # Clobbers A
 .macro CS_WRITE_PAGE addr, value
   WRITE_U16 CS_PACKET_PAGE, \addr
   WRITE_U16 CS_PACKET_DATA, \value
 .endmacro
 
 
-
+; # Clobbers A
 .macro ADD_U16_U8 addr, value
   CLC
   LDA \addr
@@ -96,7 +111,7 @@ prev_sp                  = $CFFD ; uint8
 .endmacro
 
 
-
+; # Clobbers A
 .macro SUB_U16_U8 addr, value
   SEC
   LDA \addr
@@ -113,6 +128,12 @@ prev_sp                  = $CFFD ; uint8
 .globl receive_and_run_prg
 .type receive_and_run_prg, @function
 receive_and_run_prg:
+  STA choose_run_prg ; Function argument: A=0:save to cassette, 1:run PRG from memory
+  SEI ; We will mess up the whole memory layout so disable interrupts up front
+
+  TSX         ; Save old stack pointer to memory
+  STX prev_sp
+
   REU_SNAPSHOT #$90 ; Snapshot memory from C64 to REU
 
 ;  LDA #1
@@ -145,6 +166,9 @@ receive_and_run_prg:
   LDA CS_RXTX_DATA+1
   STA mem_dst_address+1
 
+  LDA CS_RXTX_DATA      ; Discard file size
+  LDA CS_RXTX_DATA+1
+
   LDA CS_RXTX_DATA      ; Discard filetype and dummy padding byte
   LDA CS_RXTX_DATA+1
 
@@ -152,6 +176,7 @@ receive_and_run_prg:
   STA next_fragment_idx
   JSR ack_received_udp_fragment
 
+  ; Now loop to receive file data UDP fragments
 fragments_still_left_to_receive:
   JSR wait_for_msg ; Wait for a datagram
 
@@ -173,7 +198,6 @@ bytes_left_to_read:
   STA (mem_dst_address),y
   STA $D020
   ADD_U16_U8 mem_dst_address, #2
-
   SUB_U16_U8 packet_length, #1
   LDA packet_length
   ORA packet_length+1
@@ -187,7 +211,23 @@ bytes_left_to_read:
   BNE fragments_still_left_to_receive
 
   ; All data has been received!
-  SEI
+  LDA choose_run_prg
+  BNE run_prg
+
+save_prg_to_datassette:     ; Instead of running, we want to save the loaded PRG on to datasette
+  LDA #$01
+  STA save_start_address
+  LDA #$08
+  STA save_start_address+1
+  LDA #save_start_address
+
+  LDX mem_dst_address
+  LDY mem_dst_address+1
+  JSR $FFD8                    ; Call the 'SAVE' KERNAL ROM routine
+
+  JMP continue_after_program_finish
+
+run_prg:                   ; Instead of saving to datasette, run the PRG
   TSX         ; Save old stack pointer
   STX prev_sp
 

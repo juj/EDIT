@@ -43,6 +43,7 @@ void read_string_from_file(FILE *f, char *dst);
 char *strstr(const char *str1, const char *str2);
 
 // Call fopen("", "1r"); to load any next file from cassette, or fopen("FOO.TXT", "1r"); to load the next filename that matches this file.
+// Pass character 'p' in fopen() when writing a PRG file, otherwise writing a SEQ file.
 FILE *fopen(const char *filename, const char *mode);
 int fscanf(FILE *f, const char *format, ...);
 int fgetc(FILE *f);

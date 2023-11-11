@@ -476,6 +476,27 @@ void send_ask_aoc_day(int year, int day, int line_width)
   tx_bytes(&msg, sizeof(msg));
 }
 
+#define MAGIC_ASK_AOC_INPUT 0x12985331
+struct ask_aoc_input
+{
+  uint32_t magic;
+  int year;
+  unsigned char day;
+  unsigned char line_width;
+};
+
+void send_ask_aoc_input(int year, int day, int line_width)
+{
+  ask_aoc_input msg = {
+    .magic = MAGIC_ASK_AOC_INPUT,
+    .year = year,
+    .day = (unsigned char)day,
+    .line_width = (unsigned char)line_width
+  };
+  start_udp_send(sizeof(msg));
+  tx_bytes(&msg, sizeof(msg));
+}
+
 //char rrnet_recv_filename[MAX_FILENAME_LEN+1];
 
 char *receive_file_in_memory()
@@ -637,8 +658,6 @@ void convert_to_business_petscii(char *str)
   }
 }
 
-#define SCR_NEWLINE 0xFF
-
 #define BLACK       0
 #define WHITE       1
 #define RED         2
@@ -719,7 +738,10 @@ int ask_string_prompt(const char *prompt, char *dst, int maxLen)
   return x;
 }
 
-int view_file(char *text, bool calendar_view)
+#define VIEW_CALENDAR 0
+#define VIEW_DESC 1
+#define VIEW_INPUT 2
+int view_file(char *text, uint8_t view_type)
 {
   int num_lines = count_num_lines(text);
 
@@ -739,7 +761,7 @@ int view_file(char *text, bool calendar_view)
   bool line_select_mode = false;
   int line_select_start = -1, line_select_end = -1;
   int line_select_first_line = 0;
-  int x = calendar_view ? max_x : 0;
+  int x = (view_type == VIEW_CALENDAR) ? max_x : 0;
   int y = 0;
   int cursor_y = 0;
 
@@ -794,7 +816,7 @@ int view_file(char *text, bool calendar_view)
         toggle_highlight_on_line(cursor_y-y);
     }
     else if (key == 0x9D && x > 0) { --x; repaint = true; }
-    else if (calendar_view && key == 0x0D) // Enter
+    else if (view_type == VIEW_CALENDAR && key == 0x0D) // Enter
     {
       char *s = text + starts[cursor_y];
       int day = parse_selected_puzzle_day(s, starts[cursor_y+1] - starts[cursor_y]);
@@ -840,7 +862,7 @@ int view_file(char *text, bool calendar_view)
       get_key();
       repaint = true;
     }
-    else if (!calendar_view)
+    else if (view_type != VIEW_CALENDAR)
     {
       if (key == 0x5F) // ESC
       {
@@ -853,6 +875,12 @@ int view_file(char *text, bool calendar_view)
         free(text);
         free(starts);
         return -1; // toggle for printing
+      }
+      else if (view_type == VIEW_DESC && key == 0x49)
+      {
+        free(text);
+        free(starts);
+        return 1;
       }
     }
 
@@ -886,7 +914,7 @@ int main()
   {
     send_ask_aoc_calendar(year);
     char *calendar = receive_file_in_memory();
-    int selected_day = view_file(calendar, /*calendar_view=*/true);
+    int selected_day = view_file(calendar, VIEW_CALENDAR);
   //  printf("<:BACK F1:PRINT F3:SAVE INPUT F7:SUBMIT");
 
     int ret = -1;
@@ -894,8 +922,14 @@ int main()
     {
       send_ask_aoc_day(year, selected_day, for_printing ? 80 : SCREEN_WIDTH);
       char *text = receive_file_in_memory();
-      ret = view_file(calendar, /*calendar_view=*/false);
+      ret = view_file(text, VIEW_DESC);
       if (ret == -1) for_printing = !for_printing;
+      else if (ret == 1) // view input?
+      {
+        send_ask_aoc_input(year, selected_day, 250);
+        char *text = receive_file_in_memory();
+        view_file(text, VIEW_INPUT);
+      }
     }
   }
 }
