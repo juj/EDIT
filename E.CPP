@@ -52,11 +52,7 @@ void repaint_open_files_list(File *highlightFilename)
   {
     char fname[MAX_FILENAME_LEN+2]; // todo optimize away this temp copy
     assert(f->filename);
-#ifndef __C64__ // TODO SPRINTF
     sprintf(fname, f->hasUnsavedChanges ? "%s*" : "%s", f->filename);
-#else
-    strcpy(fname, f->filename);
-#endif
     uint8_t len = (uint8_t)strlen(fname);
     if (x < len) break;
     x -= len;
@@ -110,6 +106,7 @@ void repaint_line(int screenY, Line *line, int startX, int endX)
 
 void repaint_screen_lines(cursor_pos yStart, cursor_pos yEnd)
 {
+  assert(firstDisplayedLine);
   assert(yStart >= 0);
   assert(yStart <= SCREEN_HEIGHT);
   assert(yStart <= yEnd);
@@ -140,11 +137,8 @@ void print_line_column_info()
   curLineNumber, current_column()+1);
   */
 
-#ifndef __C64__ // TODO SPRINTF
   sprintf(str, " " LINE_NUM_PRINTF_MOD ":" LINE_XPOS_PRINTF_MOD, current_line_number(), (int)(current_column()+1));
-
   put_string_on_screen(str, SCREEN_WIDTH - (cursor_pos)strlen(str), SCREEN_HEIGHT-1, LTGRAY);
-#endif
 }
 
 void write_status_text(const char *text, unsigned char color)
@@ -810,6 +804,7 @@ void insert_new_line(bool cursorMovesToNewline)
   else
   {
     cursor_pos endY = screen_end_y_of_last_line_on_screen(repaintStartLine, repaintStartY)+1;
+    if (endY > SCREEN_HEIGHT) endY = SCREEN_HEIGHT; // XXXX REMOVE
     assert(endY <= SCREEN_HEIGHT);
     repaint_screen_lines(repaintStartY, endY);
   }
@@ -870,9 +865,7 @@ void run_goto_line_menu()
 
   put_string_on_screen("GO TO LINE: ", 0, SCREEN_HEIGHT-1, LTGRAY);
   char origLineNumberStr[32];
-#ifndef __C64__ // TODO SPRINTF
   sprintf(origLineNumberStr, LINE_NUM_PRINTF_MOD " ", origLineNumber);
-#endif
   put_string_on_screen(origLineNumberStr, 12, SCREEN_HEIGHT-1, DKGRAY);
   set_cursor_pos(12, SCREEN_HEIGHT-1);
   const char *empty = " ";
@@ -972,9 +965,7 @@ void measure_and_print_available_memory()
   }
 
   char str[64];
-#ifndef __C64__ // TODO SPRINTF
   sprintf(str, "%u bytes free.", available_mem);
-#endif
   put_string_on_screen(str, (SCREEN_WIDTH-(line_xpos)strlen(str))>>1, SCREEN_HEIGHT-1, LTBLUE);
 }
 
@@ -990,7 +981,6 @@ void print_textsel_info()
   file_idx numCharsSelected;
   calculate_num_lines_and_chars_selected(&numLinesSelected, &numCharsSelected);
 
-#ifndef __C64__ // TODO SPRINTF
   char str[64];
   if (numCharsSelected == 0)
   {
@@ -1002,7 +992,6 @@ void print_textsel_info()
   else
     sprintf(str, LINE_NUM_PRINTF_MOD " lines, " FILE_IDX_PRINTF_MOD " chars selected.", numLinesSelected, numCharsSelected);
   put_string_on_screen(str, (SCREEN_WIDTH-(line_xpos)strlen(str))>>1, SCREEN_HEIGHT-1, LTBLUE);
-#endif
 }
 
 void select_all()
@@ -1347,14 +1336,9 @@ void main_loop()
         char filename[20];
         wait_to_receive_file(filename);
         repaint_screen();
-#ifndef __C64__ // TODO SPRINTF
         char text[40];
         sprintf(text, "program %s saved to disk", filename);
         write_status_text(text, LTGREEN);
-#else
-        const char text[] = "program saved to disk";
-        write_status_text(text, LTGREEN);
-#endif
         }
         break;
 #endif

@@ -22,11 +22,7 @@ void out_of_memory(int isFarMemory, size_t bytes)
     bytes, isFarMemory ? "far" : "near");
 #else
 
-#ifndef __C64__ // TODO SPRINTF
   sprintf(str, "OOM(%u BYTES)", bytes);
-#else
-  strcpy(str, "OOM");
-#endif
 
 #endif
   put_string_on_screen(str, (SCREEN_WIDTH - (int)strlen(str))/2, SCREEN_HEIGHT-1,

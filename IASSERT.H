@@ -2,7 +2,7 @@
 #define _IASSERT_H
 
 #ifdef __mos__
-#define assert(x) ((void)0)
+#include "c64/mystdio.h"
 #else
 #include <assert.h>
 #endif

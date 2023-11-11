@@ -47,6 +47,7 @@ void bring_to_front_in_mru_order(File *file)
 
 void open_file_in_viewport(File *file, unsigned char bringToMruFront)
 {
+  assert(file->firstLine);
   if (bringToMruFront) bring_to_front_in_mru_order(file);
 
   if (file == currentFile)

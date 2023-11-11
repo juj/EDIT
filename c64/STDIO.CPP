@@ -5,8 +5,6 @@
 #define EOF -1 // xxx todo move to header after upstream stdio.h is removed
 #endif
 
-//#define _STDIO_DEBUG_LEVEL 2
-
 void __assert(bool condition, const char *str, const char *file, int line, const char *func)
 {
 #ifndef NDEBUG
@@ -15,11 +13,11 @@ void __assert(bool condition, const char *str, const char *file, int line, const
     // TODO: Don't call printf from within assert, but instead do a super simple putscreen
     // to print this info.
 #if defined(_STDIO_DEBUG_LEVEL) && _STDIO_DEBUG_LEVEL >= 2
-    printf("%s:%d:%s: ASSERT \"%s\" FAILED!\n", file, line, func, str);
+    printf("\nFILE %s:%d:%s: ASSERT \"%s\" FAILED!\n", file, line, func, str);
 #elif defined(_STDIO_DEBUG_LEVEL) && _STDIO_DEBUG_LEVEL >= 1
-    printf("%s:%d: ASSERT FAILED!\n", file, line);
+    printf("\nFILE %s:%d: ASSERT FAILED!\n", file, line);
 #else
-    printf("LINE %d: ASSERT FAILED!\n", line);
+    printf("\nLINE %d: ASSERT FAILED!\n", line);
 #endif
     for(;;) // Halt, and blink border red-black
     {

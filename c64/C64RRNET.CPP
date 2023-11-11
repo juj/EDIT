@@ -325,7 +325,7 @@ bool open_file_for_saving(const char *filename, uint8_t filetype)
   if (error >= 20 && error <= 74)
   {
 #ifndef NDEBUG    
-    Printf("ERROR: %d\n", (int)error);
+    printf("ERROR: %d\n", (int)error);
 #endif
 // TODO: how to do this:
 //      ; check drive error channel here to test for
@@ -340,7 +340,7 @@ end:
   {
     close_file();
 #ifndef NDEBUG    
-    Printf("FAILED %d\n", error);
+    printf("FAILED %d\n", error);
 #endif
     return false;
   }
@@ -481,7 +481,7 @@ bool process_udp_network_datagrams(char *filename)
     if (!open_file_for_saving(recv_header.filename, recv_header.filetype))
     {
 #ifndef NDEBUG    
-      Printf("FAILED TO OPEN FILE \"%s\"\n", recv_header.filename);
+      printf("FAILED TO OPEN FILE \"%s\"\n", recv_header.filename);
 #endif
       goto end;
     }
@@ -496,13 +496,13 @@ bool process_udp_network_datagrams(char *filename)
     if (error)
     {
 #ifndef NDEBUG    
-      Printf("\nFAILED TO WRITE FILE!\n");
+      printf("\nFAILED TO WRITE FILE!\n");
 #endif
     }
     else
     {
 #ifndef NDEBUG    
-      Printf("\nWROTE %u BYTES TO FILE \"%s\"\n", size, recv_header.filename);
+//      printf("\nWROTE %u BYTES TO FILE \"%s\"\n", size, recv_header.filename);
 #endif
     }
     return true;

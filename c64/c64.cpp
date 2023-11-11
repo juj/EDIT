@@ -25,11 +25,14 @@ void set_cursor_style(uint8_t style)
 
 void set_cursor_pos(uint8_t x, uint8_t y)
 {
+  assert(x < 40);
+  assert(y < 25);
   c64_set_cursor_pos(x, y);
 }
 
 void put_screen(uint16_t linearPos, char ch, unsigned char color)
 {
+  assert(linearPos < 40*25);
   uint8_t newChar = petscii_to_screen_code(ch) ^ (color&0x80);
 
   // Gotcha: if we are setting the character under the cursor, we must
@@ -52,11 +55,13 @@ void put_screen(uint16_t linearPos, char ch, unsigned char color)
 
 void put_screen(uint16_t linearPos, char ch)
 {
+  assert(linearPos < 40*25);
   put_screen(linearPos, ch, 7);
 }
 
 char get_screen(uint16_t linearPos)
 {
+  assert(linearPos < 40*25);
   // Gotcha: when reading the screen position where cursor
   // is currently at, must read the character under cursor instead.
   if (linearPos == c64_get_cursor_linear_pos()) return *char_under_cursor;
@@ -65,11 +70,13 @@ char get_screen(uint16_t linearPos)
 
 void put_screen_color(uint16_t linearPos, unsigned char color)
 {
+  assert(linearPos < 40*25);
   put_screen(linearPos, get_screen(linearPos), 7);
 }
 
 unsigned char get_screen_color(uint16_t linearPos)
 {
+  assert(linearPos < 40*25);
   // Gotcha: when reading the screen position where cursor
   // is currently at, must read the color under cursor instead.
   if (linearPos == c64_get_cursor_linear_pos()) return *color_under_cursor;
