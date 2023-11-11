@@ -38,6 +38,7 @@ def receive_datagram(timeout=None):
   return (data, addr)
 
 def send_datagram(data):
+#  print(f'Sending datagram of length {len(data)}: {data}')
   send_sock.sendto(data, ("255.255.255.255", CLIENT_PORT))
 
 def get_file_lines(document_id):
@@ -129,13 +130,17 @@ def compile_file(filename):
   additional_libs = [os.path.join(include_dir, 'stdio.cpp')]
 #  print(include_dir)
 ############### XXXXXXXXXXXX DEBUG
-  open(filename, 'w').write('''
-  #include <stdio.h>
-  int main()
-  {
-    for(;;) printf("hello, world!\\n");
-  }''')
-  current_subprocess_build = subprocess.Popen([compiler, filename, f'-I{include_dir}', '-Oz', '-o', build_output_file] + additional_libs, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+#  open(filename, 'w').write('''
+##include <stdio.h>#
+#
+#int main()
+#{
+#  printf("HELLO, WORLD!\\n");
+#}
+#''')
+  cmd = [compiler, filename, f'-I{include_dir}', '-Oz', '-o', build_output_file, '-nolibc', '-nostdlib++'] + additional_libs
+  print(str(cmd))
+  current_subprocess_build = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 a2p = [
 	0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x14,0x20,0x0d,0x11,0x93,0x0a,0x0e,0x0f,
@@ -216,6 +221,7 @@ def petscii_to_ascii_ch(ch): # shifted PETSCII
   if ch == 0xAB: return ord('{')
   if ch == 0xB3: return ord('}')
   if ch == 0xAE: return ord('\\')
+  if ch >= 0xC1 and ch <= 0xDA: return ord('a') +(ch-0xC1)
   return p2a[ch]
 '''
 	got = p2a[ch]
@@ -223,8 +229,36 @@ def petscii_to_ascii_ch(ch): # shifted PETSCII
 	return got
 '''
 
+def petscii_to_ascii_ch_inside_quotes(ch):
+  if ch >= 0x41 and ch <= 0x5A: return ch
+  if ch >= 0x61 and ch <= 0x7A: return ch
+  if ch == 0xA4: return ord('_')
+  if ch == 0xAB: return ord('{')
+  if ch == 0xB3: return ord('}')
+  if ch == 0xAE: return ord('\\')
+  if ch >= 0xC1 and ch <= 0xDA: return ord('a') +(ch-0xC1)
+  return ch#p2a[ch]
+
 def petscii_to_ascii(s):
-	return ''.join([chr(petscii_to_ascii_ch(ch)) for ch in s])
+  # Important! Do not convert characters inside ' ' and " " to ASCII,
+  # because otherwise printing becomes messed up.
+  asc = ''
+  i = 0
+  in_single_quotes = False
+  in_double_quotes = False
+  while i < len(s):
+    if s[i] == ord("'"): in_single_quotes = not in_single_quotes
+    elif s[i] == ord('"'): in_double_quotes = not in_double_quotes
+    if not in_single_quotes and not in_double_quotes:
+      asc += chr(petscii_to_ascii_ch(s[i]))
+    else:
+      if i > 0 and s[i-1] == 0xAE: # HACK: If previous character was a backspace '\', then do convert next char so that \n works
+        asc += chr(petscii_to_ascii_ch(s[i]))
+      else:
+        asc += chr(petscii_to_ascii_ch_inside_quotes(s[i]))
+    i += 1
+  print(f'petscii_to_ascii CONVERT {s} to {asc}')
+  return asc
 
 def remove_trailing_null_byte(s):
 	if len(s) > 0 and s[len(s)-1] == 0: return s[:len(s)-1]
@@ -294,6 +328,7 @@ RECV_FILE_DATAGRAM_MAGIC = 0x25291423
 #  uint16_t file_id;
 #  uint16_t num_fragments;         # Actually just a u8, max range 0-254
 #  uint16_t file_start_address;
+#  uint16_t prg_entry_func_address;
 #  uint16_t file_size;
 #  uint8_t dummy0;
 #  uint8_t filetype;
@@ -306,6 +341,16 @@ RECV_FILE_DATAGRAM_FRAGMENT_MAGIC = 0x25291424
 #  uint16_t file_id;
 #  uint16_t fragment_index;
 #};
+
+def extract_prg_entry_func_address(prg_file):
+  data = open(prg_file, 'rb').read()
+  load = data.index(0x9e) # Find first occurrence of C64 "SYS" command
+  a = data[load+1:load+5]
+  print(str(a))
+  a = [x - 0x30 for x in a]
+  print(str(a))
+  return a[0]*1000 + a[1]*100 + a[2]*10 + a[3]
+
 
 def wait_to_ack_datagram_received(datagram_number):
   print(f'wait_to_ack_datagram_received({datagram_number})')
@@ -349,12 +394,15 @@ def send_file_data_to_client(filename, file_data, crop_first_two_bytes):
   file_id = random.randrange(65536)
   num_fragments = (size + FRAGMENT_PAYLOAD_SIZE - 1) // FRAGMENT_PAYLOAD_SIZE
   filetype = 'S'
+  prg_entry_func_address = 0
   if filename.upper().endswith('.PRG'):
+    prg_entry_func_address = extract_prg_entry_func_address(filename)
+    print(f'prg_entry_func_address: {prg_entry_func_address}')
     filetype = 'P'
     filename = filename[:-4]
   out_petscii_filename = ascii_to_petscii(filename.lower())
-  recv_file_header = struct.pack('I20sHHHHBB', RECV_FILE_DATAGRAM_MAGIC, out_petscii_filename,
-    file_id, num_fragments, memory_start_address, len(file_data), 0, ord(filetype))
+  recv_file_header = struct.pack('I20sHHHHHBB', RECV_FILE_DATAGRAM_MAGIC, out_petscii_filename,
+    file_id, num_fragments, memory_start_address, prg_entry_func_address, len(file_data), 0, ord(filetype))
   send_datagram(recv_file_header)
 
   wait_to_ack_datagram_received(0xFF) # Wait for C64 being ready to start receiving actual data

@@ -50,6 +50,7 @@ int rrnet_init()
   if (cs_read_page_data() != 0x630E) return 0;
   // Configure chip
   cs_write_page_data(0x0114/*pp_self_ctl*/, 0x0055); // reset chip
+///  cs_write_page_data(0x0104/*pp_rx_ctl*/, 0x0D05); // accept individual and broadcast packets
   cs_write_page_data(0x0104/*pp_rx_ctl*/, 0x0D05); // accept individual and broadcast packets
 //  cs_write_page_data(0x0104/*pp_rx_ctl*/, 0x0D85); // accept individual and broadcast packets (promisc)
   cs_write_page_data(0x0158/*pp_ia*/, 0x8000); // Write MAC Address

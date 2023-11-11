@@ -15,11 +15,11 @@ void __assert(bool condition, const char *str, const char *file, int line, const
     // TODO: Don't call printf from within assert, but instead do a super simple putscreen
     // to print this info.
 #if defined(_STDIO_DEBUG_LEVEL) && _STDIO_DEBUG_LEVEL >= 2
-    Printf("%s:%d:%s: ASSERT \"%s\" FAILED!\n", file, line, func, str);
+    printf("%s:%d:%s: ASSERT \"%s\" FAILED!\n", file, line, func, str);
 #elif defined(_STDIO_DEBUG_LEVEL) && _STDIO_DEBUG_LEVEL >= 1
-    Printf("%s:%d: ASSERT FAILED!\n", file, line);
+    printf("%s:%d: ASSERT FAILED!\n", file, line);
 #else
-    Printf("LINE %d: ASSERT FAILED!\n", line);
+    printf("LINE %d: ASSERT FAILED!\n", line);
 #endif
     for(;;) // Halt, and blink border red-black
     {
@@ -31,7 +31,7 @@ void __assert(bool condition, const char *str, const char *file, int line, const
 }
 
 #if defined(_STDIO_DEBUG_LEVEL) && _STDIO_DEBUG_LEVEL >= 2
-#define _STDIO_DEBUG2(...) Printf(__VA_ARGS__)
+#define _STDIO_DEBUG2(...) printf(__VA_ARGS__)
 #else
 #define _STDIO_DEBUG2(...) ((void)0)
 #endif
@@ -95,12 +95,12 @@ void print_dos_error(uint8_t error, const char *operation)
     case 73: err = "POWER UP MESSAGE; break; OR WRITE ATTEMPT WITH DOS MISMATCH"; break; // DOS I and 2 are read compatible but not write compatible. Disks may be interchangeably read with either DOS, but a disk formatted on one version cannot be written upon with the other version because the format is different. This error is displayed whenever an attempt is made to write upon a disk which has been formatted in a non-compatible format. (A utility routine is available to assist in converting from one format to another.) This message may also appear after power up.
     case 74: err = "DRIVE NOT READY"; break; // An attempt has been made to access the 1541 Single Drive Floppy Disk without any diskettes present in either drive.
     default:
-      Printf("%s: ERROR %u\n", operation, (unsigned int)error);
+      printf("%s: ERROR %u\n", operation, (unsigned int)error);
       return;
   }
-  Printf("%s: %s\n", operation, err);
+  printf("%s: %s\n", operation, err);
 #elif _STDIO_DEBUG_LEVEL >= 1
-  Printf("%s: ERROR %u\n", operation, (unsigned int)error);
+  printf("%s: ERROR %u\n", operation, (unsigned int)error);
 #endif
 }
 
@@ -180,7 +180,7 @@ void put_char_back(FILE *f, uint8_t ch)
   f->nextChar = ch;
 }
 
-FILE *fopen(const char *filename, const char *mode)
+extern "C" FILE *fopen(const char *filename, const char *mode)
 {
   assert(filename);
   assert(mode);
@@ -287,7 +287,7 @@ static void fscanf_read_str(FILE *f, char *dst)
   put_char_back(f, ch);
 }
 
-int fscanf(FILE *f, const char *format, ...)
+extern "C" int fscanf(FILE *f, const char *format, ...)
 {
   if (_CHKIN(f->handle)) return 0;
 
@@ -350,7 +350,7 @@ end:
   return num_parsed;
 }
 
-char *fgets(char *str, int count, FILE *f)
+extern "C" char *fgets(char *str, int count, FILE *f)
 {
   assert(str);
   assert(count > 0);
@@ -374,7 +374,7 @@ char *fgets(char *str, int count, FILE *f)
   return (dst == str) ? 0 : dst;
 }
 
-int fgetc(FILE *f)
+extern "C" int fgetc(FILE *f)
 {
   assert(f);
   if (_CHKIN(f->handle)) return EOF;
@@ -385,7 +385,7 @@ int fgetc(FILE *f)
   else return ch;
 }
 
-size_t fread(void *buffer, size_t size, size_t count, FILE *f)
+extern "C" size_t fread(void *buffer, size_t size, size_t count, FILE *f)
 {
   if (_CHKIN(f->handle)) return 0;
 
@@ -402,7 +402,7 @@ size_t fread(void *buffer, size_t size, size_t count, FILE *f)
   return (uintptr_t)ptr - (uintptr_t)buffer;
 }
 
-size_t fwrite(const void *buffer, size_t size, size_t count, FILE *f)
+extern "C" size_t fwrite(const void *buffer, size_t size, size_t count, FILE *f)
 {
   assert(f);
   if (_CHKOUT(f->handle)) return 0;
@@ -417,7 +417,7 @@ size_t fwrite(const void *buffer, size_t size, size_t count, FILE *f)
   return (uintptr_t)ptr - (uintptr_t)buffer;
 }
 
-int fputc(int ch, FILE *f)
+extern "C" int fputc(int ch, FILE *f)
 {
   assert(f);
   if (_CHKOUT(f->handle) || DRIVE_STATUS_ERROR()) return EOF;
@@ -426,7 +426,7 @@ int fputc(int ch, FILE *f)
   return error ? EOF : ch;
 }
 
-int fputs(const char *str, FILE *f)
+extern "C" int fputs(const char *str, FILE *f)
 {
   assert(str);
   assert(f);
@@ -445,6 +445,88 @@ int fputs(const char *str, FILE *f)
   _CLRCHN();
   return 0;
 }
+
+extern "C" int puts(const char *str)
+{
+  _CLRCHN();
+  while(*str) _CHROUT(*str++);
+  _CHROUT('\r');
+  return 1;
+}
+
+extern "C" void *memcpy(void *dest, const void *src, size_t count) // TODO: optimize
+{
+  char *d = (char*)dest;
+  const char *s = (const char *)src;
+  while(count--) *d++ = *s++;
+  return dest;
+}
+
+extern "C" void *memset(void *ptr, int value, size_t num) // TODO: optimize
+{
+  char *p = (char*)ptr;
+  for(; num; --num) *p++ = (char)value;
+  return ptr;
+}
+
+extern "C" void __memset(char *ptr, char value, size_t num)
+{
+  for(; num; --num) *ptr++ = value;
+}
+
+extern "C" char *strcpy(char *s1, const char *s2) {
+  char *ret = s1;
+  for (;; ++s1, ++s2) {
+    *s1 = *s2;
+    if (!*s1)
+      return ret;
+  }
+}
+
+extern "C" size_t strlen(const char *s) {
+  size_t len = 0;
+  for (; *s; ++s)
+    ++len;
+  return len;
+}
+
+template <typename T> static inline T _atoi(const char *str) {
+  T result = 0;
+  bool sign = false;
+
+  while (isspace(*str)) { str++; }
+
+  if (*str == '+') { str++; }
+  else if (*str == '-') { sign = true; str++; }
+
+  while (*str >= '0' && *str <= '9') {
+    result = (result * 10) + (*(str++) - '0');
+  }
+  return sign ? -result : result;
+}
+
+extern "C" {
+int atoi(const char *str) { return _atoi<int>(str); }
+long atol(const char *str) { return _atoi<long>(str); }
+}
+
+extern "C" int isalpha(int c) { // TODO: optimize
+  char ch = (char)c;
+  return ((ch >= 'A') && (ch <= 'Z')) || ((ch >= 'a') && (ch <= 'z'));
+}
+
+extern "C" int isdigit(int c) { // TODO: optimize
+  char ch = (char)c;
+  return ch >= '0' && ch <= '9';
+}
+
+extern "C" int isspace(int c) { // TODO: optimize
+  char ch = c;
+  return (ch == ' ') || (ch == '\t') || (ch == '\n') || (ch == '\f') ||
+         (ch == '\r') || (ch == '\v');
+}
+
+extern "C" int isalnum(int c) { return isalpha(c) || isdigit(c); } // TODO: optimize
 
 /*
 // Prints the given uint8 to CHROUT.
@@ -557,7 +639,7 @@ two:   _CHROUT(ch[(num>>4)&15]);
 one:   _CHROUT(ch[num&15]);
 }
 
-void Printf(const char *format, ...)
+extern "C" int printf(const char *format, ...)
 {
   va_list args;
   va_start(args, format);
@@ -607,9 +689,10 @@ void Printf(const char *format, ...)
     }
   }
   va_end(args);
+  return 1;
 }
 
-char *strstr(const char *str1, const char *str2)
+extern "C" char *strstr(const char *str1, const char *str2)
 {
   while(*str1)
   {
@@ -644,7 +727,7 @@ static unsigned char petscii_to_screen_code(unsigned char petscii)
   return 0x5E;
 }
 
-char *gets_s(char *str, rsize_t n)
+extern "C" char *gets_s(char *str, rsize_t n)
 {
   assert(str);
   assert(n > 0);

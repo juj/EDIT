@@ -22,6 +22,7 @@ waiting_for_first_packet = 2    ; uint8
 
 prev_sp                  = $CBFF ; uint8
 choose_run_prg           = $CBFE ; bool, if true, we will run the downloaded PRG, otherwise we are saving it to datassette
+prg_entry_func_address   = $CBFC ; uint16
 
 ; # Clobbers A
 .macro REU_SNAPSHOT value
@@ -129,7 +130,6 @@ PLA
 .type receive_and_run_prg, @function
 receive_and_run_prg:
   STA choose_run_prg ; Function argument: A=0:save to cassette, 1:run PRG from memory
-  SEI ; We will mess up the whole memory layout so disable interrupts up front
 
   TSX         ; Save old stack pointer to memory
   STX prev_sp
@@ -165,6 +165,11 @@ receive_and_run_prg:
   STA mem_dst_address
   LDA CS_RXTX_DATA+1
   STA mem_dst_address+1
+
+  LDA CS_RXTX_DATA      ; Read PRG entry function address
+  STA prg_entry_func_address
+  LDA CS_RXTX_DATA+1
+  STA prg_entry_func_address+1
 
   LDA CS_RXTX_DATA      ; Discard file size
   LDA CS_RXTX_DATA+1
@@ -225,18 +230,15 @@ save_prg_to_datassette:     ; Instead of running, we want to save the loaded PRG
   LDY mem_dst_address+1
   JSR $FFD8                    ; Call the 'SAVE' KERNAL ROM routine
 
-  JMP continue_after_program_finish
+  JMP continue_after_datassette_save
 
 run_prg:                   ; Instead of saving to datasette, run the PRG
-  TSX         ; Save old stack pointer
-  STX prev_sp
-
   LDX #$FF ; Clear the stack pointer for the child program
   TXS
 
-  LDA #<continue_after_program_finish ; Install IRQ handler for RESTORE key to resume execution
+  LDA #<abort_execution_on_restore_key ; Install IRQ handler for RESTORE key to resume execution
   STA $318
-  LDA #>continue_after_program_finish
+  LDA #>abort_execution_on_restore_key
   STA $319
   JSR $E544 ; Call CLRSCR to clear the screen
   LDA #14
@@ -245,10 +247,30 @@ run_prg:                   ; Instead of saving to datasette, run the PRG
   STA $D021 ; Set background color to default Dark Blue
   LDA #1
   STA $CC   ; Disable blinking cursor
-  CLI
-  JSR 2061 ; Start the downloaded program
 
-continue_after_program_finish:
+  CLI
+  LDX #$FF ; Clear stack pointer for the child program
+  TXS
+  JSR start_loaded_prg ; Start the downloaded program
+
+  ; Print "Program Finished" message
+  LDX #32
+print_program_finished:
+  LDA message,X
+  JSR $FFD2
+  DEX
+  BNE print_program_finished
+
+flush_keys:
+  JSR $FFE4 ; # Consume key press
+  LDA $C6 ; #Test if there is a key in queue
+  BNE flush_keys
+wait_key:
+  LDA $C6 ; #Wait until there are no keys in queue
+  BEQ wait_key
+
+continue_after_datassette_save:
+abort_execution_on_restore_key:
   SEI
   REU_SNAPSHOT #$91 ; Restore memory from REU to C64
 
@@ -259,9 +281,20 @@ continue_after_program_finish:
   ; JSR $FF81 ; Call CINT, Initialize screen editor & 6567 video chip
   ; JSR $FF84 ; Call IOINIT, Initialize I/O devices
   CLI ; Restore interrupts
+
+flush_keys2:
+  JSR $FFE4 ; # Consume key press
+  LDA $C6 ; #Test if there is a key in queue
+  BNE flush_keys2
+
   RTS ; Return back to caller as usual
 
+message:
+  .ascii " .YEK YNA SSERP .DEHSINIF MARGORP"
 
+start_loaded_prg:
+  JMP (prg_entry_func_address)
+  RTS
 
 ; #FUNCTION: Discards given number of bytes from RR-Net incoming packet queue
 discard_rx_bytes:
@@ -389,9 +422,10 @@ wait_for_tx_ready:
 ;# FUNCTION
 wait_for_msg:           ; Wait until RR-Net ethernet frame is available
   WRITE_U16 CS_PACKET_PAGE, $0124
+wait_again:
   LDA CS_PACKET_DATA+1
   AND #$0D
-  BEQ wait_for_msg
+  BEQ wait_again
 
   LDA CS_RXTX_DATA+1    ; Ignore RR-Net status uint16
   LDA CS_RXTX_DATA
@@ -405,7 +439,7 @@ wait_for_msg:           ; Wait until RR-Net ethernet frame is available
   ; # UDP payload has 4 bytes of magic + fragment message is at minimum 4 bytes extra, total of 50 bytes
   ; # file transfer header is 24 bytes extra on top of that
   CMP #50                  ; if incoming packet is too small (< 50 bytes), it can't be intended for us
-  BPL packet_large_enough
+  BCS packet_large_enough
   CPX #0
   BNE packet_large_enough
   JSR discard_rx_bytes     ; The packet was too small that it cannot be intended for us. Discard all
@@ -470,7 +504,7 @@ packet_large_enough:
 
   LDA packet_length
   CMP #24
-  BPL size_good
+  BCS size_good
 
   LDX packet_length+1
   CPX #0

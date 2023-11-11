@@ -1448,11 +1448,19 @@ extern "C" char __restore_overlay_start, __restore_overlay_dst, __restore_overla
 
 int main(int argc, char **argv)
 {
+  deploy_restore_overlay_memory(); // This must be done before initializing the heap
+
   setup_cpp_programming_font();
   unsigned int heap_size = 0xC700 - (unsigned int)&__heap_start;
   __set_heap_limit(heap_size);
-  deploy_restore_overlay_memory();
-
+/*
+  _CLRSCR();
+  printf("START: 0X%X\n", (unsigned int)&__restore_overlay_start);
+  printf("DST: 0X%X\n", (unsigned int)&__restore_overlay_dst);
+  printf("DST END: 0X%X\n", (unsigned int)&__restore_overlay_dst_end);
+  printf("%uB OF DOC MEM\n", heap_size);
+  get_key();
+*/
   /*
   uint8_t *mem;
   for(uint16_t sz = 2048; sz > 0; --sz)
@@ -1483,14 +1491,7 @@ int main(int argc, char **argv)
 //  set_vga_text_mode(TEXT_MODE_40x25);
   init_network();
   init_screen();
-/*
-  _CLRSCR();
-  Printf("START: 0X%X\n", (unsigned int)&__restore_overlay_start);
-  Printf("DST: 0X%X\n", (unsigned int)&__restore_overlay_dst);
-  Printf("DST END: 0X%X\n", (unsigned int)&__restore_overlay_dst_end);
-  Printf("%uB OF DOC MEM\n", heap_size);
-  get_key();
-*/
+
   // TODO: Query current text mode to initialize defaults
   File *f = (argc > 1) ? load_file(argv[1]) : open_new_file();
 
