@@ -1430,6 +1430,8 @@ void main_loop()
 extern "C" size_t __heap_start;
 extern "C" char __restore_overlay_start, __restore_overlay_dst, __restore_overlay_dst_end;
 
+extern "C" void malloc_add_free_block(void *ptr, size_t size);
+
 #ifdef __C64__
 int main()
 #else
@@ -1439,6 +1441,7 @@ int main(int argc, char **argv)
   deploy_restore_overlay_memory(); // This must be done before initializing the heap
 
   setup_cpp_programming_font();
+  malloc_add_free_block((void*)0x0400, 0x0400);
 //  unsigned int heap_size = 0xC700 - (unsigned int)&__heap_start;
 //  __set_heap_limit(heap_size);
 /*

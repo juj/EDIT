@@ -898,8 +898,8 @@ static volatile unsigned char * const mem_setup_register = (unsigned char *)0xD0
 
 int main()
 {
-  unsigned int heap_size = 0xCD00 - (unsigned int)&__heap_start;
-  __set_heap_limit(heap_size);
+//  unsigned int heap_size = 0xCD00 - (unsigned int)&__heap_start;
+//  __set_heap_limit(heap_size);
 
   // Switch charset into text mode, where both lower case and upper case characters
   // are available. Default register value at boot is 0x15.

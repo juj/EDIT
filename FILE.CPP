@@ -229,7 +229,6 @@ File *load_file(const char *filename)
   bool prev_line_ended_in_newline = false;
   while(fgets(tmp_line, MAX_CHARS_PER_LINE, handle))
   {
-//    printf("GOT LINE %s\n", tmp_line);
     line_xpos len = (line_xpos)strlen(tmp_line);
     prev_line_ended_in_newline = (len > 0 && tmp_line[len-1] == '\n');
     if (prev_line_ended_in_newline) // subtract newline from line
@@ -277,6 +276,11 @@ File *load_file(const char *filename)
   }
 */
   fclose(handle);
+  if (!f->firstLine)
+  {
+    free(f);
+    return 0;
+  }
 
   for(Line *l = f->firstLine; l; l = l->nextLine)
     syntax_highlight(l);

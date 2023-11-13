@@ -1,7 +1,5 @@
 #pragma once
 
-#define _STDIO_DEBUG_LEVEL 1
-
 #ifndef _STDIO_DEBUG_LEVEL
 #define _STDIO_DEBUG_LEVEL 0
 #endif

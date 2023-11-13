@@ -87,10 +87,14 @@ extern "C" void malloc_verify_heap_consistency()
 extern "C" void *malloc(size_t bytes)
 {
 //  printf("A\n");
-//  malloc_verify_heap_consistency();
+  malloc_verify_heap_consistency();
   if (bytes < 2) bytes = 2; // Must allocate at least two payload bytes
   bytes += 2; // and each memory allocation will have two byte overhead, so account for that early on
-  if (bytes < 2) return 0; // On size overflow, abort allocation
+  if (bytes < 2)
+  {
+    assert(false);
+    return 0; // On size overflow, abort allocation
+  }
   for(region *r = first_free_region, *prev = 0; r; prev = r, r = r->next)
     if (bytes <= r->size)
     {
@@ -206,6 +210,15 @@ extern "C" void malloc_defrag(uint8_t times)
   }
 //  malloc_dump_heap();
 //  malloc_verify_heap_consistency();
+}
+
+extern "C" void malloc_add_free_block(void *ptr, size_t size)
+{
+  region *r = (region*)ptr;
+  r->size = size;
+  r->next = unsorted_free_region;
+  unsorted_free_region = r;
+  malloc_defrag(1);
 }
 
 extern "C" void free(void *ptr)

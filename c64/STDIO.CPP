@@ -36,8 +36,9 @@ void __assert(bool condition, const char *str, const char *file, int line, const
 
 bool string_contains_char(const char *str, char ch)
 {
+  assert(!(ch & 0x20));
   assert(str);
-  while(*str) if (*str++ == ch) return true;
+  while(*str) if ((*str++ & ~0x20) == ch) return true;
   return false;
 }
 
@@ -190,7 +191,7 @@ extern "C" FILE *fopen(const char *filename, const char *mode)
   fn[1] = '0';
   fn[2] = ':';
   uint8_t device_number = extract_device_number_from_string(mode);
-  bool reading_file = string_contains_char(mode, 'r');
+  bool reading_file = string_contains_char(mode, 'r' & ~0x20);
   bool accessing_disk_drive = (device_number >= 8);
   uint8_t i = accessing_disk_drive ? 3 : 0;
   for(uint8_t j = 0; filename[j]; ++j) { fn[i++] = filename[j]; }
@@ -199,7 +200,7 @@ extern "C" FILE *fopen(const char *filename, const char *mode)
     // Append ",S,R" or ",S,W" to filename to tell that the file type is Sequential, and that
     // we are either reading or writing to the file.
     fn[i++] = ',';
-    fn[i++] = string_contains_char(mode, 'p') ? 'P' : 'S';
+    fn[i++] = string_contains_char(mode, 'p' & ~0x20) ? 'P' : 'S';
     fn[i++] = ',';
     fn[i++] = reading_file ? 'R' : 'W';
   }
@@ -625,6 +626,74 @@ two:   _CHROUT('0'+(zp0>>4));
 one:   _CHROUT('0'+(zp0&0xF));
 }
 
+// Prints the given uint32 to CHROUT. (max 42_94_96_72_95)
+void chrout_u32(uint32_t num)
+{
+  volatile uint32_t *tmp_u32 = (uint32_t*)0xCBF8;
+  *tmp_u32 = num;
+  uint8_t zp0, zp1, zp2, zp3, zp4;
+  // Convert 'num' to 5x2 BCD digits.
+  __asm__(R"(
+    SED // Enter Binary Coded Decimal (BCD) mode (affects ADC commands below)
+
+    LDA #0
+    STA %[zp0] // zp0-zp4 will store the output BCD digits, 0-4294967295.
+    STA %[zp1] // Initialize these all to zero to start
+    STA %[zp2]
+    STA %[zp3]
+    STA %[zp4]
+
+    LDX #32 // Loop each of the 32 bits of the u32 input
+loop%=:
+    ROL $CBF8 // Shift the input u32 one bit to the left
+    ROL $CBF9 // rotating the next MSB bit of input into Carry
+    ROL $CBFA // rotating the next MSB bit of input into Carry
+    ROL $CBFB // rotating the next MSB bit of input into Carry
+
+    LDA %[zp0] // Multiply the three BCD number pairs by two, and add the input bit from carry to the BCD
+    ADC %[zp0]
+    STA %[zp0]
+    LDA %[zp1]
+    ADC %[zp1]
+    STA %[zp1]
+    LDA %[zp2]
+    ADC %[zp2]
+    STA %[zp2]
+    LDA %[zp3]
+    ADC %[zp3]
+    STA %[zp3]
+    LDA %[zp4]
+    ADC %[zp4]
+    STA %[zp4]
+
+    DEX     // Loop back to next input bit
+    BNE loop%=
+
+    CLD // Exit BCD mode
+  )":[zp0]"=r"(zp0), [zp1]"=r"(zp1), [zp2]"=r"(zp2), [zp3]"=r"(zp3), [zp4]"=r"(zp4)::"a","x","c");
+
+  if (zp4 > 9) goto ten;
+  if (zp4)     goto nine;
+  if (zp3 > 9) goto eight;
+  if (zp3)     goto seven;
+  if (zp2 > 9) goto six;
+  if (zp2)     goto five;
+  if (zp1 > 9) goto four;
+  if (zp1)     goto three;
+  if (zp0 > 9) goto two;
+  goto one;
+ten:   _CHROUT('0'+(zp4>>4));
+nine:  _CHROUT('0'+(zp4&0xF));
+eight: _CHROUT('0'+(zp3>>4));
+seven: _CHROUT('0'+(zp3&0xF));
+six:   _CHROUT('0'+(zp2>>4));
+five:  _CHROUT('0'+(zp2&0xF));
+four:  _CHROUT('0'+(zp1>>4));
+three: _CHROUT('0'+(zp1&0xF));
+two:   _CHROUT('0'+(zp0>>4));
+one:   _CHROUT('0'+(zp0&0xF));
+}
+
 char *itoa_u16(char *dst, uint16_t num)
 {
   uint8_t zp0, zp1, zp2;
@@ -751,25 +820,41 @@ extern "C" int printf(const char *format, ...)
       dst = va_arg(args, int);
       if (dst < 0) { _CHROUT('-'); dst = -dst; }
       chrout_u16(dst);
-      __asm__("NOP":::"memory"); // xxx random fix to mask/avoid bug https://github.com/llvm-mos/llvm-mos/issues/393
     break;
     case 'u':
       dst = va_arg(args, unsigned int);
       chrout_u16(dst);
-      __asm__("NOP":::"memory"); // xxx random fix to mask/avoid bug https://github.com/llvm-mos/llvm-mos/issues/393
     break;
     case 'x':
       chrout_x16(va_arg(args, unsigned int));
-      __asm__("NOP":::"memory"); // xxx random fix to mask/avoid bug https://github.com/llvm-mos/llvm-mos/issues/393
       break;
     case 'X':
       chrout_X16(va_arg(args, unsigned int));
-      __asm__("NOP":::"memory"); // xxx random fix to mask/avoid bug https://github.com/llvm-mos/llvm-mos/issues/393
       break;
     case 's':
       str = va_arg(args, const char *);
       assert(str);
       while(*str) _CHROUT(*str++);
+    case 'l':
+      switch(*++format)
+      {
+      case 'd':
+      case 'D':
+      {
+        int32_t i32 = va_arg(args, int32_t);
+        if (i32 < 0) { _CHROUT('-'); i32 = -i32; }
+        chrout_u32(i32);
+      }
+      break;
+      case 'u':
+      case 'U':
+      {
+        uint32_t u32 = va_arg(args, uint32_t);
+        chrout_u32(u32);
+      }
+      break;
+      default: assert(false); break;
+      }
     break;
     default: assert(false); break;
     }

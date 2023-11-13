@@ -124,10 +124,10 @@ def compile_file(filename):
 
   build_output_file = calc_output_prg_filename_from_input_cpp_filename(filename)
   # TODO PATH
-  compiler = 'C:/code/llvm-mos-sdk/build/install/bin/mos-c64-clang.bat'
+  compiler = 'C:/llvm-mos/bin/mos-c64-clang.bat'
 # compiler = 'mos-c64-clang'
   include_dir = os.path.abspath(os.path.join(script_directory, '..', 'C64'))
-  additional_libs = [os.path.join(include_dir, 'stdio.cpp')]
+  additional_libs = [os.path.join(include_dir, 'stdio.cpp'), os.path.join(include_dir, 'c64_malloc.cpp')]
 #  print(include_dir)
 ############### XXXXXXXXXXXX DEBUG
 #  open(filename, 'w').write('''
@@ -138,7 +138,7 @@ def compile_file(filename):
 #  printf("HELLO, WORLD!\\n");
 #}
 #''')
-  cmd = [compiler, filename, f'-I{include_dir}', '-Oz', '-o', build_output_file, '-nolibc', '-nostdlib++', 'C:/code/llvm-mos-sdk/mos-platform/common/c/new.cc'] + additional_libs
+  cmd = [compiler, filename, f'-I{include_dir}', '-Oz', '-o', build_output_file, '-nolibc', '-nostdlib++'] + additional_libs
   print(str(cmd))
   current_subprocess_build = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
