@@ -1430,13 +1430,17 @@ void main_loop()
 extern "C" size_t __heap_start;
 extern "C" char __restore_overlay_start, __restore_overlay_dst, __restore_overlay_dst_end;
 
+#ifdef __C64__
+int main()
+#else
 int main(int argc, char **argv)
+#endif
 {
   deploy_restore_overlay_memory(); // This must be done before initializing the heap
 
   setup_cpp_programming_font();
-  unsigned int heap_size = 0xC700 - (unsigned int)&__heap_start;
-  __set_heap_limit(heap_size);
+//  unsigned int heap_size = 0xC700 - (unsigned int)&__heap_start;
+//  __set_heap_limit(heap_size);
 /*
   _CLRSCR();
   printf("START: 0X%X\n", (unsigned int)&__restore_overlay_start);
@@ -1477,7 +1481,11 @@ int main(int argc, char **argv)
   init_screen();
 
   // TODO: Query current text mode to initialize defaults
+#ifdef __C64__
+  File *f = open_new_file();
+#else
   File *f = (argc > 1) ? load_file(argv[1]) : open_new_file();
+#endif
 
   open_file_in_viewport(f, /*bringToMruFront*/1);
   assert(currentFile);

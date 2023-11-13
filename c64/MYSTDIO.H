@@ -9,14 +9,9 @@
 #include <stdarg.h>
 #include <string.h>
 #include <ctype.h>
+#include <assert.h>
 
 //#include_next <stdio.h>
-
-//#define _STDIO_DEBUG_LEVEL 1
-
-#ifndef _STDIO_DEBUG_LEVEL
-#define _STDIO_DEBUG_LEVEL 0
-#endif
 
 typedef _BitInt(24) int24_t;
 
@@ -61,18 +56,6 @@ int fputs(const char *str, FILE *f);
 int fclose(FILE *f);
 
 int printf(const char *format, ...);
-
-void __assert(bool condition, const char *str, const char *file, int line, const char *func);
-
-#ifdef NDEBUG
-#define assert(x) ((void)0)
-#elif _STDIO_DEBUG_LEVEL >= 2
-#define assert(x) __assert((x), #x, __FILE__, __LINE__, __func__);
-#elif _STDIO_DEBUG_LEVEL >= 1
-#define assert(x) __assert((x), "", __FILE__, __LINE__, "");
-#else
-#define assert(x) __assert((x), "", "", __LINE__, "");
-#endif
 
 typedef uint8_t rsize_t;
 char *gets_s(char *str, rsize_t n);

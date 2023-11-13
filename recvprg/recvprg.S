@@ -254,7 +254,7 @@ run_prg:                   ; Instead of saving to datasette, run the PRG
   JSR start_loaded_prg ; Start the downloaded program
 
   ; Print "Program Finished" message
-  LDX #32
+  LDX #33
 print_program_finished:
   LDA message,X
   JSR $FFD2
@@ -290,7 +290,7 @@ flush_keys2:
   RTS ; Return back to caller as usual
 
 message:
-  .ascii " .YEK YNA SSERP .DEHSINIF MARGORP"
+  .ascii " .YEK YNA SSERP .DEHSINIF MARGORP\r"
 
 start_loaded_prg:
   JMP (prg_entry_func_address)

@@ -219,7 +219,7 @@ File *load_file(const char *filename)
   memset(f, 0, sizeof(File));
   strcpy(f->filename, filename);
 
-  char *tmp_line = (char*)malloc(MAX_CHARS_PER_LINE+1);
+  char *tmp_line = (char*)Malloc(MAX_CHARS_PER_LINE+1);
   if (!tmp_line)
   {
     free(f);
@@ -229,6 +229,7 @@ File *load_file(const char *filename)
   bool prev_line_ended_in_newline = false;
   while(fgets(tmp_line, MAX_CHARS_PER_LINE, handle))
   {
+//    printf("GOT LINE %s\n", tmp_line);
     line_xpos len = (line_xpos)strlen(tmp_line);
     prev_line_ended_in_newline = (len > 0 && tmp_line[len-1] == '\n');
     if (prev_line_ended_in_newline) // subtract newline from line
@@ -237,7 +238,7 @@ File *load_file(const char *filename)
     Line far *curLine = (Line far *)Farmalloc(sizeof(Line));
     if (!curLine) break; // TODO Alert/report malloc error
     memset(curLine, 0, sizeof(Line));
-    curLine->text = (char*)malloc(len);
+    curLine->text = (char*)Malloc(len);
     if (!curLine->text) break; // TODO Alert/report malloc error
     curLine->length = curLine->capacity = len;
     memcpy(curLine->text, tmp_line, len);
