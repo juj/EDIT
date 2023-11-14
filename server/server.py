@@ -462,7 +462,19 @@ def handle_ask_aoc_calendar(data):
   print(str(output.returncode))
   print(str(output.stderr))
   if output.returncode == 0:
-    stdout = output.stdout
+    # \x8A light red
+    # \x8D light green
+    header = f'\n      \x82*\x85*\x8A*\x8D* ADVENT OF CODE {year} *\x8A*\x85*\x82*     \n\n'
+#    stdout += f'   TEST \x81 COLOR1 \x82 COLOR2\n'
+#    stdout += f'   TEST \x83 COLOR3 \x84 COLOR4\n'
+#    stdout += f'   TEST \x85 COLOR5 \x86 COLOR6\n'
+#    stdout += f'   TEST \x87 COLOR7 \x88 COLOR8\n'
+#    stdout += f'   TEST \x89 COLOR9 \x8A COLORA\n'
+#    stdout += f'   TEST \x8B COLORB \x8C COLORC\n'
+#    stdout += f'   TEST \x8D COLORD \x8E COLORE\n'
+#    stdout += f'   TEST \x8F COLORF \x80 COLOR0 12\n'
+
+    stdout = header.encode('iso8859-15') + output.stdout
     print(str(stdout))
     send_file_data_to_client('', stdout, False)
 
@@ -482,9 +494,36 @@ def handle_ask_aoc_day_desc(data):
   print(str(output.stdout))
   print(str(output.stderr))
   if output.returncode == 0:
-    stdout = output.stdout
-    print(str(stdout))
-    send_file_data_to_client('', stdout, False)
+    stdout = output.stdout.decode('iso8859-15') # Proxy for PETSCII
+    # Colorize lines
+    i = 0
+    toggle_white = False
+    toggle_green = False
+    toggle_yellow = False
+    toggle_bold = False
+    out_str = ''
+    while i < len(stdout):
+      if i + 3 <= len(stdout) and stdout[i:i+3] == '---':
+        toggle_white = not toggle_white
+        if toggle_white: out_str += '\x81---'
+        else: out_str += '---\x8F'
+        i += 2
+      elif stdout[i] == '*':
+        toggle_yellow = not toggle_yellow
+        if toggle_yellow: out_str += '\x87'
+        else: out_str += '\x8F'
+      elif stdout[i] == '[':
+        toggle_green = True
+        out_str += '\x8D'
+      elif stdout[i] == ']':
+        toggle_green = False
+        out_str += '\x8F'
+      elif stdout[i] == '\n':
+        out_str += '\n\x8F'
+      else:
+        out_str += stdout[i]
+      i += 1
+    send_file_data_to_client('', out_str.encode('iso8859-15'), False)
 
 
 MAGIC_ASK_AOC_INPUT = 0x12985331

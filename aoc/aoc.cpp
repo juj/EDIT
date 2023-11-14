@@ -591,11 +591,21 @@ int *build_col_start_addresses(const char *str, int num_lines)
   return starts;
 }
 
-int longest_line_length(int *starts, int num_lines)
+int line_length(const char *line)
+{
+  int len = 0;
+  while(*line && *line != '\n' && *line != '\r') if (*line++ < 128) ++len;
+  return len;
+}
+
+int longest_line_length(const char *text, int *starts, int num_lines)
 {
   int max = 0;
   for(int i = 0; i < num_lines; ++i)
-    if (max < starts[i+1] - starts[i]) max = starts[i+1] - starts[i] - 1;
+  {
+    int len = line_length(text + starts[i]);
+    if (max < len) max = len;
+  }
   return max;
 }
 /*
@@ -747,7 +757,7 @@ int view_file(char *text, uint8_t view_type)
   int num_lines = count_num_lines(text);
 
   int *starts = build_col_start_addresses(text, num_lines);
-  int max_x = longest_line_length(starts, num_lines) - SCREEN_WIDTH;
+  int max_x = longest_line_length(text, starts, num_lines) - SCREEN_WIDTH;
   int max_y = num_lines - SCREEN_HEIGHT;
 
 //  printf("\\N = %d\n", (int)petscii_to_screen_code(ascii_to_petscii('\n')));
@@ -771,17 +781,26 @@ int view_file(char *text, uint8_t view_type)
   {
     if (repaint)
     {
+      int screen_pos = 0;
       for(int Y = 0; Y < SCREEN_HEIGHT && y+Y < num_lines; ++Y)
       {
         char *s = text + starts[y+Y];
         uint8_t highlight = (y+Y == cursor_y) ? 0x80 : 0;
         int line_length = starts[y+Y+1] - starts[y+Y] - 1;
-        int screen_pos = Y*SCREEN_WIDTH;
-        unsigned char color = (y+Y >= line_select_start && y+Y <= line_select_end) ? 0 : 14;
+        bool cur_line_selected = (y+Y >= line_select_start && y+Y <= line_select_end);
+        unsigned char color = cur_line_selected ? 0 : 13;
+        int cur_x = 0;
+        while(cur_x < x && cur_x < line_length)
+        {
+          if (s[cur_x] >= 128 && s[cur_x] < 128 + 16) color = s[cur_x] - 128;
+          ++cur_x;
+        }
         for(int X = 0; X < SCREEN_WIDTH; ++X)
         {
-          char ch = x+X < line_length ? s[x+X] : ' ';
+          char ch = cur_x < line_length ? s[cur_x] : ' ';
+          if (ch >= 128 && ch < 128 + 16) { color = ch - 128; ch = s[++cur_x]; }
           put_screen(screen_pos++, ch, color, highlight);
+          ++cur_x;
         }
       }
       repaint = false;
@@ -895,9 +914,12 @@ int view_file(char *text, uint8_t view_type)
 }
 
 static volatile unsigned char * const mem_setup_register = (unsigned char *)0xD018;
+static volatile unsigned char * const screen_bg = (unsigned char *)0xD021;
 
 int main()
 {
+  *screen_border = 5; // green
+  *screen_bg = 0; // black
 //  unsigned int heap_size = 0xCD00 - (unsigned int)&__heap_start;
 //  __set_heap_limit(heap_size);
 
