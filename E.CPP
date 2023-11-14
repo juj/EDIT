@@ -27,6 +27,11 @@
 #include "c64/c64_char_rom.h"
 
 bool scroll_viewport_horizontally_to_display_cursor();
+Line far *find_last_viewport_start_line(cursor_pos *linesInView);
+void scroll_to_beginning();
+void scroll_to_end();
+bool restrict_cursor_on_line();
+void move_viewport_vertically(cursor_pos lines, bool cursor_moves_along);
 
 #ifdef __C64__
 #define COLOR_UNSAVED_CURRENT LTRED
@@ -73,7 +78,7 @@ void repaint_line(int screenY, Line *line, int startX, int endX)
 {
   if (line)
   {
-    //if (!line->colors) // XXXX TODO Want this, but syntax highlighting of multiline comments doesn't work then
+    if (!line->colors) // XXXX TODO Want this, but syntax highlighting of multiline comments doesn't work then
     {
       startX = 0;
       syntax_highlight(line);
@@ -128,6 +133,8 @@ void repaint_screen_lines(cursor_pos yStart, cursor_pos yEnd)
 
 void print_line_column_info()
 {
+  assert(cursorY >= 0);
+  assert(cursorY < SCREEN_HEIGHT);
   assert(get_current_line_number() == current_line_number());
   //  line_num curLineNumber = get_current_line_number();
   char str[32];
@@ -356,12 +363,17 @@ void backspace_character()
   }
   else if (currentLine->prevLine)
   {
+    if (cursorY == 0) move_viewport_vertically(-1, false);
+    assert(cursorY > 0);
     currentLine = currentLine->prevLine;
     --cursorY;
+    assert(get_current_line_number() == current_line_number());
+
     cursorX = virtualX = currentLine->length;
     delete_character();
     scroll_viewport_horizontally_to_display_cursor();
   }
+  assert(cursorY >= 0);
 }
 
 // If current cursor X coordinate is too far to the right so that
@@ -394,11 +406,6 @@ bool restrict_cursor_on_line()
   cursorX = MIN(virtualX, currentLine->length - viewportXOffset);
   return scroll_viewport_horizontally_to_display_cursor();
 }
-
-Line far *find_last_viewport_start_line(cursor_pos *linesInView);
-void scroll_to_beginning();
-void scroll_to_end();
-bool restrict_cursor_on_line();
 
 void move_viewport_vertically(cursor_pos lines, bool cursor_moves_along)
 {
@@ -457,6 +464,7 @@ void move_viewport_vertically(cursor_pos lines, bool cursor_moves_along)
   }
   bool repainted = restrict_cursor_on_line();
   if (!repainted) repaint_screen();
+  assert(cursorY >= 0);
 }
 
 void move_cursor_vertically(cursor_pos lines)
@@ -683,6 +691,7 @@ void move_cursor_to_prev_word()
     if (oldXOffset != viewportXOffset)
       repaint_screen();
   }
+  assert(cursorY >= 0);
 }
 
 void move_cursor_to_next_word()
@@ -843,7 +852,12 @@ void erase_line(Line *line)
   }
   if (line == currentLine)
   {
-    if (subst == line->prevLine) --cursorY;
+    if (subst == line->prevLine)
+    {
+      if (cursorY > 0) --cursorY;
+      else move_viewport_vertically(-1, false);
+    } 
+    assert(cursorY >= 0);
     currentLine = subst;
   }
 
@@ -1125,10 +1139,12 @@ void main_loop()
 #ifdef ACTION_CURSOR_TO_FILE_END
       case ACTION_CURSOR_TO_FILE_END: scroll_to_end(); break;
 #endif
+#ifdef ACTION_CURSOR_TO_TOGGLE_FILE_START_END
       case ACTION_CURSOR_TO_TOGGLE_FILE_START_END:
         if (currentLine->nextLine) scroll_to_end();
         else scroll_to_beginning(); 
         break;
+#endif
       case ACTION_QUIT_PROGRAM:
 #ifdef ACTION_QUIT_PROGRAM_ALT2
       case ACTION_QUIT_PROGRAM_ALT2:
@@ -1195,9 +1211,11 @@ void main_loop()
         insert_indent(/*line_start=*/false);
         break;
 #endif
+#ifdef ACTION_ADD_INDENT_TO_LINE_START
       case ACTION_ADD_INDENT_TO_LINE_START:
         insert_indent(/*line_start=*/true);
         break;
+#endif
       case ACTION_UNINDENT_LINE_START: unindent(); break;
       case ACTION_ALT_TAB_MENU_NEXT_DOCUMENT:
 #ifdef ACTION_ALT_TAB_MENU_NEXT_DOCUMENT_ALT2
@@ -1218,7 +1236,9 @@ void main_loop()
       }
         break;
       case ACTION_CUT_TEXT:
+#ifdef ACTION_CUT_TEXT_ALT2
       case ACTION_CUT_TEXT_ALT2:
+#endif
         copy_selection(/*cutSelection=*/true);
         break;
       case ACTION_COPY_TEXT:
@@ -1228,7 +1248,9 @@ void main_loop()
         copy_selection(/*cutSelection=*/false);
         break;
       case ACTION_PASTE_TEXT:
+#ifdef ACTION_PASTE_TEXT_ALT2
       case ACTION_PASTE_TEXT_ALT2:
+#endif
         paste_selection();
         break;
       case ACTION_TOGGLE_TEXT_SELECT_MODE:
@@ -1241,6 +1263,7 @@ void main_loop()
         else
           copy_selection(/*cutSelection=*/false);
         break;
+#ifdef ACTION_TOGGLE_TEXT_SELECT_MODE_AND_SELECT_CURRENT_LINE
       case ACTION_TOGGLE_TEXT_SELECT_MODE_AND_SELECT_CURRENT_LINE:
         if (textSelectionModeActive) copy_selection(/*cutSelection=*/false);
         else
@@ -1255,8 +1278,11 @@ void main_loop()
           print_textsel_info();
         }
         break;
+#endif
       case ACTION_SAVE_FILE:
+#ifdef ACTION_SAVE_FILE_AS
       case ACTION_SAVE_FILE_AS:
+#endif
       {
         bool userCancelled = false;
         if (is_file_unnamed(currentFile) || is_shift_key_held(key))
@@ -1432,56 +1458,22 @@ void main_loop()
   }
 }
 
+#ifdef __C64__
+
 extern "C" size_t __heap_start;
 extern "C" char __restore_overlay_start, __restore_overlay_dst, __restore_overlay_dst_end;
-
 extern "C" void malloc_add_free_block(void *ptr, size_t size);
 
-#ifdef __C64__
 int main()
 #else
 int main(int argc, char **argv)
 #endif
 {
+#ifdef __C64__
   deploy_restore_overlay_memory(); // This must be done before initializing the heap
-
   setup_cpp_programming_font();
   malloc_add_free_block((void*)0x0400, 0x0400);
-//  unsigned int heap_size = 0xC700 - (unsigned int)&__heap_start;
-//  __set_heap_limit(heap_size);
-/*
-  _CLRSCR();
-  printf("START: 0X%X\n", (unsigned int)&__restore_overlay_start);
-  printf("DST: 0X%X\n", (unsigned int)&__restore_overlay_dst);
-  printf("DST END: 0X%X\n", (unsigned int)&__restore_overlay_dst_end);
-  printf("%uB OF DOC MEM\n", heap_size);
-  get_key();
-*/
-  /*
-  uint8_t *mem;
-  for(uint16_t sz = 2048; sz > 0; --sz)
-  {
-    mem = (uint8_t*)malloc(sz);
-    if (mem)
-    {
-      printf("ALLOCATED %u BYTES.\n", sz);
-      break;
-    }
-  }
-  uint16_t base = (uint16_t)&__heap_start;
-  size_t heap_size = (uint16_t)__heap_limit();
-  uint16_t heap_end = base + heap_size;
-  uint16_t stack_bottom = (uint16_t)&stack_bottom;//(uint16_t)__builtin_frame_address(0);
-  printf("BASE: 0X%04X\n", base);
-  printf("HEAP_SIZE: 0X%04X\n", heap_size);
-  printf("HEAP_END: 0X%04X\n", heap_end);
-  printf("STACK_BOTTOM: 0X%04X\n", stack_bottom);
-  get_key();
-*/
-
-
-
-
+#endif
  //// query_svga_modes();
 //  set_vga_text_mode(TEXT_MODE_90x60);
 //  set_vga_text_mode(TEXT_MODE_40x25);
@@ -1509,5 +1501,7 @@ int main(int argc, char **argv)
 #endif
   deinit_screen();
   deinit_network();
+#ifdef __C64__
   _RESET();
+#endif
 }

@@ -49,7 +49,7 @@ int rrnet_init(bool enable_promiscuous_mode)
   cs_set_page(0);
   if (cs_read_page_data() != 0x630E)
   {
-    printf("RR-NET/CS8900A WAS NOT DETECTED.");
+    printf("RR-NET/CS8900A WAS NOT DETECTED.\n");
     return 0;
   }
 /*

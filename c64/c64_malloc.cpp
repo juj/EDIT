@@ -19,6 +19,7 @@ static region *unsorted_free_region = 0;
 __attribute__((constructor(99999)))
 static void initialize_malloc()
 {
+  assert((uint16_t)&__heap_start < MALLOC_HEAP_CEILING - 16);
   region *r = (region*)first_free_region;
   r->size = MALLOC_HEAP_CEILING - (uint16_t)&__heap_start;
   r->next = 0;

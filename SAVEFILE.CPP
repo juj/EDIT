@@ -61,8 +61,8 @@ void save_file(File *file)
   file->hasUnsavedChanges = 0;
 error:
   char str[64];
-  sprintf(str, "Unable to save file \"%s\"!", file->filename);
-  log_error(str);
+  sprintf(str, "Unable to save file \"%s\"!\n", file->filename);
+  printf(str);
   return;
 }
 #endif

@@ -100,6 +100,7 @@ void send_datagram(const void *src, size_t numBytes)
 
 void send_line_to_network_server(uint8_t editType, File *f, Line *l, line_num lineno)
 {
+#if 0 // TODO
   UpdateLineMsg *msg = (UpdateLineMsg*)malloc(sizeof(UpdateLineMsg) + MAX_FILENAME_LEN + MAX_CHARS_PER_LINE);
   msg->magic = MAGIC_UPDATE_LINE_MSG;
   msg->line_no = lineno - 1; // Convert 1-based line number to 0-based
@@ -112,6 +113,7 @@ void send_line_to_network_server(uint8_t editType, File *f, Line *l, line_num li
   if (l) memcpy(data, l->text, l->length);
   send_datagram(msg, sizeof(UpdateLineMsg) + msg->filename_len + msg->line_len);
   free(msg);
+#endif
 }
 
 static uint8_t data[1400];
@@ -134,3 +136,8 @@ void receive_data_from_network()
     }
   }
 }
+
+void send_new_document_to_network_server(File *f, bool clear_contents)
+{
+}
+

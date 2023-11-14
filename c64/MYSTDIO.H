@@ -1,5 +1,7 @@
 #pragma once
 
+#ifdef __C64__
+
 // Before including this file, call
 // #define _STDIO_DEBUG_LEVEL 2 to add verbose debugging support, or
 // #define _STDIO_DEBUG_LEVEL 1 to add more lightweight debugging support.
@@ -13,7 +15,11 @@
 
 //#include_next <stdio.h>
 
+#ifdef __clang__
 typedef _BitInt(24) int24_t;
+#else
+typedef int int24_t;
+#endif
 
 struct FILE
 {
@@ -64,4 +70,6 @@ void *memcpy8(void *dest, const void *src, uint8_t count);
 
 #ifdef __cplusplus
 } // extern "C"
+#endif
+
 #endif

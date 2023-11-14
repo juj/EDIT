@@ -1,3 +1,5 @@
+#ifdef __C64__
+
 #include <string.h>
 
 static volatile unsigned char *processor_port = (unsigned char *)0x01;
@@ -97,3 +99,5 @@ void deploy_restore_overlay_memory()
   for(char *d = &__restore_overlay_dst; d != &__restore_overlay_dst_end;)
     *d++ = *s++;
 }
+
+#endif

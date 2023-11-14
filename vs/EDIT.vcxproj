@@ -147,6 +147,7 @@
     <ClInclude Include="..\UTIL.H" />
     <ClInclude Include="..\VGA.H" />
     <ClInclude Include="..\VIEWPORT.H" />
+    <ClInclude Include="KEYCODES.H" />
     <ClInclude Include="vs_network.h" />
   </ItemGroup>
   <ItemGroup>
@@ -168,6 +169,7 @@
     <ClCompile Include="..\UTIL.CPP" />
     <ClCompile Include="..\VGA.CPP" />
     <ClCompile Include="..\VIEWPORT.CPP" />
+    <ClCompile Include="vs_key.cpp" />
     <ClCompile Include="vs_network.cpp" />
     <ClCompile Include="vs_network_client.cpp" />
     <ClCompile Include="vs_vt100.cpp" />

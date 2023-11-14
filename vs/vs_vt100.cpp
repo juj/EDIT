@@ -254,3 +254,11 @@ bool init_screen()
 void deinit_screen()
 {
 }
+
+void scroll_screen_up(int8_t lines_scrolled)
+{
+}
+
+void scroll_screen_down(int8_t lines_scrolled)
+{
+}

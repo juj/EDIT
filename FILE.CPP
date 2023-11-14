@@ -222,7 +222,7 @@ File *load_file(const char *filename)
   char *tmp_line = (char*)Malloc(MAX_CHARS_PER_LINE+1);
   if (!tmp_line)
   {
-    free(f);
+    Free(f, sizeof(File));
     fclose(handle);
     return 0;
   }
@@ -257,7 +257,7 @@ File *load_file(const char *filename)
     }
     */
   }
-  free(tmp_line);
+  Free(tmp_line, MAX_CHARS_PER_LINE+1);
   // Gotcha: Must append a dummy newline if the previous line ended in a newline
   // and the last line in file is actually empty.
 /*
@@ -278,7 +278,7 @@ File *load_file(const char *filename)
   fclose(handle);
   if (!f->firstLine)
   {
-    free(f);
+    Free(f, sizeof(File));
     return 0;
   }
 

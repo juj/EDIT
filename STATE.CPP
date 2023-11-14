@@ -1,5 +1,6 @@
 #include "state.h"
 #include "screen.h"
+#include <assert.h>
 
 allocated_mem_size_t allocatedMemory = 0;
 
@@ -43,6 +44,8 @@ line_xpos current_column()
 
 line_num current_line_number()
 {
+  assert(cursorY >= 0);
+  assert(cursorY < SCREEN_HEIGHT);
   return firstDisplayedLineNumber + cursorY;
 }
 

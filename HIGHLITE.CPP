@@ -173,7 +173,7 @@ void syntax_highlight(Line far *line)
       return;
     }
   }
-
+  assert(line->length <= MAX_CHARS_PER_LINE);
   for(; i < line->length; ++i)
   {                                      //   % 'asdfasd'
     if (is_whitespace(line->text[i]))    // !     ! () 0        :;<=>? @ |

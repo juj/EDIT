@@ -81,35 +81,3 @@
 // General character mappings:
 #define LEFT_CURLY_BRACE  PETSCII_LEFT_CURLY_BRACE
 #define RIGHT_CURLY_BRACE PETSCII_RIGHT_CURLY_BRACE
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

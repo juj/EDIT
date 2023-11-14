@@ -268,7 +268,7 @@ _KERNAL void _Noreturn _RESET() { _ASM volatile("JMP ($FFFC)"); __builtin_unreac
 _KERNAL bool _KBHIT() { return *(volatile unsigned char *)0x00C6; }
 
 // Clears the screen (resets both character and color data) and moves cursor to top-left (0,0).
-_KERNAL void _CLRSCR() { _ASM volatile("JSR $E544"); }
+_KERNAL void _CLRSCR() { _ASM volatile("JSR $E544":::"a","x","y","c"); }
 
 // Disables interrupts. Be sure to re-enable interrupts after executing a critical block.
 // Note that these calls do not have a nesting counter, i.e. calls to _DISABLE_INTR()

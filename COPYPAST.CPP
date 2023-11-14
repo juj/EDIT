@@ -242,9 +242,17 @@ void paste_selection()
   if (i > 0)
   {
     for(line_xpos k = currentLine->length + i - 1; k >= pastePosition + i; --k)
+    {
+      assert(k < currentLine->capacity);
+      assert(k - i >= 0);
       currentLine->text[k] = currentLine->text[k - i];
+    }
     for(file_idx l = 0; l < i; ++l)
+    {
+      assert(pastePosition+l < currentLine->capacity);
+      assert(l < copyBufferCapacity);
       currentLine->text[pastePosition+l] = copyBuffer[l];
+    }
     currentLine->length += i;
   }
   clear_highlight(currentLine);
@@ -325,9 +333,11 @@ void paste_selection()
   {
     --cursorY;
     firstDisplayedLine = firstDisplayedLine->nextLine;
+    ++firstDisplayedLineNumber;
     assert(firstDisplayedLine);
   }
   viewportXOffset = 0; // TODO proper horiz scrolling
 
   repaint_screen(); // TODO: optimize repaint
+  assert(get_current_line_number() == current_line_number());
 }

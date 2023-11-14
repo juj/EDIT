@@ -130,9 +130,15 @@ int is_navigation_action_key(int key)
   case ACTION_CURSOR_TO_NEXT_WORD:
   case ACTION_CURSOR_TO_LINE_START:
   case ACTION_CURSOR_TO_LINE_END:
+#ifdef ACTION_CURSOR_TO_TOGGLE_FILE_START_END
   case ACTION_CURSOR_TO_TOGGLE_FILE_START_END:
+#endif
+#ifdef ACTION_PAGE_ONE_THIRD_UP
   case ACTION_PAGE_ONE_THIRD_UP:
+#endif
+#ifdef ACTION_PAGE_ONE_THIRD_DOWN
   case ACTION_PAGE_ONE_THIRD_DOWN:
+#endif
   case ACTION_PAGE_UP:
   case ACTION_PAGE_DOWN:
     return true;
@@ -151,8 +157,9 @@ int get_key()
 {
   int key = _getch();
   if (!key || key == 0xE0)
-    key = 0x100 | _getch();
-  if (is_shift_key_currently_down() && is_shift_aware_key(key)) key |= KEY_SHIFT_MODIFIER;
+    key = KEY_EXTENDED_MODIFIER | _getch();
+//  if (is_shift_key_currently_down() && is_shift_aware_key(key)) key |= KEY_SHIFT_MODIFIER;
+  if (is_shift_key_currently_down()) key |= KEY_SHIFT_MODIFIER;
   return key;
 }
 #endif
