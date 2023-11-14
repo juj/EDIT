@@ -26,7 +26,7 @@
 #include "c64/c64_kernal.h"
 #include "c64/c64_char_rom.h"
 
-void scroll_viewport_horizontally_to_display_cursor();
+bool scroll_viewport_horizontally_to_display_cursor();
 
 #ifdef __C64__
 #define COLOR_UNSAVED_CURRENT LTRED
@@ -367,34 +367,38 @@ void backspace_character()
 // If current cursor X coordinate is too far to the right so that
 // it is outside the display, we must scroll the viewport by
 // adjusting viewportXOffset and repaint the screen.
-void scroll_viewport_horizontally_to_display_cursor()
+// Return true if repainted screen
+bool scroll_viewport_horizontally_to_display_cursor()
 {
   if (currentLine->length < viewportXOffset)
   {
     viewportXOffset = currentLine->length;
     cursorX = 0;
     repaint_screen();
+    return true;
   }
   if (cursorX >= SCREEN_WIDTH)
   {
     viewportXOffset += cursorX - (SCREEN_WIDTH-1);
     cursorX = SCREEN_WIDTH - 1;
     repaint_screen();
+    return true;
   }
+  return false;
 }
 
 // Adjust real cursor X based on the virtual cursor X of where it
-// would want to be.
-void restrict_cursor_on_line()
+// would want to be. Return true if screen was repainted.
+bool restrict_cursor_on_line()
 {
   cursorX = MIN(virtualX, currentLine->length - viewportXOffset);
-  scroll_viewport_horizontally_to_display_cursor();
+  return scroll_viewport_horizontally_to_display_cursor();
 }
 
 Line far *find_last_viewport_start_line(cursor_pos *linesInView);
 void scroll_to_beginning();
 void scroll_to_end();
-void restrict_cursor_on_line();
+bool restrict_cursor_on_line();
 
 void move_viewport_vertically(cursor_pos lines, bool cursor_moves_along)
 {
@@ -451,39 +455,30 @@ void move_viewport_vertically(cursor_pos lines, bool cursor_moves_along)
         break;
     }
   }
-  restrict_cursor_on_line();
-
-  if (scrolled_viewport) repaint_screen();
+  bool repainted = restrict_cursor_on_line();
+  if (!repainted) repaint_screen();
 }
 
 void move_cursor_vertically(cursor_pos lines)
 {
-  int8_t makeSound = 0;
+  assert(currentLine);
+  uint8_t scrolled = 0; // 0: scrolled nothing, 1: scrolled cursor, 2: scrolled viewport
 
-  while(lines < 0)
+  if (lines < 0)
   {
-    assert(currentLine);
-    if (cursorY > 0)
+    if (cursorY + lines >= 0)
     {
-      --cursorY;
-      makeSound = -1;
-      assert(currentLine->prevLine);
-      currentLine = currentLine->prevLine;
+      cursorY += lines;
+      scrolled = 1;
+      while(lines) { ++lines; currentLine = currentLine->prevLine; assert(currentLine); }
     }
     else
     {
-      assert(currentLine == firstDisplayedLine);
-      if (currentLine->prevLine)
-      {
-        makeSound = -1;
-        currentLine = firstDisplayedLine = currentLine->prevLine;
-        --firstDisplayedLineNumber;
-        repaint_screen();
-      }
-      else if (!makeSound)
-        makeSound = 1;
+      cursorY = 0;
+      scrolled = 1;
+      if (currentLine->prevLine) scrolled = 2;
+      while(lines && currentLine->prevLine) { firstDisplayedLine = currentLine = currentLine->prevLine; ++lines; --firstDisplayedLineNumber; }
     }
-    ++lines;
   }
 
   while(lines > 0)
@@ -492,27 +487,20 @@ void move_cursor_vertically(cursor_pos lines)
     if (currentLine->nextLine)
     {
       currentLine = currentLine->nextLine;
-      makeSound = -1;
-      if (cursorY < SCREEN_HEIGHT-1)
-      {
-        ++cursorY;
-      }
+      if (cursorY < SCREEN_HEIGHT-1) ++cursorY, scrolled = 1;
       else
       {
+        scrolled = 2;
         firstDisplayedLine = firstDisplayedLine->nextLine;
         ++firstDisplayedLineNumber;
-        repaint_screen();
       }
     }
-    else if (!makeSound)
-      makeSound = 1;
     --lines;
   }
 
-  restrict_cursor_on_line();
-
-  if (makeSound == 1)
-    beep(170, 50);
+  bool repainted = restrict_cursor_on_line();
+  if (!repainted && scrolled == 2) repaint_screen();
+  if (scrolled == 0) beep(170, 50);
 }
 
 void move_cursor_horizontally(cursor_pos chars)
