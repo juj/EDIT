@@ -461,6 +461,24 @@ extern "C" void *memcpy(void *dest, const void *src, size_t count) // TODO: opti
   return dest;
 }
 
+extern "C" void *memcpy8(void *dest, const void *src, uint8_t count) // TODO: optimize
+{
+  char *d = (char*)dest;
+  const char *s = (const char *)src;
+  while(count--) *d++ = *s++;
+  return dest;
+}
+
+extern "C" void *memmove(void *dest, const void *src, size_t num)
+{
+  if (dest < src || !num) return memcpy(dest, src, num);
+
+  char *d = (char*)dest + (num-1);
+  char *s = (char*)src + (num-1);
+  do *d-- = *s--; while(d != dest);
+  return dest;
+}
+
 extern "C" void putchar(char c) // TODO: optimize
 {
   if (__builtin_expect(c == '\n', 0))

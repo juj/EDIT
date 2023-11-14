@@ -107,3 +107,57 @@ void highlight_scroll_to_right(bool scrolled)
 {
   *screen_frame = scrolled ? /*DARKBLUE*/6 : /*LIGHTBLUE*/14;
 }
+
+void scroll_screen_up(int8_t lines_scrolled)
+{
+  /*
+  // Don't scroll first line since it contains the open files list - copy that manually
+  char *ram_copy_start = (char*)screen_ram + SCREEN_WIDTH;
+  char *color_copy_start = (char*)color_ram + SCREEN_WIDTH;
+  int copy_size = (SCREEN_WIDTH-1)*SCREEN_HEIGHT-offset;
+  memmove(ram_copy_start + offset, ram_copy_start, copy_size);
+  memmove(color_copy_start + offset, color_copy_start, copy_size);
+  */
+  int end = SCREEN_WIDTH*SCREEN_HEIGHT;
+  int offset = SCREEN_WIDTH*(int)lines_scrolled;
+  char *ram_dst = (char*)screen_ram + end - SCREEN_WIDTH;
+  char *ram_src = ram_dst - offset;
+  char *col_dst = (char*)color_ram + end - SCREEN_WIDTH;
+  char *col_src = col_dst - offset;
+  for(int y = 0; y < SCREEN_HEIGHT-1-lines_scrolled; ++y)
+  {
+    memcpy8(ram_dst, ram_src, SCREEN_WIDTH);
+    ram_dst -= SCREEN_WIDTH;
+    ram_src -= SCREEN_WIDTH;
+    memcpy8(col_dst, col_src, SCREEN_WIDTH);
+    col_dst -= SCREEN_WIDTH;
+    col_src -= SCREEN_WIDTH;
+  }
+}
+
+void scroll_screen_down(int8_t lines_scrolled)
+{
+  /*
+  // Don't scroll last line since it contains the line:column number info at bottom right
+  char *ram_copy_start = (char*)screen_ram;
+  char *color_copy_start = (char*)color_ram;
+  int offset = SCREEN_WIDTH*(int)lines_scrolled;
+  int copy_size = (SCREEN_WIDTH-1)*SCREEN_HEIGHT-offset;
+  memmove(ram_copy_start, ram_copy_start + offset, copy_size);
+  memmove(color_copy_start, color_copy_start + offset, copy_size);
+  */
+  int offset = SCREEN_WIDTH*(int)lines_scrolled;
+  char *ram_dst = (char*)screen_ram + SCREEN_WIDTH;
+  char *ram_src = ram_dst + offset;
+  char *col_dst = (char*)color_ram + SCREEN_WIDTH;
+  char *col_src = col_dst + offset;
+  for(int y = 0; y < SCREEN_HEIGHT-2-lines_scrolled; ++y)
+  {
+    memcpy8(ram_dst, ram_src, SCREEN_WIDTH);
+    ram_dst += SCREEN_WIDTH;
+    ram_src += SCREEN_WIDTH;
+    memcpy8(col_dst, col_src, SCREEN_WIDTH);
+    col_dst += SCREEN_WIDTH;
+    col_src += SCREEN_WIDTH;
+  }
+}

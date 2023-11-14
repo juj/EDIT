@@ -60,6 +60,8 @@ int printf(const char *format, ...);
 typedef uint8_t rsize_t;
 char *gets_s(char *str, rsize_t n);
 
+void *memcpy8(void *dest, const void *src, uint8_t count);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

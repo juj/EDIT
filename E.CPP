@@ -462,45 +462,62 @@ void move_viewport_vertically(cursor_pos lines, bool cursor_moves_along)
 void move_cursor_vertically(cursor_pos lines)
 {
   assert(currentLine);
-  uint8_t scrolled = 0; // 0: scrolled nothing, 1: scrolled cursor, 2: scrolled viewport
+  bool scrolled = false; // Detect if we want to play a beep sound
 
   if (lines < 0)
   {
-    if (cursorY + lines >= 0)
+    if (cursorY + lines >= 0) // No need to scroll viewport?
     {
       cursorY += lines;
-      scrolled = 1;
+      scrolled = true;
       while(lines) { ++lines; currentLine = currentLine->prevLine; assert(currentLine); }
     }
     else
     {
-      cursorY = 0;
-      scrolled = 1;
-      if (currentLine->prevLine) scrolled = 2;
-      while(lines && currentLine->prevLine) { firstDisplayedLine = currentLine = currentLine->prevLine; ++lines; --firstDisplayedLineNumber; }
+      if (cursorY > 0)
+      {
+        scrolled = true;
+        lines += cursorY;
+        cursorY = 0;
+      }
+      int8_t lines_scrolled = 0;
+      while(lines && currentLine->prevLine) { firstDisplayedLine = currentLine = currentLine->prevLine; ++lines; --firstDisplayedLineNumber; ++lines_scrolled; }
+      if (lines_scrolled)
+      {
+        scroll_screen_up(lines_scrolled);
+        repaint_screen_lines(0, lines_scrolled+1); // Draw +1 line to clear the open files list at top right
+        scrolled = true;
+      }
     }
   }
 
+  int8_t viewport_lines_scrolled_down = 0;
   while(lines > 0)
   {
     assert(currentLine);
     if (currentLine->nextLine)
     {
+      scrolled = true;
       currentLine = currentLine->nextLine;
-      if (cursorY < SCREEN_HEIGHT-1) ++cursorY, scrolled = 1;
+      if (cursorY < SCREEN_HEIGHT-1) ++cursorY;
       else
       {
-        scrolled = 2;
         firstDisplayedLine = firstDisplayedLine->nextLine;
         ++firstDisplayedLineNumber;
+        ++viewport_lines_scrolled_down;
       }
     }
     --lines;
   }
+  if (viewport_lines_scrolled_down)
+  {
+    scroll_screen_down(viewport_lines_scrolled_down);
+    repaint_screen_lines(0, 1); // Redraw first line to repaint the open files list
+    repaint_screen_lines(SCREEN_HEIGHT-2, SCREEN_HEIGHT); // Redraw last line to repaint the line:column info
+  }
 
-  bool repainted = restrict_cursor_on_line();
-  if (!repainted && scrolled == 2) repaint_screen();
-  if (scrolled == 0) beep(170, 50);
+  restrict_cursor_on_line();
+  if (!scrolled) beep(170, 50);
 }
 
 void move_cursor_horizontally(cursor_pos chars)
