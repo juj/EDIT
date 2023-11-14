@@ -501,25 +501,39 @@ def handle_ask_aoc_day_desc(data):
     toggle_green = False
     toggle_yellow = False
     toggle_bold = False
+    toggle_reverse_gray = False
     out_str = ''
     while i < len(stdout):
-      if i + 3 <= len(stdout) and stdout[i:i+3] == '---':
-        toggle_white = not toggle_white
-        if toggle_white: out_str += '\x81---'
-        else: out_str += '---\x8F'
-        i += 2
-      elif stdout[i] == '*':
-        toggle_yellow = not toggle_yellow
-        if toggle_yellow: out_str += '\x87'
-        else: out_str += '\x8F'
+      if stdout[i] == '#' and stdout[i+1] == '#':
+        toggle_white = True
+        out_str += '\x81'
+        i += 1
+      elif stdout[i] == '*' and stdout[i+1] != '*' and stdout[i-1] != '*':
+        star_end = stdout.find('*', i+1)
+        word_star_end = stdout.find('star', i)
+        if word_star_end >= i and word_star_end < star_end:
+          toggle_yellow = not toggle_yellow
+          if toggle_yellow: out_str += '\x87'
+          else: out_str += '\x8F'
+        else:
+          toggle_white = not toggle_white
+          if toggle_white: out_str += '\x81'
+          else: out_str += '\x8F'
+      elif stdout[i] == '`':
+        toggle_reverse_gray = not toggle_reverse_gray
+        if toggle_reverse_gray: out_str += '\xAA'
+        else: out_str += '\xAB'
       elif stdout[i] == '[':
         toggle_green = True
         out_str += '\x8D'
       elif stdout[i] == ']':
         toggle_green = False
         out_str += '\x8F'
+        if stdout[i+1] == '[': # Skip past the number citation reference, e.g. [foo][1] -> foo
+          i = stdout.find(']', i+1)
       elif stdout[i] == '\n':
         out_str += '\n\x8F'
+        toggle_white = False
       else:
         out_str += stdout[i]
       i += 1

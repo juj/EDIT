@@ -786,6 +786,7 @@ int view_file(char *text, uint8_t view_type)
       {
         char *s = text + starts[y+Y];
         uint8_t highlight = (y+Y == cursor_y) ? 0x80 : 0;
+        uint8_t extraHighlight = 0;
         int line_length = starts[y+Y+1] - starts[y+Y] - 1;
         bool cur_line_selected = (y+Y >= line_select_start && y+Y <= line_select_end);
         unsigned char color = cur_line_selected ? 0 : 13;
@@ -793,13 +794,20 @@ int view_file(char *text, uint8_t view_type)
         while(cur_x < x && cur_x < line_length)
         {
           if (s[cur_x] >= 128 && s[cur_x] < 128 + 16) color = s[cur_x] - 128;
+          else if (s[cur_x] == 0xAA) extraHighlight = 0x80;
+          else if (s[cur_x] == 0xAB) extraHighlight = 0;
           ++cur_x;
         }
         for(int X = 0; X < SCREEN_WIDTH; ++X)
         {
           char ch = cur_x < line_length ? s[cur_x] : ' ';
-          if (ch >= 128 && ch < 128 + 16) { color = ch - 128; ch = s[++cur_x]; }
-          put_screen(screen_pos++, ch, color, highlight);
+          while(ch >= 128)
+          {
+            if (ch >= 128 && ch < 128 + 16) { color = ch - 128; ch = s[++cur_x]; }
+            else if (ch == 0xAA) { extraHighlight = 0x80; ch = s[++cur_x]; }
+            else if (ch == 0xAB) { extraHighlight = 0; ch = s[++cur_x]; }
+          }
+          put_screen(screen_pos++, ch, color, highlight ^ extraHighlight);
           ++cur_x;
         }
       }
