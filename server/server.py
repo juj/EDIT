@@ -464,7 +464,7 @@ def handle_ask_aoc_calendar(data):
   if output.returncode == 0:
     # \x8A light red
     # \x8D light green
-    header = f'\n      \x82*\x85*\x8A*\x8D* ADVENT OF CODE {year} *\x8A*\x85*\x82*     \n\n'
+    header = f'\n                     \x82*\x85*\x8A*\x8D* ADVENT OF CODE {year} *\x8A*\x85*\x82*     \n\n'
 #    stdout += f'   TEST \x81 COLOR1 \x82 COLOR2\n'
 #    stdout += f'   TEST \x83 COLOR3 \x84 COLOR4\n'
 #    stdout += f'   TEST \x85 COLOR5 \x86 COLOR6\n'
@@ -473,8 +473,13 @@ def handle_ask_aoc_calendar(data):
 #    stdout += f'   TEST \x8B COLORB \x8C COLORC\n'
 #    stdout += f'   TEST \x8D COLORD \x8E COLORE\n'
 #    stdout += f'   TEST \x8F COLORF \x80 COLOR0 12\n'
+    stdout = output.stdout.decode('iso8859-15')
+    stdout = stdout.replace(' **\n', '\x87**\x8F\n')
+    stdout = stdout.replace(' * \n', '\x87* \x8F\n')
+    stdout = stdout.replace(' *\n', '\x87*\x8F\n')
 
-    stdout = header.encode('iso8859-15') + output.stdout
+
+    stdout = (header + stdout).encode('iso8859-15')
     print(str(stdout))
     send_file_data_to_client('', stdout, False)
 
@@ -483,7 +488,7 @@ MAGIC_ASK_AOC_DAY = 0x910532EF
 def handle_ask_aoc_day_desc(data):
   print(f"handle_ask_aoc_day_desc({data})")
   year, day, column_width = struct.unpack('HBB', data)
-  cmd = ['aoc', 'read', '-w', str(column_width)]
+  cmd = ['aoc', 'read', '-m', '-w', str(column_width)]
   if year:
     cmd += ['-y', str(year)]
   if day:
@@ -500,29 +505,39 @@ def handle_ask_aoc_day_desc(data):
     toggle_white = False
     toggle_green = False
     toggle_yellow = False
-    toggle_bold = False
-    toggle_reverse_gray = False
+    toggle_reverse = False
     out_str = ''
     while i < len(stdout):
-      if stdout[i] == '#' and stdout[i+1] == '#':
-        toggle_white = True
+      if stdout[i:].startswith('\nYou can also [Shareon'):
+        break;
+      if stdout[i] == '#' and stdout[i+1] == '#' and not toggle_reverse:
         out_str += '\x81'
         i += 1
-      elif stdout[i] == '*' and stdout[i+1] != '*' and stdout[i-1] != '*':
-        star_end = stdout.find('*', i+1)
-        word_star_end = stdout.find('star', i)
-        if word_star_end >= i and word_star_end < star_end:
-          toggle_yellow = not toggle_yellow
-          if toggle_yellow: out_str += '\x87'
-          else: out_str += '\x8F'
+      elif stdout[i:i+2] == '**' and ord(stdout[i-1]) <= 32 and ord(stdout[i+2]) <= 32 and not toggle_reverse:
+        out_str += '\x87**\x8F'
+        i += 1
+      elif stdout[i] == '*' and stdout[i+1] != '*' and stdout[i-1] != '*' \
+        and (ord(stdout[i+1]) > 32 or ord(stdout[i-1]) > 32):
+        if toggle_yellow:
+          toggle_yellow = False
+          out_str += '\x8F'
+        elif toggle_white:
+          toggle_white = False
+          out_str += '\x8F'
         else:
-          toggle_white = not toggle_white
-          if toggle_white: out_str += '\x81'
-          else: out_str += '\x8F'
+          star_end = stdout.find('*', i+1)
+          word_star_end = stdout.find('star', i)
+          
+          if word_star_end >= i and word_star_end < star_end:
+            toggle_yellow = True
+            out_str += '\x87'
+          else:
+            toggle_white = True
+            out_str += '\x81'
       elif stdout[i] == '`':
-        toggle_reverse_gray = not toggle_reverse_gray
-        if toggle_reverse_gray: out_str += '\xAA'
-        else: out_str += '\xAB'
+        toggle_reverse = not toggle_reverse
+        if toggle_reverse: out_str += '\x90'
+        else: out_str += '\x91'
       elif stdout[i] == '[':
         toggle_green = True
         out_str += '\x8D'
@@ -532,11 +547,16 @@ def handle_ask_aoc_day_desc(data):
         if stdout[i+1] == '[': # Skip past the number citation reference, e.g. [foo][1] -> foo
           i = stdout.find(']', i+1)
       elif stdout[i] == '\n':
-        out_str += '\n\x8F'
-        toggle_white = False
+        if toggle_reverse: out_str += '\x91'
+        out_str += '\n'
+        if toggle_white: out_str += '\x81'
+        if toggle_green: out_str += '\x8D'
+        if toggle_yellow: out_str += '\x87'
+        if toggle_reverse: out_str += '\x90'
       else:
         out_str += stdout[i]
       i += 1
+    out_str += '\n'
     send_file_data_to_client('', out_str.encode('iso8859-15'), False)
 
 

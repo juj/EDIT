@@ -502,6 +502,7 @@ void send_ask_aoc_input(int year, int day, int line_width)
 
 char *receive_file_in_memory()
 {
+  _CLRSCR();
 //  printf("RECEIVE FILE IN MEMORY\n");
   uint16_t bytes_left = 0;
   while(!bytes_left) bytes_left = poll_for_udp_file_transfer_fragment(true);
@@ -757,6 +758,7 @@ int view_file(char *text, uint8_t view_type)
   int num_lines = count_num_lines(text);
 
   int *starts = build_col_start_addresses(text, num_lines);
+  --num_lines;
   int max_x = longest_line_length(text, starts, num_lines) - SCREEN_WIDTH;
   int max_y = num_lines - SCREEN_HEIGHT;
 
@@ -782,32 +784,33 @@ int view_file(char *text, uint8_t view_type)
     if (repaint)
     {
       int screen_pos = 0;
-      for(int Y = 0; Y < SCREEN_HEIGHT && y+Y < num_lines; ++Y)
+      for(uint8_t Y = 0; Y < SCREEN_HEIGHT && y+Y < num_lines; ++Y)
       {
         char *s = text + starts[y+Y];
         uint8_t highlight = (y+Y == cursor_y) ? 0x80 : 0;
         uint8_t extraHighlight = 0;
-        int line_length = starts[y+Y+1] - starts[y+Y] - 1;
+        uint8_t line_length = starts[y+Y+1] - starts[y+Y] - 1;
         bool cur_line_selected = (y+Y >= line_select_start && y+Y <= line_select_end);
-        unsigned char color = cur_line_selected ? 0 : 13;
-        int cur_x = 0;
+        unsigned char color = cur_line_selected ? 14 : 15;
+        uint8_t cur_x = 0;
         while(cur_x < x && cur_x < line_length)
         {
-          if (s[cur_x] >= 128 && s[cur_x] < 128 + 16) color = s[cur_x] - 128;
-          else if (s[cur_x] == 0xAA) extraHighlight = 0x80;
-          else if (s[cur_x] == 0xAB) extraHighlight = 0;
+          if (s[cur_x] >= 128 && s[cur_x] < 128 + 16) color = cur_line_selected ? 14 : s[cur_x] - 128;
+          else if (s[cur_x] == 0x90) extraHighlight = 0x80;
+          else if (s[cur_x] == 0x91) extraHighlight = 0;
           ++cur_x;
         }
-        for(int X = 0; X < SCREEN_WIDTH; ++X)
+        for(uint8_t X = 0; X < SCREEN_WIDTH; ++X)
         {
-          char ch = cur_x < line_length ? s[cur_x] : ' ';
-          while(ch >= 128)
+          unsigned char ch = cur_x < line_length ? s[cur_x] : ' ';
+          while(ch >= 128 && ch < 128 + 18)
           {
-            if (ch >= 128 && ch < 128 + 16) { color = ch - 128; ch = s[++cur_x]; }
-            else if (ch == 0xAA) { extraHighlight = 0x80; ch = s[++cur_x]; }
-            else if (ch == 0xAB) { extraHighlight = 0; ch = s[++cur_x]; }
+            if (ch < 128 + 16) { if (!cur_line_selected) color = ch - 128; ch = s[++cur_x]; }
+            else if (ch == 128+16) { extraHighlight = 0x80; ch = s[++cur_x]; }
+            else /*if (ch == 0x91)*/ { extraHighlight = 0; ch = s[++cur_x]; }
+//            else break;
           }
-          put_screen(screen_pos++, ch, color, highlight ^ extraHighlight);
+          put_screen(screen_pos++, (ch >= 32) ? ch : ' ', color, highlight ^ extraHighlight);
           ++cur_x;
         }
       }
@@ -874,6 +877,7 @@ int view_file(char *text, uint8_t view_type)
       FILE *handle = fopen(filename, device);
       int l0 = line_select_mode?line_select_start:0;
       int l1 = line_select_mode?line_select_end+1:num_lines;
+      unsigned int num_bytes = 0;
       for(int line = l0; line < l1; ++line)
       {
 //        assert(strlen(text+starts[line]) <= max_x + SCREEN_WIDTH);
@@ -882,12 +886,15 @@ int view_file(char *text, uint8_t view_type)
         for(int l = 0; l < len; ++l)
           fputc(s[l], handle);
         fputc('\n',handle);
+        num_bytes += len + 1;
       }
       fclose(handle);
       char str[40];
-      sprintf(str, "WROTE %d LINES.", l1-l0);
+      sprintf(str, "WROTE %d LINES/%u BYTES.", l1-l0, num_bytes);
       put_string_on_screen(str, 0, SCREEN_HEIGHT-1, WHITE);
       get_key();
+      line_select_mode = false;
+      line_select_start = line_select_end = -1;
       repaint = true;
     }
     else if (view_type != VIEW_CALENDAR)
@@ -904,11 +911,21 @@ int view_file(char *text, uint8_t view_type)
         free(starts);
         return -1; // toggle for printing
       }
-      else if (view_type == VIEW_DESC && key == 0x49)
+      else if (view_type == VIEW_DESC)
       {
-        free(text);
-        free(starts);
-        return 1;
+        const char *s = text + starts[cursor_y];
+        if (key == 0x0D && (strstr(s, "RETURN") || strstr(s, "CALENDAR")))
+        {
+          free(text);
+          free(starts);
+          return 0;          
+        }
+        if (key == 0x49/*I*/ || (key == 0x0D && (strstr(s, "GET") || strstr(s, "INPUT")))) // I shows input
+        {
+          free(text);
+          free(starts);
+          return 1;
+        }
       }
     }
 
@@ -923,11 +940,14 @@ int view_file(char *text, uint8_t view_type)
 
 static volatile unsigned char * const mem_setup_register = (unsigned char *)0xD018;
 static volatile unsigned char * const screen_bg = (unsigned char *)0xD021;
+static volatile unsigned char * const key_repeat_register = (unsigned char *)0x028A;
 
 int main()
 {
+  *key_repeat_register |= 0x80; // Make all keys repeat
   *screen_border = 5; // green
   *screen_bg = 0; // black
+  _SCREEN(&SCREEN_WIDTH, &SCREEN_HEIGHT);
 //  unsigned int heap_size = 0xCD00 - (unsigned int)&__heap_start;
 //  __set_heap_limit(heap_size);
 
