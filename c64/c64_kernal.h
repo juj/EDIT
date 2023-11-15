@@ -222,7 +222,7 @@ _KERNAL uint8_t _SAVE(const void *start, const void *end)
 }
 
 // Set the current real-time clock time ("Jiffies counter")
-typedef _BitInt(24) _Jiffies;
+typedef unsigned _BitInt(24) _Jiffies;
 _KERNAL void _SETTIM(_Jiffies jiffies) { NEED_STACK(2/*todo:max unknown*/); _ASM volatile("JSR $FFDB"::"a"((uint8_t)(jiffies>>16)),"x"((uint8_t)(jiffies>>8)),"y"((uint8_t)(jiffies))); }
 
 // Read the RTC clock
@@ -230,8 +230,41 @@ _KERNAL _Jiffies _RDTIM()
 {
   NEED_STACK(2/*todo:max unknown*/);
   uint8_t lo, mid, hi;
-  _ASM("JSR $FFDE":"=a"(hi),"=x"(mid),"=y"(lo)::);
+  // TODO: Odd, it seems I need to extract these in opposite
+  // order than is documented (docs say A is MSB and Y is LSB
+  // but in practice I find the opposite direction must be used)
+  _ASM volatile("JSR $FFDE":"=y"(hi),"=x"(mid),"=a"(lo)::);
   return ((_Jiffies)hi << 16) | ((_Jiffies)mid << 8) | lo;
+}
+
+// Read the two lowest bytes of RTC clock only
+_KERNAL uint16_t _RDTIM16()
+{
+  NEED_STACK(2/*todo:max unknown*/);
+  uint8_t lo, mid;
+  // TODO: Odd, it seems I need to extract these in opposite
+  // order than is documented (docs say A is MSB and Y is LSB
+  // but in practice I find the opposite direction must be used)
+  _ASM volatile("JSR $FFDE":"=x"(mid),"=a"(lo)::"y");
+  return ((uint16_t)mid << 8) | lo;
+}
+
+_KERNAL uint8_t _JIFFIES_PER_SEC()
+{
+  uint8_t jiffies_per_sec;
+  _ASM(
+    "    SEI\n"
+    "l1%=: LDA $D012\n"
+    "l2%=: CMP $D012\n"
+    "    BEQ l2%=\n"
+    "    BMI l1%=\n"
+    "    CMP #$20\n"
+    "    BCC ntsc%=\n"
+    "    LDA #50\n"
+    "    JMP done%=\n"
+    "ntsc%=: LDA #60\n"
+    "done%=: CLI\n":"+a"(jiffies_per_sec)::"c");
+  return jiffies_per_sec;
 }
 
 // Query Stop key indicator. If pressed, call CLRCHN and clear keyboard buffer.

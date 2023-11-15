@@ -562,7 +562,6 @@ def handle_ask_aoc_day_desc(data):
       else:
         out_str += stdout[i]
       i += 1
-    out_str += '\n'
     send_file_data_to_client('', out_str.encode('iso8859-15'), False)
 
 

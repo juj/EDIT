@@ -514,6 +514,7 @@ char *receive_file_in_memory()
   uint16_t next_fragment_index = 0;
   char *recv_data = (char*)malloc(header.file_size+2);
   assert(recv_data);
+  if (!recv_data) return 0;
   uint16_t file_offset = 0;
 //  printf("FILE SIZE: %u\n", header.file_size);
   send_udp_fragment_received_msg(0xFF); // Send back msg that we are ready to start transfer.
@@ -573,22 +574,33 @@ end:
 int count_num_lines(const char *str)
 {
   int c = 1;
-  while(*str)
-    {
-      c += (*str++ == '\n');
-//      printf("%c", *str);
-    }
+  while(*str) c += (*str++ == '\n');
   return c;
+}
+
+uint8_t get_key()
+{
+  uint8_t key = 0;
+  while(!key) key = _GETIN();
+  return key;
 }
 
 int *build_col_start_addresses(const char *str, int num_lines)
 {
   int *starts = (int*)malloc((num_lines+1)*sizeof(int));
+  if (!starts)
+  {
+    malloc_dump_heap();
+  }
+  assert(starts);
+  if (!starts) return 0;
   int cur = 0;
   starts[0] = 0;
-  for(const char *s = str; *s; ++s)
-    if (*s == '\n') starts[++cur] = s - str + 1;
-  starts[num_lines] = strlen(str) - starts[num_lines-1];
+  const char *s = str;
+  for(; *s; ++s)
+    if (*s == '\n')
+      starts[++cur] = s - str + 1;
+  starts[num_lines] = s + 1 - str;
   return starts;
 }
 
@@ -700,13 +712,6 @@ void put_string_on_screen(const char *str, uint8_t x, uint8_t y, uint8_t color)
     put_screen(pos, str[i], color, 0);
 }
 
-uint8_t get_key()
-{
-  uint8_t key = 0;
-  while(!key) key = _GETIN();
-  return key;
-}
-
 int ask_string_prompt(const char *prompt, char *dst, int maxLen)
 {
   clear_line((uint16_t)(SCREEN_HEIGHT-1)*SCREEN_WIDTH, ' ', LTGRAY); // Clear last line to start with
@@ -795,7 +800,7 @@ int view_file(char *text, uint8_t view_type)
   int num_lines = count_num_lines(text);
 
   int *starts = build_col_start_addresses(text, num_lines);
-  --num_lines;
+//  --num_lines;
   int max_x = longest_line_length(text, starts, num_lines) - SCREEN_WIDTH;
   int max_y = num_lines - SCREEN_HEIGHT;
 
@@ -911,23 +916,39 @@ int view_file(char *text, uint8_t view_type)
       printf("\n"); // Add a newline so that the next question appears on a new line
       ask_string_prompt("ENTER FILENAME: ", filename, 16);
       printf("\n"); // Add a newline so that the text "PRESS RECORD & PLAY ON TAPE" will appear on a line of its own
-      FILE *handle = fopen(filename, device);
       int l0 = line_select_mode?line_select_start:0;
       int l1 = line_select_mode?line_select_end+1:num_lines;
-      unsigned int num_bytes = 0;
+      uint16_t num_bytes = 0;
+      int line_num = 0;
+      //int screen_pos, char ch, unsigned char color, uint8_t highlight)
+      put_string_on_screen("saving: [                ]", 0, SCREEN_HEIGHT-1, WHITE);
+      int pos = SCREEN_WIDTH*(SCREEN_HEIGHT-1) + strlen("saving: [");
+      int progress_incr = num_lines >> 4;
+      int progress = 0;
+      uint16_t elapsed = _RDTIM16();
+      FILE *handle = fopen(filename, device);
       for(int line = l0; line < l1; ++line)
       {
-//        assert(strlen(text+starts[line]) <= max_x + SCREEN_WIDTH);
+        if (++progress >= progress_incr)
+        {
+          progress -= progress_incr;
+          put_screen(pos++, '*', 1, 0);
+        }
         char *s = text+starts[line];
         int len = starts[line+1] - starts[line] - 1;
-        for(int l = 0; l < len; ++l)
-          fputc(s[l], handle);
+        fwrite(s, len, 1, handle);
         fputc('\n',handle);
         num_bytes += len + 1;
       }
       fclose(handle);
+      elapsed = _RDTIM16() - elapsed;
       char str[40];
-      sprintf(str, "WROTE %d LINES/%u BYTES.", l1-l0, num_bytes);
+      uint8_t jps = _JIFFIES_PER_SEC();
+      uint16_t bytes_per_sec = (uint16_t)((unsigned long)num_bytes*jps/elapsed);
+      sprintf(str, "wrote %d lines/%u bytes", l1-l0, num_bytes);
+      put_string_on_screen(str, 0, SCREEN_HEIGHT-2, WHITE);
+      uint16_t seconds = (uint16_t)(elapsed / jps);
+      sprintf(str, "in %lu jiffies=%u sec, %u b/sec.", (unsigned long)elapsed, seconds, bytes_per_sec);
       put_string_on_screen(str, 0, SCREEN_HEIGHT-1, WHITE);
       get_key();
       line_select_mode = false;
@@ -1009,6 +1030,7 @@ int main()
   {
     send_ask_aoc_calendar(selected_year);
     char *calendar = receive_file_in_memory();
+    if (!calendar) break;
     selected_day = view_file(calendar, VIEW_CALENDAR);
   //  printf("<:BACK F1:PRINT F3:SAVE INPUT F7:SUBMIT");
 
@@ -1017,12 +1039,14 @@ int main()
     {
       send_ask_aoc_day(selected_year, selected_day, for_printing ? 80 : SCREEN_WIDTH);
       char *text = receive_file_in_memory();
+      if (!text) break;
       ret = view_file(text, VIEW_DESC);
       if (ret == -1) for_printing = !for_printing;
       else if (ret == 1) // view input?
       {
         send_ask_aoc_input(selected_year, selected_day, 250);
         char *text = receive_file_in_memory();
+        if (!text) break;
         view_file(text, VIEW_INPUT);
         ret = -1;
       }

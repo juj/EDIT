@@ -758,6 +758,75 @@ one:   *dst++ = '0'+(zp0&0xF);
   return dst;
 }
 
+// Prints the given uint32 to CHROUT. (max 42_94_96_72_95)
+char *itoa_u32(char *dst, uint32_t num)
+{
+  volatile uint32_t *tmp_u32 = (uint32_t*)0xCBF8;
+  *tmp_u32 = num;
+  uint8_t zp0, zp1, zp2, zp3, zp4;
+  // Convert 'num' to 5x2 BCD digits.
+  __asm__(R"(
+    SED // Enter Binary Coded Decimal (BCD) mode (affects ADC commands below)
+
+    LDA #0
+    STA %[zp0] // zp0-zp4 will store the output BCD digits, 0-4294967295.
+    STA %[zp1] // Initialize these all to zero to start
+    STA %[zp2]
+    STA %[zp3]
+    STA %[zp4]
+
+    LDX #32 // Loop each of the 32 bits of the u32 input
+loop%=:
+    ROL $CBF8 // Shift the input u32 one bit to the left
+    ROL $CBF9 // rotating the next MSB bit of input into Carry
+    ROL $CBFA // rotating the next MSB bit of input into Carry
+    ROL $CBFB // rotating the next MSB bit of input into Carry
+
+    LDA %[zp0] // Multiply the three BCD number pairs by two, and add the input bit from carry to the BCD
+    ADC %[zp0]
+    STA %[zp0]
+    LDA %[zp1]
+    ADC %[zp1]
+    STA %[zp1]
+    LDA %[zp2]
+    ADC %[zp2]
+    STA %[zp2]
+    LDA %[zp3]
+    ADC %[zp3]
+    STA %[zp3]
+    LDA %[zp4]
+    ADC %[zp4]
+    STA %[zp4]
+
+    DEX     // Loop back to next input bit
+    BNE loop%=
+
+    CLD // Exit BCD mode
+  )":[zp0]"=r"(zp0), [zp1]"=r"(zp1), [zp2]"=r"(zp2), [zp3]"=r"(zp3), [zp4]"=r"(zp4)::"a","x","c");
+
+  if (zp4 > 9) goto ten;
+  if (zp4)     goto nine;
+  if (zp3 > 9) goto eight;
+  if (zp3)     goto seven;
+  if (zp2 > 9) goto six;
+  if (zp2)     goto five;
+  if (zp1 > 9) goto four;
+  if (zp1)     goto three;
+  if (zp0 > 9) goto two;
+  goto one;
+ten:   *dst++ = '0'+(zp4>>4);
+nine:  *dst++ = '0'+(zp4&0xF);
+eight: *dst++ = '0'+(zp3>>4);
+seven: *dst++ = '0'+(zp3&0xF);
+six:   *dst++ = '0'+(zp2>>4);
+five:  *dst++ = '0'+(zp2&0xF);
+four:  *dst++ = '0'+(zp1>>4);
+three: *dst++ = '0'+(zp1&0xF);
+two:   *dst++ = '0'+(zp0>>4);
+one:   *dst++ = '0'+(zp0&0xF);
+  return dst;
+}
+
 void chrout_x16(uint16_t num)
 {
   const uint8_t ch[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' };
@@ -906,26 +975,43 @@ extern "C" int sprintf(char *s, const char *format, ...)
       dst = va_arg(args, int);
       if (dst < 0) { *s++ = '-'; dst = -dst; }
       s = itoa_u16(s, dst);
-      __asm__("NOP":::"memory"); // xxx random fix to mask/avoid bug https://github.com/llvm-mos/llvm-mos/issues/393
-    break;
+      break;
     case 'u':
       dst = va_arg(args, unsigned int);
       s = itoa_u16(s, dst);
-      __asm__("NOP":::"memory"); // xxx random fix to mask/avoid bug https://github.com/llvm-mos/llvm-mos/issues/393
-    break;
+      break;
     case 'x':
       s = itox_x16(s, va_arg(args, unsigned int));
-      __asm__("NOP":::"memory"); // xxx random fix to mask/avoid bug https://github.com/llvm-mos/llvm-mos/issues/393
       break;
     case 'X':
       s = itoX_X16(s, va_arg(args, unsigned int));
-      __asm__("NOP":::"memory"); // xxx random fix to mask/avoid bug https://github.com/llvm-mos/llvm-mos/issues/393
       break;
     case 's':
       str = va_arg(args, const char *);
       assert(str);
       while(*str) *s++ = *str++;
-    break;
+      break;
+    case 'l':
+      switch(*++format)
+      {
+      case 'd':
+      case 'D':
+      {
+        int32_t i32 = va_arg(args, int32_t);
+        if (i32 < 0) { *s++ = '-'; i32 = -i32; }
+        s = itoa_u32(s, i32);
+      }
+      break;
+      case 'u':
+      case 'U':
+      {
+        uint32_t u32 = va_arg(args, uint32_t);
+        s = itoa_u32(s, u32);
+      }
+      break;
+      default: assert(false); break;
+      }
+      break;
     default: assert(false); break;
     }
   }

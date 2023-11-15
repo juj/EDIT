@@ -16,12 +16,14 @@ static region *unsorted_free_region = 0;
 
 #define MALLOC_HEAP_CEILING 0xC700u
 
+static uint16_t total_heap_space = 0;
 __attribute__((constructor(99999)))
 static void initialize_malloc()
 {
   assert((uint16_t)&__heap_start < MALLOC_HEAP_CEILING - 16);
   region *r = (region*)first_free_region;
   r->size = MALLOC_HEAP_CEILING - (uint16_t)&__heap_start;
+  total_heap_space += r->size;
   r->next = 0;
 }
 
@@ -30,14 +32,11 @@ static bool linked_list_has_a_cycle(region *r)
   if (!r) return false;
   for(region *r2 = r->next; r2;)
   {
-//    printf("A R: 0X%X, R2: 0X%X\n", (uintptr_t)r, (uintptr_t)r2);
     r = r->next;
     r2 = r2->next;
-//    printf("B R: 0X%X, R2: 0X%X\n", (uintptr_t)r, (uintptr_t)r2);
     if (!r2) return false;
     if (r2 == r) return true;
     r2 = r2->next;    
-//    printf("C R: 0X%X, R2: 0X%X\n", (uintptr_t)r, (uintptr_t)r2);
     if (r2 == r) return true;
   }
   return false;
@@ -87,7 +86,6 @@ extern "C" void malloc_verify_heap_consistency()
 
 extern "C" void *malloc(size_t bytes)
 {
-//  printf("A\n");
   malloc_verify_heap_consistency();
   if (bytes < 2) bytes = 2; // Must allocate at least two payload bytes
   bytes += 2; // and each memory allocation will have two byte overhead, so account for that early on
@@ -116,13 +114,20 @@ extern "C" void *malloc(size_t bytes)
         if (prev) prev->next = r->next;
         else first_free_region = r->next;
       }
-//  printf("B\n");
-  malloc_verify_heap_consistency();
-  assert(!ptr_is_contained_in_free_heap(r));
-  assert(!ptr_is_contained_in_free_heap((void*)((uintptr_t)r + 2)));
+      malloc_verify_heap_consistency();
+      assert(!ptr_is_contained_in_free_heap(r));
+      assert(!ptr_is_contained_in_free_heap((void*)((uintptr_t)r + 2)));
       return (void*)((uintptr_t)r + 2);
     }
   return 0;
+}
+
+extern "C" uint16_t malloc_free_heap_available()
+{
+  uint16_t free_heap = 0;
+  for(region *r = first_free_region; r; r = r->next) free_heap += r->size - 2;
+  for(region *r = unsorted_free_region; r; r = r->next) free_heap += r->size - 2;
+    return free_heap;
 }
 
 extern "C" void malloc_dump_heap()
@@ -131,6 +136,8 @@ extern "C" void malloc_dump_heap()
     printf("R: 0X%X -> 0X%X, NEXT: 0X%X\n", (uintptr_t)r, (uintptr_t)r + r->size, (uintptr_t)r->next);
   for(region *r = unsorted_free_region; r; r = r->next)
     printf("U: 0X%X -> 0X%X, NEXT: 0X%X\n", (uintptr_t)r, (uintptr_t)r + r->size, (uintptr_t)r->next);
+  printf("%u BYTES OF FREE HEAP\n", malloc_free_heap_available());
+  printf("TOTAL HEAP SIZE: %u\n", total_heap_space);
 }
 
 extern "C" size_t malloc_usable_size(void *ptr)
@@ -154,7 +161,7 @@ extern "C" void *realloc(void *ptr, size_t bytes)
 extern "C" void malloc_defrag(uint8_t times)
 {
 //  malloc_dump_heap();
-//  malloc_verify_heap_consistency();
+  malloc_verify_heap_consistency();
   while(times--)
   {
 //    printf("DEFRAG %u\n", (uint16_t)times);
@@ -210,7 +217,7 @@ extern "C" void malloc_defrag(uint8_t times)
     }
   }
 //  malloc_dump_heap();
-//  malloc_verify_heap_consistency();
+  malloc_verify_heap_consistency();
 }
 
 extern "C" void malloc_add_free_block(void *ptr, size_t size)
@@ -219,6 +226,7 @@ extern "C" void malloc_add_free_block(void *ptr, size_t size)
   r->size = size;
   r->next = unsorted_free_region;
   unsorted_free_region = r;
+  total_heap_space += r->size;
   malloc_defrag(1);
 }
 
@@ -226,9 +234,7 @@ extern "C" void free(void *ptr)
 {
   if (!ptr) return;
 
-//  printf("FREE(0X%X)\n", (uint16_t)ptr);
-//  malloc_dump_heap();
-//  malloc_verify_heap_consistency();
+  malloc_verify_heap_consistency();
   assert(!ptr_is_contained_in_free_heap(ptr));
 
   region *r = (region*)((uintptr_t)ptr - 2);
@@ -237,8 +243,6 @@ extern "C" void free(void *ptr)
   unsorted_free_region = r;
 
   malloc_defrag(1);
-//  printf("D\n");
-//  malloc_dump_heap();
   assert(ptr_is_contained_in_free_heap(r));
   malloc_verify_heap_consistency();
 }

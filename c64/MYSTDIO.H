@@ -68,6 +68,11 @@ char *gets_s(char *str, rsize_t n);
 
 void *memcpy8(void *dest, const void *src, uint8_t count);
 
+uint16_t malloc_free_heap_available();
+void malloc_dump_heap();
+size_t malloc_usable_size(void *ptr);
+void malloc_verify_heap_consistency();
+
 #ifdef __cplusplus
 } // extern "C"
 #endif
