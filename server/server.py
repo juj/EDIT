@@ -485,7 +485,9 @@ def handle_ask_aoc_calendar(data):
 
 
 MAGIC_ASK_AOC_DAY = 0x910532EF
+current_puzzle_part = 1
 def handle_ask_aoc_day_desc(data):
+  global current_puzzle_part
   print(f"handle_ask_aoc_day_desc({data})")
   year, day, column_width = struct.unpack('HBB', data)
   cmd = ['aoc', 'read', '-m', '-w', str(column_width)]
@@ -507,6 +509,10 @@ def handle_ask_aoc_day_desc(data):
     toggle_yellow = False
     toggle_reverse = False
     out_str = ''
+
+    if '--- Part Two ---' in stdout: current_puzzle_part = 2
+    else: current_puzzle_part = 1
+
     while i < len(stdout):
       if stdout[i:].startswith('\nYou can also [Shareon'):
         break;
@@ -580,6 +586,27 @@ def handle_ask_aoc_input(data):
     send_file_data_to_client('', day_inp, False)
 
 
+MAGIC_SUBMIT_AOC_ANSWER = 0x4291FF01
+def handle_submit_aoc_answer(data):
+  global current_puzzle_part
+  print(f'handle_submit_aoc_answer({data})')
+  year, day, answer = struct.unpack('HB33s', data)
+  answer = answer[0:answer.find(b'\x00')].decode('ascii')
+  print(f'Year: {year}, day: {day}, answer: "{answer}"')
+  cmd = ['aoc', 'submit', '-w', '40']
+  if year: cmd += ['-y', str(year)]
+  if day: cmd += ['-d', str(day)]
+  cmd += [str(current_puzzle_part), answer]
+  print(str(cmd))
+  output = subprocess.run(cmd, capture_output=True)
+  print(str(output.returncode))
+  print(str(output.stdout))
+  print(str(output.stderr))
+  if output.returncode == 0:
+    send_file_data_to_client('', output.stdout, False)
+
+
+
 
 def server_main():
   while True:
@@ -599,6 +626,8 @@ def server_main():
         handle_ask_aoc_day_desc(data)
       elif magic == MAGIC_ASK_AOC_INPUT:
         handle_ask_aoc_input(data)
+      elif magic == MAGIC_SUBMIT_AOC_ANSWER:
+        handle_submit_aoc_answer(data)
       else:
         print(f'Unknown magic {hex(magic)}')
     except TimeoutError:

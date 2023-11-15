@@ -750,9 +750,46 @@ int ask_string_prompt(const char *prompt, char *dst, int maxLen)
   return x;
 }
 
+#define MAGIC_SUBMIT_AOC_ANSWER 0x4291FF01
+struct submit_aoc_answer
+{
+  uint32_t magic;
+  int year;
+  unsigned char day;
+  char answer[33];
+};
+
+void send_submit_aoc_answer(int year, int day, char *answer)
+{
+  submit_aoc_answer msg = {
+    .magic = MAGIC_SUBMIT_AOC_ANSWER,
+    .year = year,
+    .day = (unsigned char)day
+  };
+  strcpy(msg.answer, answer);
+  start_udp_send(sizeof(msg));
+  tx_bytes(&msg, sizeof(msg));
+}
+
+int selected_year = 2023;
+int selected_day = 0;
+
 #define VIEW_CALENDAR 0
 #define VIEW_DESC 1
 #define VIEW_INPUT 2
+#define VIEW_RESPONSE 3
+int view_file(char *text, uint8_t view_type);
+
+void ask_answer()
+{
+  char answer[31] = {};
+  ask_string_prompt("answer: ", answer, sizeof(answer)-1);
+  send_submit_aoc_answer(selected_year, selected_day, answer);
+
+  char *response = receive_file_in_memory();
+  view_file(response, VIEW_RESPONSE);
+}
+
 int view_file(char *text, uint8_t view_type)
 {
   int num_lines = count_num_lines(text);
@@ -899,7 +936,7 @@ int view_file(char *text, uint8_t view_type)
     }
     else if (view_type != VIEW_CALENDAR)
     {
-      if (key == 0x5F) // ESC
+      if (key == 0x5F || (view_type == VIEW_RESPONSE && key == 0x0D)) // ESC
       {
         free(text);
         free(starts);
@@ -925,6 +962,13 @@ int view_file(char *text, uint8_t view_type)
           free(text);
           free(starts);
           return 1;
+        }
+        if (key == 0x0D && strstr(s, "NSWER:"))
+        {
+          ask_answer();
+          free(text);
+          free(starts);
+          return -2; // reload this page
         }
       }
     }
@@ -960,24 +1004,24 @@ int main()
   if (!success) printf("RR-NET NOT FOUND!\n");
 
   bool for_printing = false;
-  int year = 2020;
+  selected_year = 2020;
   for(;;)
   {
-    send_ask_aoc_calendar(year);
+    send_ask_aoc_calendar(selected_year);
     char *calendar = receive_file_in_memory();
-    int selected_day = view_file(calendar, VIEW_CALENDAR);
+    selected_day = view_file(calendar, VIEW_CALENDAR);
   //  printf("<:BACK F1:PRINT F3:SAVE INPUT F7:SUBMIT");
 
     int ret = -1;
-    while(ret == -1)
+    while(ret < 0)
     {
-      send_ask_aoc_day(year, selected_day, for_printing ? 80 : SCREEN_WIDTH);
+      send_ask_aoc_day(selected_year, selected_day, for_printing ? 80 : SCREEN_WIDTH);
       char *text = receive_file_in_memory();
       ret = view_file(text, VIEW_DESC);
       if (ret == -1) for_printing = !for_printing;
       else if (ret == 1) // view input?
       {
-        send_ask_aoc_input(year, selected_day, 250);
+        send_ask_aoc_input(selected_year, selected_day, 250);
         char *text = receive_file_in_memory();
         view_file(text, VIEW_INPUT);
         ret = -1;
