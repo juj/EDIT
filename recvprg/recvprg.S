@@ -18,6 +18,7 @@ num_fragments            = $5B  ; uint16
 next_fragment_idx        = $5D  ; uint8
 mem_dst_address          = $5F  ; uint16
 save_start_address       = $61  ; uint16, zero page address where we store save start for SAVE KERNAL call
+tmp_reg_y                = $63  ; uint8, used for saving Y
 waiting_for_first_packet = 2    ; uint8
 
 prev_sp                  = $CBFF ; uint8
@@ -297,7 +298,9 @@ start_loaded_prg:
   RTS
 
 ; #FUNCTION: Discards given number of bytes from RR-Net incoming packet queue
+; #Clobbers A and X, preserves Y
 discard_rx_bytes:
+  STY tmp_reg_y
   ; A and X contain number of bytes to discard
   CMP #0          ; Test if A is zero (have an even multiple of 256 bytes to discard)
   BEQ high_part   ; Jump to deal directly with high part
@@ -326,6 +329,7 @@ times_128:       ; Loop just like before
   DEX
   BNE loop_hi    ; If we still have multiples of 256 left, do it again
 end:
+  LDY tmp_reg_y
   RTS
 
 
@@ -449,21 +453,39 @@ packet_large_enough:
   SUB_U16_U8 packet_length, #50
 
   ; # Parse Ethernet frame
-  discard_n_rx_bytes #12 ; Discard SRC and DST MAC address fields of the Ethernet frame
+
+debug_manual_skip_mac:
+  LDA CS_RXTX_DATA      ; Read EtherType
+  LDX CS_RXTX_DATA+1
+  LDA CS_RXTX_DATA      ; Read EtherType
+  LDX CS_RXTX_DATA+1
+  LDA CS_RXTX_DATA      ; Read EtherType
+  LDX CS_RXTX_DATA+1
+  LDA CS_RXTX_DATA      ; Read EtherType
+  LDX CS_RXTX_DATA+1
+  LDA CS_RXTX_DATA      ; Read EtherType
+  LDX CS_RXTX_DATA+1
+  LDA CS_RXTX_DATA      ; Read EtherType
+  LDX CS_RXTX_DATA+1
+
+
+;  discard_n_rx_bytes #12 ; Discard SRC and DST MAC address fields of the Ethernet frame
 
   LDY #0                ; Y receives result of all testing
 
   LDA CS_RXTX_DATA      ; Read EtherType
   LDX CS_RXTX_DATA+1
-  CMP #0                ; Test if EtherType equals $0800
+  CMP #8                ; Test if EtherType equals $0800
   BEQ 1f
-  CPX #8
+  INY                   ; EtherType test failed
+1:
+  CPX #0
   BEQ 1f
   INY                   ; EtherType test failed
 1:
 
   ; # Parse IP frame
-  discard_n_rx_bytes #8 ; Discard early parts of IP frame
+  discard_n_rx_bytes #8 ; Discard early parts of IP frame, destroys Y so save it on stack
   LDA CS_RXTX_DATA      ; Read Protocol
   LDX CS_RXTX_DATA+1    ;
   CPX #$11              ; Test against $11 (UDP)
@@ -471,7 +493,7 @@ packet_large_enough:
   INY                   ; Protocol test failed
 1:
 
-  discard_n_rx_bytes #18 ; Discard remaining 10 bytes of IP frame, and 8 bytes of UDP header
+  discard_n_rx_bytes #18 ; Discard remaining 10 bytes of IP frame, and 8 bytes of UDP header, destroys Y so save it on stack
   LDA CS_RXTX_DATA      ; Read low u16 of magic
   LDX CS_RXTX_DATA+1    ;
 
@@ -500,7 +522,7 @@ packet_large_enough:
 1:
 
   LDA waiting_for_first_packet ; Finally, test if the datagram size is as expected
-  BNE size_good                ; If this is a datagram continuation packet, size is already validated to be good above
+  BEQ size_good                ; If this is a datagram continuation packet, size is already validated to be good above
 
   LDA packet_length
   CMP #24
