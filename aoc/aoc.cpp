@@ -785,6 +785,19 @@ int selected_day = 0;
 #define VIEW_RESPONSE 3
 int view_file(char *text, uint8_t view_type);
 
+uint8_t remove_control_codes(char *dst, const char *s, uint8_t srcLen)
+{
+  char *d = dst;
+  while(*s && *s != '\n' && *s != '\r' && srcLen--)
+  {
+    if ((uint8_t)*s < 0x80 || (uint8_t)*s > 0x91)
+      *d++ = *s;
+    ++s;
+  }
+  *d = 0;
+  return d - dst;
+}
+
 void ask_answer()
 {
   char answer[31] = {};
@@ -927,6 +940,7 @@ int view_file(char *text, uint8_t view_type)
       int progress = 0;
       _Jiffies elapsed = _RDTIM();
       FILE *handle = fopen(filename, device);
+      char *tmp = (view_type == VIEW_DESC) ? (char*)malloc(82) : 0;
       for(int line = l0; line < l1; ++line)
       {
         if (++progress >= progress_incr)
@@ -937,10 +951,19 @@ int view_file(char *text, uint8_t view_type)
         char *s = text+starts[line];
         int len = starts[line+1] - starts[line] - 1;
         assert(len <= 255);
-        fwrite8(s, (uint8_t)len, 1, handle);
+
+        if (view_type == VIEW_DESC)
+        {
+          uint8_t out_len = remove_control_codes(tmp, s, len);
+          assert(out_len <= 81);
+          fwrite8(tmp, out_len, handle);
+        }
+        else
+          fwrite8(s, (uint8_t)len, handle);
         fputc('\n',handle);
         num_bytes += len + 1;
       }
+      free(tmp);
       fclose(handle);
       elapsed = _RDTIM() - elapsed;
       char str[44];
