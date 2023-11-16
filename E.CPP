@@ -1285,14 +1285,18 @@ void main_loop()
 #endif
       {
         bool userCancelled = false;
+        char device[8] = {};
         if (is_file_unnamed(currentFile) || is_shift_key_held(key))
         {
-          userCancelled = ask_name_for_file(currentFile);
+#ifdef __C64__
+          userCancelled = ask_string_prompt("SAVE TO DEVICE #: ", device, 2) <= 0;
+#endif
+          if (!userCancelled) userCancelled = ask_name_for_file(currentFile);
           if (!userCancelled) currentFile->hasUnsavedChanges = 1;
         }
         if (!userCancelled && currentFile->hasUnsavedChanges)
         {
-          save_file(currentFile);
+          save_file(currentFile, device);
           // The file name may have gotten renamed as part of the save.
           send_new_document_to_network_server(currentFile, /*clear_contents=*/false);
         }
