@@ -357,14 +357,20 @@ extern "C" int fscanf(FILE *f, const char *format, ...)
       break;
       case 's':
       {
-        ch = read_next_char(f, &error);
-        if (error) goto end;
-        if (isspace(ch)) goto end; // todo not 100% sure if this would happen. Maybe "100asdf" being scanned as "%d %s"?
         char *str = va_arg(args, char*);
         fscanf_read_str(f, str);
         ++num_parsed;
       }
       break;
+      case 'c':
+      {
+        char *dst = va_arg(args, char*);
+        *dst = read_next_char(f, &error);
+        if (error) goto end;
+        ++num_parsed;
+      }
+      break;
+      default: assert(false);
       }
     }
   }
@@ -976,6 +982,7 @@ extern "C" int printf(const char *format, ...)
       str = va_arg(args, const char *);
       assert(str);
       while(*str) _CHROUT(*str++);
+      break;
     case 'l':
       switch(*++format)
       {
