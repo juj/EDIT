@@ -971,20 +971,8 @@ void erase_current_line()
 
 void measure_and_print_available_memory()
 {
-  uint16_t available_mem = 2*1024;
-  while(available_mem > 0)
-  {
-    void *ptr = malloc(available_mem);
-    if (ptr)
-    {
-      free(ptr);
-      break;
-    }
-    --available_mem;
-  }
-
   char str[64];
-  sprintf(str, "%u bytes free.", available_mem);
+  sprintf(str, "%u bytes free.", malloc_free_heap_available());
   put_string_on_screen(str, (SCREEN_WIDTH-(line_xpos)strlen(str))>>1, SCREEN_HEIGHT-1, LTBLUE);
 }
 
@@ -1351,7 +1339,7 @@ void main_loop()
         repaint_screen();
         break;
 #endif
-#if defined(ACTION_SHOW_AVAILABLE_MEMORY) && !defined(NDEBUG)
+#if defined(ACTION_SHOW_AVAILABLE_MEMORY)// && !defined(NDEBUG)
       case ACTION_SHOW_AVAILABLE_MEMORY:
         measure_and_print_available_memory();
         break;
