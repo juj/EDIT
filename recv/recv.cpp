@@ -211,7 +211,7 @@ static unsigned char ascii_to_petscii(unsigned char ch)
   if (ch == 0x14) return 0x08; // Device Control 4
   if (ch == 0x60) return 0xC0; // `
   if (ch == 0x93) return 0x0C; // "
-  if (ch >= 0x41 && ch <= 0x5A) return ch + 0x80; // A-Z
+  if (ch >= 0x41 && ch <= 0x5A) return ch + 0x20; // A-Z
   if (ch >= 0x61 && ch <= 0x7A) return ch - 0x20; // a-z
   if (ch >= 0x7B && ch <= 0x7F) return ch + 0x60; // {, |, }, ~ and DEL
   if (ch <= 0xBF || ch >= 0xE0) return ch; // Various other characters that map directly through
