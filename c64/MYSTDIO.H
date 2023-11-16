@@ -17,9 +17,22 @@
 
 #ifdef __clang__
 typedef _BitInt(24) int24_t;
+typedef unsigned _BitInt(24) uint24_t;
 #else
 typedef int int24_t;
+typedef unsigned int uint24_t;
 #endif
+
+typedef int8_t i8;
+typedef uint8_t u8;
+typedef int16_t i16;
+typedef uint16_t u16;
+typedef int24_t i24;
+typedef uint24_t u24;
+typedef int32_t i32;
+typedef uint32_t u32;
+typedef int64_t i64;
+typedef uint64_t u64;
 
 struct FILE
 {
