@@ -502,7 +502,6 @@ def handle_ask_aoc_day_desc(data):
   print(str(output.stderr))
   if output.returncode == 0:
     stdout = output.stdout.decode('iso8859-15') # Proxy for PETSCII
-    stdout = stdout.replace('You can\n[Shareon Twitter Mastodon] this victory\nor [Return to Your Advent Calendar].', '')
     # Colorize lines
     i = 0
     toggle_white = False
@@ -604,7 +603,9 @@ def handle_submit_aoc_answer(data):
   print(str(output.stdout))
   print(str(output.stderr))
   if output.returncode == 0:
-    send_file_data_to_client('', output.stdout, False)
+    stdout = output.stdout.decode('iso8859-15')
+    stdout = stdout.replace('You can\n[Shareon Twitter Mastodon] this victory\nor [Return to Your Advent Calendar].', '')
+    send_file_data_to_client('', stdout.encode('iso8859-15'), False)
 
 
 
