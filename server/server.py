@@ -138,7 +138,7 @@ def compile_file(filename):
 #  printf("HELLO, WORLD!\\n");
 #}
 #''')
-  cmd = [compiler, filename, f'-I{include_dir}', '-Oz', '-o', build_output_file, '-nolibc', '-nostdlib++'] + additional_libs
+  cmd = [compiler, filename, f'-I{include_dir}', '-D_STDIO_DEBUG_LEVEL=1', '-Oz', '-o', build_output_file, '-nolibc', '-nostdlib++'] + additional_libs
   print(str(cmd))
   current_subprocess_build = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
@@ -563,6 +563,7 @@ def handle_ask_aoc_day_desc(data):
       else:
         out_str += stdout[i]
       i += 1
+    print(str(out_str.encode('iso8859-15')))
     send_file_data_to_client('', out_str.encode('iso8859-15'), False)
 
 
