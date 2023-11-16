@@ -19,7 +19,11 @@ template this throw try typedef union unsigned virtual void volatile while */
 static int strneq(const char huge *s, const char *s2, int n)
 {
   for(int i = 0; i < n; ++i)
+#ifdef __C64__
+    if (s[i] != (s2[i] ^ 0x20))
+#else
     if (s[i] != s2[i])
+#endif
       return 0;
   return 1;
 }
@@ -35,6 +39,12 @@ static int is_one_of(char ch, const char *s)
 #define E(str) (strneq(s, str, len))
 #define E1(str) (strneq(s1, str, len1))
 
+#ifdef __C64__
+#define CH(x) ((x) ^ 0x20) // Convert string literal a-z from ASCII to business PETSCII
+#else
+#define CH(x) (x)
+#endif
+
 int is_cpp_reserved_word(const char huge *s, const char huge *end)
 {
   assert(s);
@@ -45,48 +55,50 @@ int is_cpp_reserved_word(const char huge *s, const char huge *end)
   switch(len)
   {
   case 2:
-    if (*s == 'd') return E1("o");
-    return E("if");
+    if (*s == CH('d')) return E1("o");
+    if (*s == CH('i')) return E1("8") || E1("f");
+    return E("u8");
   case 3:
-    if (*s == 'f') return E1("or");
-    if (*s == 'i') return E1("nt");
-    if (*s == 'n') return E1("ew");
+    if (*s == CH('f')) return E1("or");
+    if (*s == CH('i')) return E1("16") || E1("24") || E1("32") || E1("64") || E1("nt");
+    if (*s == CH('u')) return E1("16") || E1("24") || E1("32") || E1("64");
+    if (*s == CH('n')) return E1("ew");
     return E("try");
   case 4:
-    if (*s == 'a') return E1("uto");
-    if (*s == 'c') return E1("ase") || E1("har");
-    if (*s == 'e') return E1("lse") || E1("num");
-    if (*s == 'g') return E1("oto");
-    if (*s == 'l') return E1("ong");
-    if (*s == 't') return E1("this");
+    if (*s == CH('a')) return E1("uto");
+    if (*s == CH('c')) return E1("ase") || E1("har");
+    if (*s == CH('e')) return E1("lse") || E1("num");
+    if (*s == CH('g')) return E1("oto");
+    if (*s == CH('l')) return E1("ong");
+    if (*s == CH('t')) return E1("this");
     return E("void");
   case 5:
-    if (*s == 'b') return E1("reak");
-    if (*s == 'c') return E1("atch") || E1("lass") || E1("onst");
-    if (*s == 'f') return E1("loat");
-    if (*s == 's') return E1("hort");
-    if (*s == 't') return E1("hrow");
-    if (*s == 'u') return E1("nion");
+    if (*s == CH('b')) return E1("reak");
+    if (*s == CH('c')) return E1("atch") || E1("lass") || E1("onst");
+    if (*s == CH('f')) return E1("loat");
+    if (*s == CH('s')) return E1("hort");
+    if (*s == CH('t')) return E1("hrow");
+    if (*s == CH('u')) return E1("nion");
     return E("while");
   case 6:
-    if (*s == 'd') return E1("elete") || E1("ouble");
-    if (*s == 'e') return E1("xtern");
-    if (*s == 'f') return E1("riend");
-    if (*s == 'i') return E1("nline");
-    if (*s == 'p') return E1("ublic");
-    if (*s == 's') return E1("igned") || E1("izeof") || E1("tatic") || E1("truct") || E1("witch");
+    if (*s == CH('d')) return E1("elete") || E1("ouble");
+    if (*s == CH('e')) return E1("xtern");
+    if (*s == CH('f')) return E1("riend");
+    if (*s == CH('i')) return E1("nline");
+    if (*s == CH('p')) return E1("ublic");
+    if (*s == CH('s')) return E1("igned") || E1("izeof") || E1("tatic") || E1("truct") || E1("witch");
     return E("return");
   case 7:
-    if (*s == 'd') return E1("efault");
-    if (*s == 'p') return E1("rivate");
-    if (*s == 't') return E1("ypedef");
+    if (*s == CH('d')) return E1("efault");
+    if (*s == CH('p')) return E1("rivate");
+    if (*s == CH('t')) return E1("ypedef");
     return E("virtual");
   case 8:
-    if (*s == 'c') return E1("ontinue");
-    if (*s == 'o') return E1("perator");
-    if (*s == 'r') return E1("egister");
-    if (*s == 't') return E1("emplate");
-    if (*s == 'u') return E1("nsigned");
+    if (*s == CH('c')) return E1("ontinue");
+    if (*s == CH('o')) return E1("perator");
+    if (*s == CH('r')) return E1("egister");
+    if (*s == CH('t')) return E1("emplate");
+    if (*s == CH('u')) return E1("nsigned");
     return E("volatile");
   case 9:
     return E("protected");
@@ -108,7 +120,7 @@ void clear_highlight(Line far *line)
 unsigned char scan_hex_number(const char huge *s, size_t len)
 {
   assert(s[0] == '0');
-  assert(s[1] == 'x'); // these are known from calling this function
+  assert(s[1] == CH('x')); // these are known from calling this function
   for(size_t i = 2; i < len; ++i)
     if (!(s[i] >= '0' && s[i] <= '9')
      && !((s[i] | 0x20) >= 'a' && (s[i] | 0x20) <= 'f'))
@@ -186,7 +198,7 @@ void syntax_highlight(Line far *line)
       unsigned char color = LTGREEN | bg;
       if (line->text[i] == '0' && j-i>1)
       {
-	      if (line->text[i+1] == 'x') color = scan_hex_number(&line->text[i], j-i);
+	      if (line->text[i+1] == CH('x')) color = scan_hex_number(&line->text[i], j-i);
 	      else color = scan_octal_number(&line->text[i], j-i);
       }
       else if (line->text[i] >= '0' && line->text[i] <= '9')
