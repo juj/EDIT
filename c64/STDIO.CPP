@@ -305,8 +305,13 @@ static void fscanf_read_str(FILE *f, char *dst)
   {
     *dst++ = ch;
     ch = read_next_char(f, &error);
-    if (error) return;
+    if (error)
+    {
+      *dst = 0;
+      return;
+    }
   }
+  *dst = 0;
   put_char_back(f, ch);
 }
 
@@ -574,10 +579,21 @@ extern "C" char *strcpy(char *s1, const char *s2) {
   }
 }
 
-extern "C" size_t strlen(const char *s) {
-  size_t len = 0;
-  for (; *s; ++s)
+extern "C" size_t strlen(const char *s)
+{
+  const char *s2 = s;
+  while(*s2) ++s2;
+  return s2 - s;
+}
+
+extern "C" uint8_t strlen8(const char *s)
+{
+  uint8_t len = 0;
+  while(s[len])
+  {
+    assert(len != 255);
     ++len;
+  }
   return len;
 }
 

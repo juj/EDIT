@@ -60,7 +60,14 @@ static void assert_check_used_region_consistency(region *r)
 static void assert_check_free_region_consistency(region *r)
 {
   assert_check_used_region_consistency(r);
-
+/*
+  if (r->next != unsorted_free_region)
+  {
+    malloc_dump_heap();
+    printf("T:%X, SIZE:%X,END:%X,NEXT:%X\n",
+      (uintptr_t)r, r->size, (uintptr_t)r+r->size, (uintptr_t)r->next);
+  }
+  */
   assert(first_free_region == 0 || r->next != first_free_region);
   assert(unsorted_free_region == 0 || r->next != unsorted_free_region);
 //  printf("R:%X, SIZE:%X,END:%X,NEXT:%X\n",
@@ -118,8 +125,9 @@ extern "C" void malloc_defrag(uint8_t times)
     region *r = unsorted_free_region;
     if (!r) return;
     unsorted_free_region = r->next;
+    r->next = 0;
 
-    if (!first_free_region) { first_free_region = r; r->next = 0; continue; }
+    if (!first_free_region) { first_free_region = r; continue; }
 
     if (r < first_free_region)
     {

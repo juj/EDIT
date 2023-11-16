@@ -819,12 +819,15 @@ int view_file(char *text, uint8_t view_type)
 
 //  printf("\\N = %d\n", (int)petscii_to_screen_code(ascii_to_petscii('\n')));
   convert_to_business_petscii(text);
+  /*
   char *c = text;
   while(*c) // Delimit lines with zeros
   {
-    if (*c == '\n') *c = 0;
+    if (*c == '\n' || *c == '\r') *c = 0;
     ++c;
-  }
+  }*/
+  for(int i = 0; i < num_lines; ++i)
+    text[starts[i]-1] = 0;
 
   bool line_select_mode = false;
   int line_select_start = -1, line_select_end = -1;

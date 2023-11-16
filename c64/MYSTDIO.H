@@ -67,6 +67,7 @@ int printf(const char *format, ...);
 typedef uint8_t rsize_t;
 char *gets_s(char *str, rsize_t n);
 
+uint8_t strlen8(const char *s);
 void *memcpy8(void *dest, const void *src, uint8_t count);
 
 uint16_t malloc_free_heap_available();
