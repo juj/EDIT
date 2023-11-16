@@ -83,10 +83,10 @@ char *gets_s(char *str, rsize_t n);
 uint8_t strlen8(const char *s);
 void *memcpy8(void *dest, const void *src, uint8_t count);
 
-uint16_t malloc_free_heap_available();
-void malloc_dump_heap();
+uint16_t malloc_free_heap_available(void);
+void malloc_dump_heap(void);
 size_t malloc_usable_size(void *ptr);
-void malloc_verify_heap_consistency();
+void malloc_verify_heap_consistency(void);
 
 #ifdef __cplusplus
 } // extern "C"
