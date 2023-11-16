@@ -558,6 +558,31 @@ extern "C" char *strcat(char *s1, const char *s2) // TODO: optimize
   return s1;
 }
 
+extern "C" int strcmp(const char *s1, const char *s2)
+{
+  for(;;)
+  {
+    if (!*s1) return -1;
+    if (!*s2) return 1;
+    if (!*s1 != !*s2) return *s1 - *s2;
+    ++s1;
+    ++s2;
+  }
+}
+
+extern "C" int strncmp(const char *s1, const char *s2, size_t num) // TODO: optimize
+{
+  for(const char *end = s1 + num; s1 < end;)
+  {
+    if (!*s1) return -1;
+    if (!*s2) return 1;
+    if (*s1 != *s2) return *s1 - *s2;
+    ++s1;
+    ++s2;
+  }
+  return 0;
+}
+
 extern "C" void *memset(void *ptr, int value, size_t num) // TODO: optimize
 {
   char *p = (char*)ptr;
