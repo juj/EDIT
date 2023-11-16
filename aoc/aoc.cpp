@@ -218,7 +218,7 @@ static unsigned char ascii_to_business_petscii(unsigned char ch)
   if (ch == 0x14) return 0x08; // Device Control 4
   if (ch == 0x60) return 0xC0; // `
   if (ch == 0x93) return 0x0C; // "
-  if (ch >= 0x41 && ch <= 0x5A) return ch + 0x80; // A-Z
+  if (ch >= 0x41 && ch <= 0x5A) return ch + 0x20; // A-Z
   if (ch >= 0x61 && ch <= 0x7A) return ch - 0x20; // a-z
   if (ch >= 0x7B && ch <= 0x7F) return ch + 0x60; // {, |, }, ~ and DEL
   if (ch <= 0xBF || ch >= 0xE0) return ch; // Various other characters that map directly through
@@ -826,8 +826,6 @@ int view_file(char *text, uint8_t view_type)
     if (*c == '\n' || *c == '\r') *c = 0;
     ++c;
   }*/
-  for(int i = 0; i < num_lines; ++i)
-    text[starts[i]-1] = 0;
 
   bool line_select_mode = false;
   int line_select_start = -1, line_select_end = -1;
@@ -835,6 +833,23 @@ int view_file(char *text, uint8_t view_type)
   int x = (view_type == VIEW_CALENDAR) ? max_x : 0;
   int y = 0;
   int cursor_y = 0;
+
+  for(int i = 1; i < num_lines; ++i)
+  {
+    text[starts[i]-1] = 0;
+
+    // For convenience, scroll down to part two, or end of puzzle, if it has been unlocked.
+    if (view_type == VIEW_DESC)
+    {
+      if (!strncmp(text+starts[i]+2, "--- pART tWO ---", strlen("--- pART tWO ---")))
+        y = cursor_y = i-1;
+      else if (!strncmp(text+starts[i], "yOUR PUZZLE ANSWER WAS", strlen("yOUR PUZZLE ANSWER WAS")))
+      {
+        y = num_lines - SCREEN_HEIGHT;
+        cursor_y = i;
+      }
+    }
+  }
 
   bool repaint = true;
   for(;;)
