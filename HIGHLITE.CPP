@@ -66,6 +66,7 @@ int is_cpp_reserved_word(const char huge *s, const char huge *end)
     return E("try");
   case 4:
     if (*s == CH('a')) return E1("uto");
+    if (*s == CH('b')) return E1("ool");
     if (*s == CH('c')) return E1("ase") || E1("har");
     if (*s == CH('e')) return E1("lse") || E1("num");
     if (*s == CH('g')) return E1("oto");
