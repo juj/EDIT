@@ -17,6 +17,8 @@ static region *unsorted_free_region = 0;
 #define MALLOC_HEAP_CEILING 0xC700u
 
 static uint16_t total_heap_space = 0;
+static uint16_t used_heap_space = 0;
+
 __attribute__((constructor(99999)))
 static void initialize_malloc()
 {
@@ -96,6 +98,12 @@ extern "C" void malloc_verify_heap_consistency()
 {
   assert(!linked_list_has_a_cycle(first_free_region));
   assert(!linked_list_has_a_cycle(unsorted_free_region));
+  assert(total_heap_space < MALLOC_HEAP_CEILING);
+  assert(used_heap_space <= total_heap_space);
+//  printf("MALLOC FREE HEAP: %x\n", malloc_free_heap_available());
+//  printf("USED HEAP: %x\n", used_heap_space);
+//  printf("TOTAL HEAP: %x\n", total_heap_space);
+  assert(malloc_free_heap_available() + used_heap_space == total_heap_space);
   for(region *r = first_free_region; r; r = r->next)
   {
     assert_check_free_region_consistency(r);
@@ -210,6 +218,7 @@ extern "C" void *malloc(size_t bytes)
       }
       // else we cannot fit a new region, so return the whole region.
 //      malloc_dump_heap();
+      used_heap_space += bytes;
       malloc_verify_heap_consistency();
       assert(!ptr_is_contained_in_free_heap(r));
       assert(!ptr_is_contained_in_free_heap((void*)((uintptr_t)r + 2)));
@@ -223,8 +232,8 @@ extern "C" void *malloc(size_t bytes)
 extern "C" uint16_t malloc_free_heap_available()
 {
   uint16_t free_heap = 0;
-  for(region *r = first_free_region; r; r = r->next) free_heap += r->size - 2;
-  for(region *r = unsorted_free_region; r; r = r->next) free_heap += r->size - 2;
+  for(region *r = first_free_region; r; r = r->next) free_heap += r->size;
+  for(region *r = unsorted_free_region; r; r = r->next) free_heap += r->size;
     return free_heap;
 }
 
@@ -283,6 +292,8 @@ extern "C" void free(void *ptr)
   assert(!ptr_is_contained_in_free_heap(r));
   assert_check_used_region_consistency(r);
 
+  assert(used_heap_space >= r->size);
+  used_heap_space -= r->size;
   r->next = unsorted_free_region;
   unsorted_free_region = r;
 
