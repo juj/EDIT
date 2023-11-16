@@ -57,6 +57,7 @@ int fgetc(FILE *f);
 char *fgets(char *str, int count, FILE *f);
 size_t fread(void *buffer, size_t size, size_t count, FILE *f);
 size_t fwrite(const void *buffer, size_t size, size_t count, FILE *f);
+size_t fwrite8(const void *buffer, uint8_t count, FILE *f);
 int fputc(int ch, FILE *f);
 int fputs(const char *str, FILE *f);
 int fclose(FILE *f);

@@ -5,6 +5,29 @@
 #define EOF -1 // xxx todo move to header after upstream stdio.h is removed
 #endif
 
+// If enabled, file read and write operations briefly flash the screen border
+#define STDIO_FLASH_BORDERS_VISUALIZATION
+
+#ifdef STDIO_FLASH_BORDERS_VISUALIZATION
+static volatile uint8_t *const screen_border = (uint8_t*)0xD020;
+
+class SaveOldScreenBorder
+{
+#ifdef STDIO_FLASH_BORDERS_VISUALIZATION
+public:
+  uint8_t border;
+  SaveOldScreenBorder():border(*screen_border) {}
+  ~SaveOldScreenBorder() { *screen_border = border; }
+#endif
+};
+
+#define SCOPE_SAVE_SCREEN_BORDER() SaveOldScreenBorder _s
+#define SET_SCREEN_BORDER(ch) (*screen_border = (ch))
+#else
+#define SCOPE_SAVE_SCREEN_BORDER() ((void)0)
+#define SET_SCREEN_BORDER(ch) ((void)0)
+#endif
+
 void __assert(bool condition, const char *str, const char *file, int line, const char *func)
 {
 #ifndef NDEBUG
@@ -143,6 +166,7 @@ static uint8_t read_next_char(FILE *f, bool *error)
   }
   */
   uint8_t ch = _CHRIN_GET_ERROR(error);
+  SET_SCREEN_BORDER(ch);
   if (*error) _STDIO_DEBUG2("FREAD ERR");
 /////  if (ch == 199)
   {
@@ -191,7 +215,7 @@ extern "C" FILE *fopen(const char *filename, const char *mode)
   fn[1] = '0';
   fn[2] = ':';
   uint8_t device_number = extract_device_number_from_string(mode);
-  bool reading_file = string_contains_char(mode, 'r' & ~0x20);
+  bool writing_file = string_contains_char(mode, 'w' & ~0x20);
   bool accessing_disk_drive = (device_number >= 8);
   uint8_t i = accessing_disk_drive ? 3 : 0;
   for(uint8_t j = 0; filename[j]; ++j) { fn[i++] = filename[j]; }
@@ -202,14 +226,14 @@ extern "C" FILE *fopen(const char *filename, const char *mode)
     fn[i++] = ',';
     fn[i++] = string_contains_char(mode, 'p' & ~0x20) ? 'P' : 'S';
     fn[i++] = ',';
-    fn[i++] = reading_file ? 'R' : 'W';
+    fn[i++] = writing_file ? 'W' : 'R';
   }
   _SETNAM(fn, i);
-  _SETLFS(fileHandleCounter, device_number, accessing_disk_drive ? 2 : (reading_file ? 0 : 1));
+  _SETLFS(fileHandleCounter, device_number, accessing_disk_drive ? 2 : writing_file);
   uint8_t error = _OPEN();
   print_dos_error(error, "FOPEN");
 
-  error = reading_file ? _CHKIN(fileHandleCounter) : _CHKOUT(fileHandleCounter);
+  error = writing_file ? _CHKOUT(fileHandleCounter) : _CHKIN(fileHandleCounter);
   print_dos_error(error, "FOPEN/CHKINOUT");
 
   if ((error = _READST()))
@@ -289,6 +313,7 @@ static void fscanf_read_str(FILE *f, char *dst)
 extern "C" int fscanf(FILE *f, const char *format, ...)
 {
   if (_CHKIN(f->handle)) return 0;
+  SCOPE_SAVE_SCREEN_BORDER();
 
   va_list args;
   va_start(args, format);
@@ -357,6 +382,7 @@ extern "C" char *fgets(char *str, int count, FILE *f)
 
   if (f->error) return 0;
   if (_CHKIN(f->handle)) return 0;
+  SCOPE_SAVE_SCREEN_BORDER();
 
   --count; // account early for null terminating byte
   char *dst = str;
@@ -377,6 +403,8 @@ extern "C" int fgetc(FILE *f)
 {
   assert(f);
   if (_CHKIN(f->handle)) return EOF;
+  SCOPE_SAVE_SCREEN_BORDER();
+
   bool error;
   uint8_t ch = read_next_char(f, &error);
   _CLRCHN();
@@ -387,6 +415,7 @@ extern "C" int fgetc(FILE *f)
 extern "C" size_t fread(void *buffer, size_t size, size_t count, FILE *f)
 {
   if (_CHKIN(f->handle)) return 0;
+  SCOPE_SAVE_SCREEN_BORDER();
 
   uint8_t *ptr = (uint8_t*)buffer;
   for(size_t i = 0; i < size; ++i)
@@ -405,13 +434,33 @@ extern "C" size_t fwrite(const void *buffer, size_t size, size_t count, FILE *f)
 {
   assert(f);
   if (_CHKOUT(f->handle)) return 0;
+  SCOPE_SAVE_SCREEN_BORDER();
+
   const uint8_t *ptr = (const uint8_t*)buffer;
   for(size_t i = 0; i < size; ++i)
     for(size_t j = 0; j < count; ++j)
     {
       if (DRIVE_STATUS_ERROR()) break;
+      SET_SCREEN_BORDER(*ptr);
       _CHROUT(*ptr++);
     }
+  _CLRCHN();
+  return (uintptr_t)ptr - (uintptr_t)buffer;
+}
+
+extern "C" size_t fwrite8(const void *buffer, uint8_t count, FILE *f)
+{
+  assert(f);
+  if (_CHKOUT(f->handle)) return 0;
+  SCOPE_SAVE_SCREEN_BORDER();
+
+  const uint8_t *ptr = (const uint8_t*)buffer;
+  while(count--)
+  {
+    if (DRIVE_STATUS_ERROR()) break;
+    SET_SCREEN_BORDER(*ptr);
+    _CHROUT(*ptr++);
+  }
   _CLRCHN();
   return (uintptr_t)ptr - (uintptr_t)buffer;
 }
@@ -420,6 +469,9 @@ extern "C" int fputc(int ch, FILE *f)
 {
   assert(f);
   if (_CHKOUT(f->handle) || DRIVE_STATUS_ERROR()) return EOF;
+  SCOPE_SAVE_SCREEN_BORDER();
+  SET_SCREEN_BORDER(ch);
+
   bool error = _CHROUT_GET_ERROR((unsigned char)ch);
   _CLRCHN();
   return error ? EOF : ch;
@@ -431,9 +483,11 @@ extern "C" int fputs(const char *str, FILE *f)
   assert(f);
 
   if (_CHKOUT(f->handle)) return EOF;
+  SCOPE_SAVE_SCREEN_BORDER();
 
   while(*str)
   {
+    SET_SCREEN_BORDER(*str);
     bool error = _CHROUT_GET_ERROR(*str++);
     if (error)
     {

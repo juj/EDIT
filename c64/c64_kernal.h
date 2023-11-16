@@ -167,7 +167,9 @@ _KERNAL uint8_t _CHRIN_GET_ERROR(bool *error)
   return byte;
 }
 
-// Output a character to the current Output Channel
+// Output a character to the current Output Channel.
+// Note: calling this function temporarily disables interrupts,
+// so will stall the advance of the RTC clock (_RDTIM() below).
 _KERNAL void _CHROUT(uint8_t byte) { NEED_STACK(8/*todo:max unknown*/); _ASM volatile("JSR $FFD2"::"a"(byte):"c"); }
 _KERNAL bool _CHROUT_GET_ERROR(uint8_t byte)
 {
@@ -221,11 +223,13 @@ _KERNAL uint8_t _SAVE(const void *start, const void *end)
   return error;
 }
 
-// Set the current real-time clock time ("Jiffies counter")
+// Set the current real-time clock time ("Jiffies" counter)
 typedef unsigned _BitInt(24) _Jiffies;
 _KERNAL void _SETTIM(_Jiffies jiffies) { NEED_STACK(2/*todo:max unknown*/); _ASM volatile("JSR $FFDB"::"a"((uint8_t)(jiffies>>16)),"x"((uint8_t)(jiffies>>8)),"y"((uint8_t)(jiffies))); }
 
-// Read the RTC clock
+// Read the RTC "Jiffies" clock. This clock ticks at fixed 60Hz,
+// even on PAL systems. Note: The RTC clock does not advance
+// while interrupts are disabled.
 _KERNAL _Jiffies _RDTIM()
 {
   NEED_STACK(2/*todo:max unknown*/);
@@ -249,9 +253,10 @@ _KERNAL uint16_t _RDTIM16()
   return ((uint16_t)mid << 8) | lo;
 }
 
-_KERNAL uint8_t _JIFFIES_PER_SEC()
+// Returns 50 on PAL systems and 60 on NTSC systems.
+_KERNAL uint8_t _FRAMES_PER_SEC()
 {
-  uint8_t jiffies_per_sec;
+  uint8_t frames_per_sec;
   _ASM(
     "    SEI\n"
     "l1%=: LDA $D012\n"
@@ -263,8 +268,8 @@ _KERNAL uint8_t _JIFFIES_PER_SEC()
     "    LDA #50\n"
     "    JMP done%=\n"
     "ntsc%=: LDA #60\n"
-    "done%=: CLI\n":"+a"(jiffies_per_sec)::"c");
-  return jiffies_per_sec;
+    "done%=: CLI\n":"+a"(frames_per_sec)::"c");
+  return frames_per_sec;
 }
 
 // Query Stop key indicator. If pressed, call CLRCHN and clear keyboard buffer.

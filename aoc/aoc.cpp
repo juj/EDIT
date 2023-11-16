@@ -925,7 +925,7 @@ int view_file(char *text, uint8_t view_type)
       int pos = SCREEN_WIDTH*(SCREEN_HEIGHT-1) + strlen("saving: [");
       int progress_incr = num_lines >> 4;
       int progress = 0;
-      uint16_t elapsed = _RDTIM16();
+      _Jiffies elapsed = _RDTIM();
       FILE *handle = fopen(filename, device);
       for(int line = l0; line < l1; ++line)
       {
@@ -936,20 +936,20 @@ int view_file(char *text, uint8_t view_type)
         }
         char *s = text+starts[line];
         int len = starts[line+1] - starts[line] - 1;
-        fwrite(s, len, 1, handle);
+        assert(len <= 255);
+        fwrite8(s, (uint8_t)len, 1, handle);
         fputc('\n',handle);
         num_bytes += len + 1;
       }
       fclose(handle);
-      elapsed = _RDTIM16() - elapsed;
-      char str[40];
-      uint8_t jps = _JIFFIES_PER_SEC();
-      uint16_t bytes_per_sec = (uint16_t)((unsigned long)num_bytes*jps/elapsed);
+      elapsed = _RDTIM() - elapsed;
+      char str[44];
+      uint16_t bytes_per_sec = (uint16_t)((unsigned long)num_bytes*60/elapsed);
       sprintf(str, "wrote %d lines/%u bytes", l1-l0, num_bytes);
-      put_string_on_screen(str, 0, SCREEN_HEIGHT-2, WHITE);
-      uint16_t seconds = (uint16_t)(elapsed / jps);
-      sprintf(str, "in %lu jiffies=%u sec, %u b/sec.", (unsigned long)elapsed, seconds, bytes_per_sec);
       put_string_on_screen(str, 0, SCREEN_HEIGHT-1, WHITE);
+      uint16_t seconds = (uint16_t)(elapsed / 60);
+      //sprintf(str, "in %lu jiffies=%u sec, %u b/sec.", (unsigned long)elapsed, seconds, bytes_per_sec);
+      //put_string_on_screen(str, 0, SCREEN_HEIGHT-1, WHITE);
       get_key();
       line_select_mode = false;
       line_select_start = line_select_end = -1;
