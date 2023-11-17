@@ -24,21 +24,24 @@ waiting_for_first_packet = 2    ; uint8
 prev_sp                  = $CBFF ; uint8
 choose_run_prg           = $CBFE ; bool, if true, we will run the downloaded PRG, otherwise we are saving it to datassette
 prg_entry_func_address   = $CBFC ; uint16
+prev_cpu_processor_port  = $CBFB ; uint8 ; Save the value of the CPU processor port register (Memory address $0001). REU is unable to reload this
 
 ; # Clobbers A
 .macro REU_SNAPSHOT value
+  ; # Copy $0002 - $C7FF area (copying byte addresses 0 and 1 doesn't seem to work on real hardware)
+  LDA #2
+  STA $DF02 ; Set copy src address low byte in C64 memory
+  STA $DF04 ; Set copy dst address low byte in REU memory
+
   LDA #0
   STA $DF0A ; Set flags (transfer address increments on both C64 and REU side)
 
-  ; # Copy $0000 - $C7FF area
-  STA $DF02 ; Set copy src address in C64 memory
-  STA $DF03
+  STA $DF03 ; Set copy src address high byte in C64 memory
 
-  STA $DF04 ; Set copy dst address in REU memory
-  STA $DF05
+  STA $DF05 ; Set copy dst address mid and high bytes in REU memory
   STA $DF06
 
-  LDA #$FF  ; Set transfer length
+  LDA #$FD  ; Set transfer length
   STA $DF07
   LDA #$C7
   STA $DF08
@@ -46,7 +49,11 @@ prg_entry_func_address   = $CBFC ; uint16
   LDA \value ; #Kick off the transfer immediately (this will be synchronous, C64 CPU halts until transfer is complete)
   STA $DF01
 
-  ; # Copy $D000 - $DC00 area
+  LDA #0
+  STA $DF02 ; Set copy src address low byte in C64 memory
+  STA $DF04 ; Set copy dst address low byte in REU memory
+
+  ; # Copy $D000 - $DC03 area
   LDA #$D0
   STA $DF03
   STA $DF05
@@ -134,6 +141,9 @@ receive_and_run_prg:
 
   TSX         ; Save old stack pointer to memory
   STX prev_sp
+
+  LDA $1      ; Save old CPU processor port state
+  STA prev_cpu_processor_port
 
   REU_SNAPSHOT #$90 ; Snapshot memory from C64 to REU
 
@@ -273,6 +283,10 @@ wait_key:
 continue_after_datassette_save:
 abort_execution_on_restore_key:
   SEI
+  LDA #$2F ;# Restore CPU port Read/Write status to default value so we can write to the register
+  STA $0
+  LDA prev_cpu_processor_port ;# And the CPU Processor port bits to the previous value
+  STA $1
   REU_SNAPSHOT #$91 ; Restore memory from REU to C64
 
   LDX prev_sp ; Restore old stack pointer
