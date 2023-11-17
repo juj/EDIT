@@ -1,8 +1,32 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
+#include "../c64/nfio.h"
 #include "../c64/c64_kernal.h"
 #include "../c64/c64_cursor.h"
+
+#define BLACK       0
+#define WHITE       1
+#define RED         2
+#define CYAN        3
+#define MAGENTA     4
+#define GREEN       5
+#define BLUE        6
+#define YELLOW      7
+#define ORANGE      8
+#define BROWN       9
+#define LTRED      10
+#define BLACK_GRAY 11
+#define DKGRAY     12
+#define LTGREEN    13
+#define LTBLUE     14
+#define LTGRAY     15
+
+uint8_t SCREEN_WIDTH = 40;
+uint8_t SCREEN_HEIGHT = 25;
+
+void put_string_on_screen(const char *str, uint8_t x, uint8_t y, uint8_t color);
+int ask_string_prompt(const char *prompt, char *dst, int maxLen);
 
 static volatile uint8_t * const rrnet_ctl      = (uint8_t *)0xDE01;
 static volatile uint8_t * const cs_packet_page = (uint8_t *)0xDE02;
@@ -39,35 +63,6 @@ static void cs_write_page_data(uint16_t page, uint16_t data)
 {
   cs_set_page(page);
   write_u16_lo_hi(cs_packet_data, data);
-}
-
-int rrnet_init(bool enable_promiscuous_mode)
-{
-  *rrnet_ctl |= 1; // enable clock port on the C64 to access RR-Net through a carrier cartridge
-
-  // Detect RR-Net
-  cs_set_page(0);
-  if (cs_read_page_data() != 0x630E)
-  {
-    printf("RR-NET/CS8900A WAS NOT DETECTED.\n");
-    return 0;
-  }
-/*
-  // Detect RR-Net MK3 by calculating a checksum. See http://wiki.icomp.de/wiki/RRNet
-  volatile uint8_t * const mk3_eeprom = (uint8_t *)0xDE0C;
-  if ((mk3_eeprom[0] ^ mk3_eeprom[1] ^ 0x55) != mk3_eeprom[2] ||
-     ((mk3_eeprom[0] + mk3_eeprom[1] + mk3_eeprom[2]) ^ 0xAA) != mk3_eeprom[3])
-  {
-    printf("RR-NET MK3 NOT DETECTED (CKSUM ERROR)\n");
-  }
-*/
-  // Configure chip
-  cs_write_page_data(0x0114/*pp_self_ctl*/, 0x0055); // reset chip
-  uint16_t mode = 0x0D05; // accept individual and broadcast packets
-  if (enable_promiscuous_mode) mode |= 0x80; // and maybe enable promiscuous mode
-  cs_write_page_data(0x0104/*pp_rx_ctl*/, mode);
-  cs_write_page_data(0x0112/*pp_line_ctl*/, 0xD3); // Enable RX and TX
-  return 1;
 }
 
 struct eth_frame
@@ -107,18 +102,6 @@ struct udp_magic
 };
 
 #define RECV_FILE_DATAGRAM_MAGIC 0x25291423
-struct recv_file_datagram_header
-{
-//  uint32_t magic_header;
-  char filename[20];
-  uint16_t file_id;
-  uint16_t num_fragments;
-  uint16_t file_start_address;
-  uint16_t prg_entry_func_address;
-  uint16_t file_size;
-  uint8_t dummy0;
-  uint8_t filetype;
-} __attribute__((packed));
 
 #define RECV_FILE_DATAGRAM_FRAGMENT_MAGIC 0x25291424
 struct recv_file_datagram_fragment_header
@@ -346,98 +329,12 @@ end:
   return 0;
 }
 
-uint16_t sum1c(uint16_t a, uint16_t b)
-{
-  a += b;
-  return a + (a < b);
-}
-
-uint16_t calculate_one1c_checksum(void *data, uint16_t numBytes)
-{
-  assert(numBytes % 2 == 0);
-  numBytes >>= 1;
-  uint16_t *d = (uint16_t *)data;
-  uint16_t checksum = 0;
-  while(numBytes--)
-    checksum = sum1c(checksum, ntohs(*d++));
-  return ~checksum;
-}
-
-void start_udp_send(uint16_t numBytes)
-{
-  union
-  {
-    eth_frame frame;
-    ip_frame ip;
-    udp_header udp;
-  } net;
-
-  uint16_t numBytesRoundedUpToEven = numBytes + (numBytes&1);
-  start_tx(sizeof(net.frame) + sizeof(net.ip) + sizeof(net.udp) + numBytesRoundedUpToEven);
-
-  // Perform UDP broadcast
-  for(int i = 0; i < 6; ++i)
-    net.frame.dst_mac[i] = 0xFF;
-
-  // http://wiki.icomp.de/wiki/RRNet
-  net.frame.src_mac[0] = 0x28;
-  net.frame.src_mac[1] = 0xCD;
-  net.frame.src_mac[2] = 0x4C;
-  net.frame.src_mac[3] = 0xFF;
-  net.frame.src_mac[4] = *(volatile unsigned char *)0xDE0E;
-  net.frame.src_mac[5] = *(volatile unsigned char *)0xDE0F;
-
-  net.frame.etherType = 0x0008;
-  tx_bytes(&net.frame, sizeof(net.frame));
-
-  net.ip.versionAndHeaderLength = 0x45;
-  net.ip.typeOfService = 0;
-  net.ip.packetLength = ntohs(sizeof(net.ip) + sizeof(net.udp) + numBytesRoundedUpToEven);
-  net.ip.identification = 0;
-  net.ip.flagsAndFragmentOffset = 0;
-  net.ip.timeToLive = 128;
-  net.ip.protocol = 17; // udp
-  net.ip.headerChecksum = 0; // temporary, will be filled later
-
-  net.ip.src_ip[0] = 192;
-  net.ip.src_ip[1] = 168;
-  net.ip.src_ip[2] = 0;
-  net.ip.src_ip[3] = 255;
-
-  net.ip.dst_ip[0] = 255;
-  net.ip.dst_ip[1] = 255;
-  net.ip.dst_ip[2] = 255;
-  net.ip.dst_ip[3] = 255;
-  net.ip.headerChecksum = ntohs(calculate_one1c_checksum(&net.ip, sizeof(net.ip))); // Calculate the IP checksum (this is not optional)
-
-  tx_bytes(&net.ip, sizeof(net.ip));
-
-  net.udp.src_port = ntohs(49739);
-  net.udp.dst_port = ntohs(4009);
-  net.udp.length = ntohs(sizeof(net.udp) + numBytesRoundedUpToEven);
-  net.udp.checksum = 0; // Skip computing UDP checksum - that is optional. (tricky to compute since checksum extends over user payload)
-  tx_bytes(&net.udp, sizeof(net.udp));
-
-  // The only thing left now is to fill the actual UDP payload data,
-  // which is the caller's side to do.
-}
-
 #define FRAGMENT_RECEIVED_DATAGRAM_MAGIC 0xEE365F02
 struct fragment_received
 {
   uint32_t magic;
   uint16_t fragment_index;
 };
-
-void send_udp_fragment_received_msg(uint16_t fragment_index)
-{
-  fragment_received recv;
-  recv.magic = FRAGMENT_RECEIVED_DATAGRAM_MAGIC;
-  recv.fragment_index = fragment_index;
-//  printf("ACKING %u\n", recv.fragment_index);
-  start_udp_send(sizeof(recv));
-  tx_bytes(&recv, sizeof(recv));
-}
 
 #define MAGIC_ASK_AOC_CALENDAR 0x39DE312B
 struct ask_aoc_calendar
@@ -571,6 +468,47 @@ end:
   return recv_data;
 }
 
+void stream_puzzle_input_file_to_disk(int year, int day)
+{
+  send_ask_aoc_input(year, day, 250);
+
+  NFILE *f = nfopen("", "r"); // TODO: Refactor nfopen() so that send_ask_aoc_input() is not necessary?
+  if (!f) return;
+
+  char device[8] = {};
+  char filename[MAX_C64_FILENAME_LEN] = {};
+  ask_string_prompt("SAVE TO DEVICE #: ", device, 2);
+  uint8_t device_num = atoi(device);
+
+  strcat(device, "w");
+  sprintf(filename, "in%d.txt", day);
+  printf("\n"); // Add a newline so that the next question appears on a new line
+  ask_string_prompt("ENTER FILENAME: ", filename, MAX_C64_FILENAME_LEN);
+  printf("\n"); // Add a newline so that the potential text "PRESS RECORD & PLAY ON TAPE" will appear on a line of its own
+
+  FILE *dst = fopen(filename, device);
+  _CLRSCR();
+  for(;;)
+  {
+    char s[64];
+    size_t recv = nfread(s, 64, 1, f);
+    if (recv <= 0) break;
+    fwrite(s, recv, 1, dst);
+    *screen_border = s[0];
+    printf("%c", (unsigned char)s[0]);
+    /*
+    int ch = nfgetc(f);
+    if (ch < 0) break;
+    *screen_border = ch;
+    fputc(ch, dst);
+    printf("%c", (unsigned char)ch);
+    */
+  }
+  fclose(dst);
+  nfclose(f);
+  put_string_on_screen("WRITE COMPLETE.", 0, SCREEN_HEIGHT-1, WHITE);
+}
+
 int count_num_lines(const char *str)
 {
   int c = 1;
@@ -637,9 +575,6 @@ int find_line_idx_for_day(char *calendar, int *starts, int num_lines, int day, i
 
 extern "C" size_t __heap_start;
 
-uint8_t SCREEN_WIDTH = 40;
-uint8_t SCREEN_HEIGHT = 25;
-
 void toggle_highlight_on_line(int y)
 {
 /*
@@ -681,23 +616,6 @@ void convert_to_business_petscii(char *str)
     ++str;
   }
 }
-
-#define BLACK       0
-#define WHITE       1
-#define RED         2
-#define CYAN        3
-#define MAGENTA     4
-#define GREEN       5
-#define BLUE        6
-#define YELLOW      7
-#define ORANGE      8
-#define BROWN       9
-#define LTRED      10
-#define BLACK_GRAY 11
-#define DKGRAY     12
-#define LTGREEN    13
-#define LTBLUE     14
-#define LTGRAY     15
 
 void clear_line(uint16_t screenPos, uint8_t ch, uint8_t color)
 {
@@ -1024,6 +942,13 @@ int view_file(char *text, uint8_t view_type)
           free(text);
           free(starts);
           return 1;
+        }
+        if (key == 0xC9/*Shift-I*/)
+        {
+          stream_puzzle_input_file_to_disk(selected_year, selected_day);
+          free(text);
+          free(starts);
+          return -2; // reload this page
         }
         if (key == 0x0D && strstr(s, "NSWER:"))
         {

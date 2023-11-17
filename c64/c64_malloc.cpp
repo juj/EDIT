@@ -279,6 +279,14 @@ extern "C" void malloc_add_free_block(void *ptr, size_t size)
   malloc_defrag(1);
 }
 
+extern "C" void *calloc(size_t num, size_t size)
+{
+  size_t bytes = num * size;
+  void *ptr = malloc(bytes);
+  if (ptr) __memset((char*)ptr, 0, bytes);
+  return ptr;
+}
+
 extern "C" void free(void *ptr)
 {
   if (!ptr) return;
