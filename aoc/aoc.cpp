@@ -914,7 +914,24 @@ int view_file(char *text, uint8_t view_type)
       line_select_start = line_select_end = -1;
       repaint = true;
     }
-    else if (view_type != VIEW_CALENDAR)
+    else if (view_type == VIEW_CALENDAR)
+    {
+      if (key == 0x2D && selected_year > 2015)
+      {
+        --selected_year;
+        free(text);
+        free(starts);
+        return -2; // reload this page
+      }
+      if (key == 0x2B)
+      {
+        ++selected_year;
+        free(text);
+        free(starts);
+        return -2; // reload this page
+      }
+    }
+    else// view_type != VIEW_CALENDAR
     {
       if (key == 0x5F || (view_type == VIEW_RESPONSE && key == 0x0D)) // ESC
       {
@@ -998,7 +1015,7 @@ int main()
     char *calendar = receive_file_in_memory();
     if (!calendar) break;
     selected_day = view_file(calendar, VIEW_CALENDAR);
-  //  printf("<:BACK F1:PRINT F3:SAVE INPUT F7:SUBMIT");
+    if (selected_day < 0) continue;
 
     int ret = -1;
     while(ret < 0)
