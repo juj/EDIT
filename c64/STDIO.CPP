@@ -590,11 +590,6 @@ extern "C" void *memset(void *ptr, int value, size_t num) // TODO: optimize
   return ptr;
 }
 
-extern "C" void __memset(char *ptr, char value, size_t num) __attribute__((optnone))
-{
-  for(; num; --num) *ptr++ = value;
-}
-
 extern "C" char *strcpy(char *s1, const char *s2) {
   char *ret = s1;
   for (;; ++s1, ++s2) {
