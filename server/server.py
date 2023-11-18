@@ -523,7 +523,8 @@ def handle_ask_aoc_day_desc(data):
         out_str += '\x87**\x8F'
         i += 1
       elif stdout[i] == '*' and stdout[i+1] != '*' and stdout[i-1] != '*' \
-        and (ord(stdout[i+1]) > 32 or ord(stdout[i-1]) > 32):
+        and (ord(stdout[i+1]) > 32 or ord(stdout[i-1]) > 32) and \
+        (not toggle_reverse or stdout[i+1] == '`' or stdout[i-1] == '`'):
         if toggle_yellow:
           toggle_yellow = False
           out_str += '\x8F'
