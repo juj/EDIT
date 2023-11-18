@@ -84,6 +84,7 @@ uint8_t strlen8(const char *s);
 void *memcpy8(void *dest, const void *src, uint8_t count);
 
 void __memset(char *ptr, char value, size_t num);
+int memcmp(const void *ptr1, const void *ptr2, size_t num);
 
 uint16_t malloc_free_heap_available(void);
 void malloc_dump_heap(void);

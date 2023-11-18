@@ -743,7 +743,7 @@ one:   _CHROUT('0'+(zp0&0xF));
 // Prints the given uint32 to CHROUT. (max 42_94_96_72_95)
 void chrout_u32(uint32_t num)
 {
-  volatile uint32_t *tmp_u32 = (uint32_t*)0xCBF8;
+  volatile uint32_t *tmp_u32 = (uint32_t*)0xCBF7;
   *tmp_u32 = num;
   uint8_t zp0, zp1, zp2, zp3, zp4;
   // Convert 'num' to 5x2 BCD digits.
@@ -759,10 +759,10 @@ void chrout_u32(uint32_t num)
 
     LDX #32 // Loop each of the 32 bits of the u32 input
 loop%=:
-    ROL $CBF8 // Shift the input u32 one bit to the left
+    ROL $CBF7 // Shift the input u32 one bit to the left
+    ROL $CBF8 // rotating the next MSB bit of input into Carry
     ROL $CBF9 // rotating the next MSB bit of input into Carry
     ROL $CBFA // rotating the next MSB bit of input into Carry
-    ROL $CBFB // rotating the next MSB bit of input into Carry
 
     LDA %[zp0] // Multiply the three BCD number pairs by two, and add the input bit from carry to the BCD
     ADC %[zp0]
@@ -857,7 +857,7 @@ one:   *dst++ = '0'+(zp0&0xF);
 // Prints the given uint32 to CHROUT. (max 42_94_96_72_95)
 char *itoa_u32(char *dst, uint32_t num)
 {
-  volatile uint32_t *tmp_u32 = (uint32_t*)0xCBF8;
+  volatile uint32_t *tmp_u32 = (uint32_t*)0xCBF7;
   *tmp_u32 = num;
   uint8_t zp0, zp1, zp2, zp3, zp4;
   // Convert 'num' to 5x2 BCD digits.
@@ -873,10 +873,10 @@ char *itoa_u32(char *dst, uint32_t num)
 
     LDX #32 // Loop each of the 32 bits of the u32 input
 loop%=:
-    ROL $CBF8 // Shift the input u32 one bit to the left
+    ROL $CBF7 // Shift the input u32 one bit to the left
+    ROL $CBF8 // rotating the next MSB bit of input into Carry
     ROL $CBF9 // rotating the next MSB bit of input into Carry
     ROL $CBFA // rotating the next MSB bit of input into Carry
-    ROL $CBFB // rotating the next MSB bit of input into Carry
 
     LDA %[zp0] // Multiply the three BCD number pairs by two, and add the input bit from carry to the BCD
     ADC %[zp0]
@@ -1204,6 +1204,19 @@ extern "C" char *gets_s(char *str, rsize_t n)
       break;
     }
   }
+}
+
+extern "C" int memcmp(const void *ptr1, const void *ptr2, size_t num)
+{
+  const unsigned char *p1 = (const unsigned char *)ptr1;
+  const unsigned char *p2 = (const unsigned char *)ptr2;
+  while(num)
+  {
+    int ch = (int)*p1 - (int)*p2;
+    if (ch) return ch;
+    ++p1; ++p2; --num;
+  }
+  return 0;
 }
 
 #include "reucpy.h"
