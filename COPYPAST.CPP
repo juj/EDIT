@@ -15,7 +15,7 @@ char huge *copyBuffer = 0;
 file_idx copyBufferLength = 0;
 file_idx copyBufferCapacity = 0;
 
-void repaint_screen_lines(cursor_pos yStart, cursor_pos yEnd); // TODO proper declaration location
+void repaint_screen_lines(cursor_pos yStart, cursor_pos yEnd, cursor_pos xStart); // TODO proper declaration location
 void repaint_screen();
 void insert_new_line(bool cursorMovesToNewline);
 void restrict_cursor_on_line();
@@ -149,7 +149,7 @@ void erase_selected_text()
     selectionStartLine->length = newLineLength;
     cursorX = virtualX = MIN(cursorX, selectionStartColumn);
     clear_selection();
-    repaint_screen_lines(cursorY, cursorY+1);
+    repaint_screen_lines(cursorY, cursorY+1, 0);
     send_current_line_to_server();
     return;
   }
@@ -259,7 +259,7 @@ void paste_selection()
 
   if (i >= copyBufferLength)
   {
-    repaint_screen_lines(cursorY, cursorY+1);
+    repaint_screen_lines(cursorY, cursorY+1, 0);
     return;
   }
   ++i; // Skip first newline

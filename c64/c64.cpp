@@ -18,6 +18,25 @@ static volatile unsigned char * const color_under_cursor = (unsigned char*)0x028
 
 unsigned char petscii_to_screen_code(unsigned char petscii);
 
+unsigned char screen_code_to_petscii(unsigned char screencode)
+{
+  screencode &= 0x7F;
+  if (32 <= screencode && screencode <= 63) return screencode;
+  if (screencode <= 95) return screencode + 32;
+  return screencode + 64;
+  /*
+  if (petscii <= 31) return 32;//petscii + 128;
+  if (petscii <= 63) return petscii;
+  if (petscii <= 95) return petscii - 64;
+  if (petscii <= 127) return petscii - 32;
+  if (petscii <= 159) return 32;//petscii + 64;
+  if (petscii <= 191) return petscii - 64;
+  if (petscii <= 254) return petscii - 128;
+  return 0x5E;
+  */
+
+}
+
 void set_cursor_style(uint8_t style)
 {
   c64_set_cursor_style(style);
@@ -65,13 +84,14 @@ char get_screen(uint16_t linearPos)
   // Gotcha: when reading the screen position where cursor
   // is currently at, must read the character under cursor instead.
   if (linearPos == c64_get_cursor_linear_pos()) return *char_under_cursor;
-  return screen_ram[linearPos]; // TODO: screen code to PETSCII
+  return screen_code_to_petscii(screen_ram[linearPos]);
 }
 
 void put_screen_color(uint16_t linearPos, unsigned char color)
 {
   assert(linearPos < 40*25);
-  put_screen(linearPos, get_screen(linearPos), 7);
+  if (linearPos == c64_get_cursor_linear_pos()) put_screen(linearPos, get_screen(linearPos), color);
+  else color_ram[linearPos] = color;
 }
 
 unsigned char get_screen_color(uint16_t linearPos)
@@ -160,4 +180,22 @@ void scroll_screen_down(int8_t lines_scrolled)
     col_dst += SCREEN_WIDTH;
     col_src += SCREEN_WIDTH;
   }
+}
+
+void scroll_screen_right(int8_t chars_scrolled)
+{
+  int offset = chars_scrolled;
+  char *ram_dst = (char*)screen_ram + SCREEN_WIDTH;
+  char *ram_src = ram_dst + offset;
+  char *col_dst = (char*)color_ram + SCREEN_WIDTH;
+  char *col_src = col_dst + offset;
+  for(int y = 0; y < SCREEN_HEIGHT; ++y)
+  {
+    memcpy8(ram_dst, ram_src, SCREEN_WIDTH - chars_scrolled);
+    ram_dst += SCREEN_WIDTH;
+    ram_src += SCREEN_WIDTH;
+    memcpy8(col_dst, col_src, SCREEN_WIDTH - chars_scrolled);
+    col_dst += SCREEN_WIDTH;
+    col_src += SCREEN_WIDTH;
+  }  
 }

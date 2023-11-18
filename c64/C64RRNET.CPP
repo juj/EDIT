@@ -351,7 +351,7 @@ uint32_t poll_for_udp_datagram(uint16_t *outBytesLeft)
 {
   // Poll if there is an Ethernet frame ready for processing
   cs_set_page(0x0124);
-  if ((cs_read_page_data() & 0x0D00) == 0) return 0;
+  if ((cs_read_page_data() & 0x0D00) == 0) { *outBytesLeft = 0; return 0; }
 
   rx_data_hi_lo(); // dummy read to flush status word (ignored)
   uint16_t bytes_left = rx_data_hi_lo();

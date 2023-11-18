@@ -49,11 +49,11 @@ line_num current_line_number()
   return firstDisplayedLineNumber + cursorY;
 }
 
-void repaint_screen_lines(cursor_pos yStart, cursor_pos yEnd); // TODO proper declaration location
+void repaint_screen_lines(cursor_pos yStart, cursor_pos yEnd, cursor_pos xStart); // TODO proper declaration location
 
 void repaint_status_line()
 {
-  repaint_screen_lines(SCREEN_HEIGHT-1, SCREEN_HEIGHT);
+  repaint_screen_lines(SCREEN_HEIGHT-1, SCREEN_HEIGHT, 0);
 }
 
 void mark_insert_mode_inactive_and_repaint_status()
