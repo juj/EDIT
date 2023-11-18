@@ -1,5 +1,6 @@
 #include "state.h"
 #include "screen.h"
+#include "editor.h"
 #include <assert.h>
 
 allocated_mem_size_t allocatedMemory = 0;
@@ -49,11 +50,9 @@ line_num current_line_number()
   return firstDisplayedLineNumber + cursorY;
 }
 
-void repaint_screen_lines(cursor_pos yStart, cursor_pos yEnd, cursor_pos xStart); // TODO proper declaration location
-
 void repaint_status_line()
 {
-  repaint_screen_lines(SCREEN_HEIGHT-1, SCREEN_HEIGHT, 0);
+  repaint_screen_lines(SCREEN_HEIGHT-1, SCREEN_HEIGHT, 0, SCREEN_WIDTH);
 }
 
 void mark_insert_mode_inactive_and_repaint_status()

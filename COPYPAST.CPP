@@ -9,16 +9,12 @@
 #include "audio.h" // TODO REMOVE THIS
 #include "iassert.h"
 #include "network.h"
+#include "editor.h"
 #include <string.h>
 
 char huge *copyBuffer = 0;
 file_idx copyBufferLength = 0;
 file_idx copyBufferCapacity = 0;
-
-void repaint_screen_lines(cursor_pos yStart, cursor_pos yEnd, cursor_pos xStart); // TODO proper declaration location
-void repaint_screen();
-void insert_new_line(bool cursorMovesToNewline);
-void restrict_cursor_on_line();
 
 void calculate_num_lines_and_chars_selected(line_num *lines, file_idx *chars)
 {
@@ -149,7 +145,7 @@ void erase_selected_text()
     selectionStartLine->length = newLineLength;
     cursorX = virtualX = MIN(cursorX, selectionStartColumn);
     clear_selection();
-    repaint_screen_lines(cursorY, cursorY+1, 0);
+    repaint_screen_lines(cursorY, cursorY+1, 0, SCREEN_WIDTH);
     send_current_line_to_server();
     return;
   }
@@ -259,7 +255,7 @@ void paste_selection()
 
   if (i >= copyBufferLength)
   {
-    repaint_screen_lines(cursorY, cursorY+1, 0);
+    repaint_screen_lines(cursorY, cursorY+1, 0, SCREEN_WIDTH);
     return;
   }
   ++i; // Skip first newline
@@ -326,7 +322,7 @@ void paste_selection()
   if (endLine) endLine->prevLine = startLine;
   else currentFile->lastLine = startLine;
 
-//  repaint_screen_lines(cursorY, MIN(SCREEN_HEIGHT, cursorY+numPastedLines));
+//  repaint_screen_lines(cursorY, MIN(SCREEN_HEIGHT, cursorY+numPastedLines), 0, SCREEN_WIDTH);
   currentLine = endLine;
   cursorY += numPastedLines;
   while(cursorY >= SCREEN_HEIGHT)

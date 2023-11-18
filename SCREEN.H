@@ -117,6 +117,7 @@ void set_vga_cursor_position(int x, int y);
 
 void scroll_screen_up(int8_t lines_scrolled); // viewport and cursor move up (text content moves down)
 void scroll_screen_down(int8_t lines_scrolled); // viewport and cursor move down (text content moves up)
+void scroll_screen_left(int8_t chars_scrolled); // viewport and cursor move left (text content moves right)
 void scroll_screen_right(int8_t chars_scrolled); // viewport and cursor move right (text content moves left)
 
 #endif

@@ -23,15 +23,9 @@
 #include "cursor.h"
 #include "smindent.h"
 #include "network.h"
+#include "editor.h"
 #include "c64/c64_kernal.h"
 #include "c64/c64_char_rom.h"
-
-bool scroll_viewport_horizontally_to_display_cursor();
-Line far *find_last_viewport_start_line(cursor_pos *linesInView);
-void scroll_to_beginning();
-void scroll_to_end();
-bool restrict_cursor_on_line();
-void move_viewport_vertically(cursor_pos lines, bool cursor_moves_along);
 
 #ifdef __C64__
 #define COLOR_UNSAVED_CURRENT LTRED
@@ -104,7 +98,7 @@ void repaint_line(int screenY, Line *line, int startX, int endX)
     }
 #endif
   }
-  else
+  else if (screenY == 0 || (startX == 0 && endX == SCREEN_WIDTH))
     clear_line(screenY * SCREEN_WIDTH, 0);
 
 #ifndef __C64__
@@ -113,7 +107,7 @@ void repaint_line(int screenY, Line *line, int startX, int endX)
 #endif
 }
 
-void repaint_screen_lines(cursor_pos yStart, cursor_pos yEnd, cursor_pos xStart)
+void repaint_screen_lines(cursor_pos yStart, cursor_pos yEnd, cursor_pos xStart, cursor_pos xEnd)
 {
   assert(firstDisplayedLine);
   assert(yStart >= 0);
@@ -127,7 +121,7 @@ void repaint_screen_lines(cursor_pos yStart, cursor_pos yEnd, cursor_pos xStart)
 
   for(; screenY < yEnd; ++screenY)
   {
-    repaint_line(screenY, curLine, xStart, SCREEN_WIDTH);
+    repaint_line(screenY, curLine, xStart, xEnd);
     if (curLine) curLine = curLine->nextLine;
     ++lineNumber;
   }
@@ -167,7 +161,7 @@ void print_insert_status_text(bool print_on_clear = false)
 
 void repaint_screen()
 {
-  repaint_screen_lines(/*startY=*/0, SCREEN_HEIGHT, /*startX=*/0);
+  repaint_screen_lines(/*startY=*/0, SCREEN_HEIGHT, /*startX=*/0, SCREEN_WIDTH);
   print_line_column_info();
   set_cursor_pos(cursorX, cursorY);
 }
@@ -278,7 +272,7 @@ void insert_character(char ch, uint8_t times, line_xpos insert_pos)
       cursorX = SCREEN_WIDTH-1;
 #ifdef __C64__
       scroll_screen_right(viewportXIncrement);
-      repaint_screen_lines(0, SCREEN_HEIGHT, /*startX=*/SCREEN_WIDTH-viewportXIncrement);
+      repaint_screen_lines(0, SCREEN_HEIGHT, /*startX=*/SCREEN_WIDTH-viewportXIncrement, SCREEN_WIDTH);
 #else
       full_repaint = true;
 #endif
@@ -346,7 +340,7 @@ void delete_character()
 
     cursor_pos endY = screen_end_y_of_last_line_on_screen(currentLine, cursorY)+2;
     if (endY > SCREEN_HEIGHT) endY = SCREEN_HEIGHT;
-    repaint_screen_lines(cursorY, endY, /*startX=*/0);
+    repaint_screen_lines(cursorY, endY, /*startX=*/0, SCREEN_WIDTH);
   }
   mark_current_file_modified();
   // TODO: only repaint the current line starting from currentCharOffset
@@ -501,7 +495,7 @@ void move_cursor_vertically(cursor_pos lines)
       if (lines_scrolled)
       {
         scroll_screen_up(lines_scrolled);
-        repaint_screen_lines(0, lines_scrolled+1, /*startX=*/0); // Draw +1 line to clear the open files list at top right
+        repaint_screen_lines(0, lines_scrolled+1, /*startX=*/0, SCREEN_WIDTH); // Draw +1 line to clear the open files list at top right
         scrolled = true;
       }
     }
@@ -528,8 +522,8 @@ void move_cursor_vertically(cursor_pos lines)
   if (viewport_lines_scrolled_down)
   {
     scroll_screen_down(viewport_lines_scrolled_down);
-    repaint_screen_lines(0, 1, /*startX=*/0); // Redraw first line to repaint the open files list
-    repaint_screen_lines(SCREEN_HEIGHT-2, SCREEN_HEIGHT, /*startX=*/0); // Redraw last line to repaint the line:column info
+    repaint_screen_lines(0, 1, /*startX=*/0, SCREEN_WIDTH); // Redraw first line to repaint the open files list
+    repaint_screen_lines(SCREEN_HEIGHT-2, SCREEN_HEIGHT, /*startX=*/0, SCREEN_WIDTH); // Redraw last line to repaint the line:column info
   }
 
   restrict_cursor_on_line();
@@ -593,8 +587,18 @@ void move_cursor_horizontally(cursor_pos chars)
         ERROR_BEEP();
     }
   }
-  if (oldViewportXOffset != viewportXOffset)
-    repaint_screen();
+  if (viewportXOffset > oldViewportXOffset)
+  {
+    int8_t viewportXIncrement = viewportXOffset - oldViewportXOffset;
+    scroll_screen_right(viewportXIncrement);
+    repaint_screen_lines(0, SCREEN_HEIGHT, SCREEN_WIDTH - viewportXIncrement, SCREEN_WIDTH);
+  }
+  else if (viewportXOffset < oldViewportXOffset)
+  {
+    int8_t viewportXDecrement = oldViewportXOffset - viewportXOffset;
+    scroll_screen_left(viewportXDecrement);
+    repaint_screen_lines(0, SCREEN_HEIGHT, 0, viewportXDecrement);
+  }
 }
 
 void toggle_cursor_home()
@@ -828,7 +832,7 @@ void insert_new_line(bool cursorMovesToNewline)
     cursor_pos endY = screen_end_y_of_last_line_on_screen(repaintStartLine, repaintStartY)+1;
     if (endY > SCREEN_HEIGHT) endY = SCREEN_HEIGHT; // XXXX REMOVE
     assert(endY <= SCREEN_HEIGHT);
-    repaint_screen_lines(repaintStartY, endY, /*startX=*/0);
+    repaint_screen_lines(repaintStartY, endY, /*startX=*/0, SCREEN_WIDTH);
   }
 }
 
@@ -927,7 +931,7 @@ void run_goto_line_menu()
       }
       currentLine = get_nth_line_of_document(targetLineNumber);
       cursorY = targetLineNumber - viewportPos;
-      repaint_screen_lines(0, SCREEN_HEIGHT-1, /*startX=*/0); // Don't repaint status line, that has the "GO TO LINE:" text
+      repaint_screen_lines(0, SCREEN_HEIGHT-1, /*startX=*/0, SCREEN_WIDTH); // Don't repaint status line, that has the "GO TO LINE:" text
       assert(targetLineNumber >= 1);
       assert(viewportPos >= 1);
       assert(targetLineNumber - viewportPos >= 0);
@@ -989,7 +993,7 @@ void measure_and_print_available_memory()
 void print_textsel_info()
 {
   // TODO: Can this be optimized to occur less frequently?
-  repaint_screen_lines(SCREEN_HEIGHT-1, SCREEN_HEIGHT, /*startX=*/0);
+  repaint_screen_lines(SCREEN_HEIGHT-1, SCREEN_HEIGHT, /*startX=*/0, SCREEN_WIDTH);
   if (!selectionStartLine && !textSelectionModeActive)
     return;
 
@@ -1033,8 +1037,8 @@ void clear_currently_selected_text()
     int endLine = selectionEndLineNum+1-firstDisplayedLineNumber;
     endLine = MIN(SCREEN_HEIGHT, endLine);
     clear_selection();
-    repaint_screen_lines(startLine, endLine, /*startX=*/0);
-    repaint_screen_lines(SCREEN_HEIGHT-1, SCREEN_HEIGHT, /*startX=*/0);
+    repaint_screen_lines(startLine, endLine, /*startX=*/0, SCREEN_WIDTH);
+    repaint_screen_lines(SCREEN_HEIGHT-1, SCREEN_HEIGHT, /*startX=*/0, SCREEN_WIDTH);
   }
   mark_text_selection_mode_inactive_and_repaint_status();
 }
@@ -1272,7 +1276,7 @@ void main_loop()
           selectionStartColumn = 0;
           selectionEndColumn = current_column();
           selectionStartLine = selectionEndLine = currentLine;
-          repaint_screen_lines(selectionStartLineNum - firstDisplayedLineNumber, selectionStartLineNum + 1 - firstDisplayedLineNumber, /*startX=*/0);
+          repaint_screen_lines(selectionStartLineNum - firstDisplayedLineNumber, selectionStartLineNum + 1 - firstDisplayedLineNumber, /*startX=*/0, SCREEN_WIDTH);
           print_textsel_info();
         }
         break;
@@ -1454,7 +1458,7 @@ void main_loop()
       cursor_pos repaintY1 = (cursor_pos)(MAX(oldLineNum, lineNum) + 1 - firstDisplayedLineNumber);
       repaintY1 = MIN(SCREEN_HEIGHT, repaintY1);
       assert(repaintY0 <= repaintY1);
-      repaint_screen_lines(repaintY0, repaintY1, /*startX=*/0);
+      repaint_screen_lines(repaintY0, repaintY1, /*startX=*/0, SCREEN_WIDTH);
       print_textsel_info();
     }
   }

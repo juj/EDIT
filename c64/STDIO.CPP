@@ -520,6 +520,9 @@ extern "C" int puts(const char *str)
 
 extern "C" void *memcpy(void *dest, const void *src, size_t count) // TODO: optimize
 {
+  assert(dest >= 0x400);
+  assert(src >= 0x400);
+  assert(count < 40000); // Arbitrary limit to indicate a programming error
   char *d = (char*)dest;
   const char *s = (const char *)src;
   while(count--) *d++ = *s++;
@@ -528,6 +531,8 @@ extern "C" void *memcpy(void *dest, const void *src, size_t count) // TODO: opti
 
 extern "C" void *memcpy8(void *dest, const void *src, uint8_t count) // TODO: optimize
 {
+  assert(dest >= 0x400);
+  assert(src >= 0x400);
   char *d = (char*)dest;
   const char *s = (const char *)src;
   while(count--) *d++ = *s++;

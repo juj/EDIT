@@ -12,7 +12,7 @@ static volatile unsigned char * const screen_ram = (unsigned char*)0xCC00; // If
 static volatile unsigned char * const cursor_blink = (unsigned char *)0xCC;
 static volatile unsigned char * const cursor_blink_delay = (unsigned char *)0xCD;
 static volatile unsigned char * const char_under_cursor = (unsigned char *)0xCE;
-static volatile unsigned char * const cursor_blink_phase = (unsigned char *)0xCF;
+static volatile unsigned char * const cursor_blink_phase = (unsigned char *)0xCF; // 0: cursor off phase, 1: cursor on (rev char)
 static volatile unsigned char * const cursor_color = (unsigned char*)0x0286;
 static volatile unsigned char * const color_under_cursor = (unsigned char*)0x0287;
 
@@ -47,6 +47,13 @@ void set_cursor_pos(uint8_t x, uint8_t y)
   assert(x < 40);
   assert(y < 25);
   c64_set_cursor_pos(x, y);
+}
+
+void temp_hide_cursor()
+{
+  *cursor_blink_delay = 20;
+  *cursor_blink_phase = 0;
+  screen_ram[c64_get_cursor_linear_pos()] &= 0x7F;
 }
 
 void put_screen(uint16_t linearPos, char ch, unsigned char color)
@@ -182,13 +189,40 @@ void scroll_screen_down(int8_t lines_scrolled)
   }
 }
 
+void scroll_screen_left(int8_t chars_scrolled)
+{
+  assert(chars_scrolled > 0);
+  assert(chars_scrolled < SCREEN_WIDTH);
+  int offset = chars_scrolled;
+  char *ram_src = (char*)screen_ram;
+  char *ram_dst = ram_src + offset;
+  char *col_src = (char*)color_ram;
+  char *col_dst = col_src + offset;
+  _DISABLE_INTR();
+  temp_hide_cursor();
+  for(int y = 0; y < SCREEN_HEIGHT; ++y)
+  {
+    memmove(ram_dst, ram_src, SCREEN_WIDTH - chars_scrolled);
+    ram_dst += SCREEN_WIDTH;
+    ram_src += SCREEN_WIDTH;
+    memmove(col_dst, col_src, SCREEN_WIDTH - chars_scrolled);
+    col_dst += SCREEN_WIDTH;
+    col_src += SCREEN_WIDTH;
+  }  
+  _ENABLE_INTR();
+}
+
 void scroll_screen_right(int8_t chars_scrolled)
 {
+  assert(chars_scrolled > 0);
+  assert(chars_scrolled < SCREEN_WIDTH);
   int offset = chars_scrolled;
-  char *ram_dst = (char*)screen_ram + SCREEN_WIDTH;
+  char *ram_dst = (char*)screen_ram;
   char *ram_src = ram_dst + offset;
-  char *col_dst = (char*)color_ram + SCREEN_WIDTH;
+  char *col_dst = (char*)color_ram;
   char *col_src = col_dst + offset;
+  _DISABLE_INTR();
+  temp_hide_cursor();
   for(int y = 0; y < SCREEN_HEIGHT; ++y)
   {
     memcpy8(ram_dst, ram_src, SCREEN_WIDTH - chars_scrolled);
@@ -198,4 +232,5 @@ void scroll_screen_right(int8_t chars_scrolled)
     col_dst += SCREEN_WIDTH;
     col_src += SCREEN_WIDTH;
   }  
+  _ENABLE_INTR();
 }
