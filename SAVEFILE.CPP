@@ -25,7 +25,7 @@ bool ask_name_for_file(File *file)
 }
 
 #if defined(_MSC_VER) || defined(__TURBOC__)
-void save_file(File *file)
+void save_file(File *file, char *device_and_mode)
 {
   assert(file);
   if (!strcmp(file->filename, "<unsaved>"))

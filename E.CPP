@@ -271,7 +271,7 @@ void insert_character(char ch, uint8_t times, line_xpos insert_pos)
     cursorX += times;
     if (cursorX >= SCREEN_WIDTH)
     {
-      viewportXOffset += SCREEN_WIDTH-1-cursorX;
+      viewportXOffset += SCREEN_WIDTH+1-cursorX;
       cursorX = SCREEN_WIDTH-1;
       full_repaint = true;
     }
@@ -971,9 +971,11 @@ void erase_current_line()
 
 void measure_and_print_available_memory()
 {
+#ifdef __C64__
   char str[64];
   sprintf(str, "%u bytes free.", malloc_free_heap_available());
   put_string_on_screen(str, (SCREEN_WIDTH-(line_xpos)strlen(str))>>1, SCREEN_HEIGHT-1, LTBLUE);
+#endif
 }
 
 void print_textsel_info()
