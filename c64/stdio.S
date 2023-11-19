@@ -25,3 +25,40 @@ __memset_cmp_if_done:
   BNE __memset_cmp_if_done ;# If write offset pointer didn't wrap, skip incrementing high byte
   INC __rc3      ;# On wraparound of offset ptr, carry increment to high byte of destination address
   JMP __memset_cmp_if_done ;# Proceed to the next byte
+
+.section  .text.code,"ax",@progbits
+.globl sub_tick_t
+.type sub_tick_t, @function
+sub_tick_t:
+  LDY #3
+  SED ;# Enter BCD mode
+  SEC ;# Set initial carry for subtraction
+  LDA (__rc2), y
+  SBC (__rc4), y ;# Subtract 1/10ths of seconds
+  BCS 1f
+  SBC #$89
+  CLC
+1:
+  STA (__rc2), y
+  DEY
+  LDA (__rc2), y
+  SBC (__rc4), y ;# Subtract seconds
+  BCS 1f
+  SBC #$39
+  CLC
+1:
+  STA (__rc2), y
+  DEY
+  LDA (__rc2), y
+  SBC (__rc4), y ;# Subtract minutes
+  BCS 1f
+  SBC #$39
+  CLC
+1:
+  STA (__rc2), y
+  DEY
+  LDA (__rc2), y
+  SBC (__rc4), y ;# Subtract hours
+  STA (__rc2), y
+  CLD ;# Exit BCD mode
+  RTS

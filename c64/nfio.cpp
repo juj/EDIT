@@ -1,0 +1,400 @@
+#include "nfio.h"
+#include "../c64/c64_kernal.h"
+
+static volatile uint8_t * const rrnet_ctl      = (uint8_t *)0xDE01;
+static volatile uint8_t * const cs_packet_page = (uint8_t *)0xDE02;
+static volatile uint8_t * const cs_packet_data = (uint8_t *)0xDE04;
+static volatile uint8_t * const cs_rxtx_data   = (uint8_t *)0xDE08;
+static volatile uint8_t * const cs_tx_cmd      = (uint8_t *)0xDE0C;
+static volatile uint8_t * const cs_tx_len      = (uint8_t *)0xDE0E;
+
+static void write_u16_lo_hi(volatile uint8_t *dst, uint16_t value)
+{
+  dst[0] = (uint8_t)value;
+  dst[1] = (uint8_t)(value>>8);
+}
+
+static uint16_t read_u16_lo_hi(volatile uint8_t *ptr)
+{
+  uint8_t lo = ptr[0];
+  return (((uint16_t)ptr[1]) << 8) | lo;
+}
+
+static uint16_t read_u16_hi_lo(volatile uint8_t *ptr)
+{
+  uint8_t hi = ptr[1];
+  return (((uint16_t)hi) << 8) | ptr[0];
+}
+
+static void cs_set_page(uint16_t page) { write_u16_lo_hi(cs_packet_page, page); }
+static uint16_t cs_read_page_data()    { return read_u16_hi_lo(cs_packet_data); }
+static uint16_t rx_data_lo_hi()        { return read_u16_lo_hi(cs_rxtx_data); }
+static uint16_t rx_data_hi_lo()        { return read_u16_hi_lo(cs_rxtx_data); }
+static uint16_t ntohs(uint16_t x)      { return (x << 8) | (x >> 8); }
+
+static void cs_write_page_data(uint16_t page, uint16_t data)
+{
+  cs_set_page(page);
+  write_u16_lo_hi(cs_packet_data, data);
+}
+
+static bool rrnet_initialized = false;
+
+int rrnet_init(bool enable_promiscuous_mode)
+{
+  if (rrnet_initialized) return 1;
+  *rrnet_ctl |= 1; // enable clock port on the C64 to access RR-Net through a carrier cartridge
+
+  // Detect RR-Net
+  cs_set_page(0);
+  if (cs_read_page_data() != 0x630E)
+  {
+    printf("RR-NET/CS8900A WAS NOT DETECTED.");
+    return 0;
+  }
+/*
+  // Detect RR-Net MK3 by calculating a checksum. See http://wiki.icomp.de/wiki/RRNet
+  volatile uint8_t * const mk3_eeprom = (uint8_t *)0xDE0C;
+  if ((mk3_eeprom[0] ^ mk3_eeprom[1] ^ 0x55) != mk3_eeprom[2] ||
+     ((mk3_eeprom[0] + mk3_eeprom[1] + mk3_eeprom[2]) ^ 0xAA) != mk3_eeprom[3])
+  {
+    printf("RR-NET MK3 NOT DETECTED (CKSUM ERROR)\n");
+  }
+*/
+  // Configure chip
+  cs_write_page_data(0x0114/*pp_self_ctl*/, 0x0055); // reset chip
+  uint16_t mode = 0x0D05; // accept individual and broadcast packets
+  if (enable_promiscuous_mode) mode |= 0x80; // and maybe enable promiscuous mode
+  cs_write_page_data(0x0104/*pp_rx_ctl*/, mode);
+  cs_write_page_data(0x0112/*pp_line_ctl*/, 0xD3); // Enable RX and TX
+  rrnet_initialized = true;
+  return 1;
+}
+
+struct eth_frame
+{
+  unsigned char dst_mac[6];
+  unsigned char src_mac[6];
+  uint16_t etherType; // Big Endian: https://en.wikipedia.org/wiki/EtherType#Values
+};
+
+struct ip_frame
+{
+  uint8_t versionAndHeaderLength;
+  uint8_t typeOfService;
+  uint16_t packetLength;
+  uint16_t identification;
+  uint16_t flagsAndFragmentOffset;
+  uint8_t timeToLive;
+  uint8_t protocol;
+  uint16_t headerChecksum;
+  uint8_t src_ip[4];
+  uint8_t dst_ip[4];
+};
+
+struct udp_header
+{
+  uint16_t src_port;
+  uint16_t dst_port;
+  uint16_t length;
+  uint16_t checksum;
+};
+
+struct udp_magic
+{
+  uint32_t magic_header;
+};
+
+#define RECV_FILE_DATAGRAM_MAGIC 0x25291423
+
+#define RECV_FILE_DATAGRAM_FRAGMENT_MAGIC 0x25291424
+struct recv_file_datagram_fragment_header
+{
+//  uint32_t magic_header;
+  uint16_t file_id;
+  uint16_t fragment_index;
+} __attribute__((packed));
+
+static void read_struct(void *dst, uint16_t numBytes)
+{
+  uint16_t *frame = (uint16_t *)dst;
+  numBytes = (numBytes+1)>>1;
+  while(numBytes--)
+    *frame++ = rx_data_lo_hi();
+}
+
+static void discard_rx_bytes(unsigned int numBytes)
+{
+  // Read the hardware port cs_rxtx_data[1] numBytes/2 times (rounded up)
+  // to discard received uint16s that are uninteresting.
+#if 0
+  numBytes = (numBytes+1)>>1;
+  while(numBytes-- > 0)
+    (void)cs_rxtx_data[1];
+#else
+  // This is a hot function, so implement a tight discard loop
+  // manually.
+  asm(R"(
+    // A and X contain number of bytes to discard
+    CMP #0        // Test if A is zero (have an even multiple of 256 bytes to discard)
+    BEQ high_part%= // Jump to deal directly with high part
+
+    ROR A         // Calculate (A+1)/2 by shifting once right, and
+    ADC #0        // adding the lowest bit (now in Carry) back to A.
+    TAY           // Move A to Y, since A cannot be used as a loop counter
+loop_lo%=:        // Loop Y times to read the $DE09 hardware port
+    LDA $DE09     // Discards one uint16 from CS8900A receive buffer
+    DEY
+    BNE loop_lo%=
+
+high_part%=:      // Now discard full multiples of 256 bytes
+    CPX #00       // No high part to discard
+    BEQ end%=
+
+loop_hi%=:
+    LDY #128      // 256 bytes == 128 uint16s
+times_128%=:      // Loop just like before
+    LDA $DE09     // Discard a uint16 from CS8900A receive bufer
+    DEY
+    BNE times_128%=
+   
+    DEX
+    BNE loop_hi%= // If we still have multiples of 256 left, do it again
+end%=:
+  )"::"a"((uint8_t)numBytes), "x"((uint8_t)(numBytes>>8)));
+#endif
+}
+
+static void debug_dump_rx_bytes(unsigned int numBytes)
+{
+  numBytes = (numBytes+1)>>1;
+  while(numBytes-- > 0)
+    printf("%04X", ntohs(rx_data_lo_hi()));
+  printf("\n");
+}
+
+static void start_tx(uint16_t numBytes)
+{
+  write_u16_lo_hi(cs_tx_cmd, 0x00C0); // Send Transmit command 00C0h
+  write_u16_lo_hi(cs_tx_len, numBytes);
+  cs_set_page(0x0138);
+  while (!(cs_read_page_data() & 0x0100))
+    ; // Wait until we are ready to transmit
+}
+
+static void tx_bytes(const void *msg, uint16_t numBytes)
+{
+  numBytes = (numBytes+1)>>1;
+  const uint16_t *m16 = (const uint16_t*)msg;
+  while(numBytes--)
+    write_u16_lo_hi(cs_rxtx_data, *m16++);
+}
+
+uint16_t recv_udp_file_transfer_fragment(bool first_fragment)
+{
+  cs_set_page(0x0124);
+  for(;;)
+  {
+    // Wait until there is an Ethernet frame ready for processing
+    if ((cs_read_page_data() & 0x0D00) == 0) continue;
+
+    rx_data_hi_lo(); // dummy read to flush status word (ignored)
+    uint16_t bytes_left = rx_data_hi_lo();
+
+    union
+    {
+      eth_frame frame;
+      ip_frame ip;
+      udp_header udp;
+      udp_magic magic;
+    } net;
+
+#define READ_STRUCT(s) \
+    if (bytes_left < sizeof(s)) goto end; \
+    bytes_left -= sizeof(s); \
+    read_struct(&s, sizeof(s));
+
+    READ_STRUCT(net.frame);
+    if (net.frame.etherType != 0x0008/*IPV4*/) goto end;
+
+    READ_STRUCT(net.ip);
+    if (net.ip.protocol != 0x11/*UDP*/) goto end;
+
+    READ_STRUCT(net.udp);
+
+    READ_STRUCT(net.magic);
+    if ((first_fragment && net.magic.magic_header == RECV_FILE_DATAGRAM_MAGIC && bytes_left == sizeof(recv_file_datagram_header))
+      || (!first_fragment && net.magic.magic_header == RECV_FILE_DATAGRAM_FRAGMENT_MAGIC && bytes_left > sizeof(recv_file_datagram_fragment_header)))
+      return bytes_left; // this is interesting data, return it for processing
+
+    // Not interesting, discard and continue
+end:
+    discard_rx_bytes(bytes_left);
+  }
+}
+
+uint16_t sum1c(uint16_t a, uint16_t b)
+{
+  a += b;
+  return a + (a < b);
+}
+
+uint16_t calculate_one1c_checksum(void *data, uint16_t numBytes)
+{
+  assert(numBytes % 2 == 0);
+  numBytes >>= 1;
+  uint16_t *d = (uint16_t *)data;
+  uint16_t checksum = 0;
+  while(numBytes--)
+    checksum = sum1c(checksum, ntohs(*d++));
+  return ~checksum;
+}
+
+void start_udp_send(uint16_t numBytes)
+{
+  union
+  {
+    eth_frame frame;
+    ip_frame ip;
+    udp_header udp;
+  } net;
+
+  uint16_t numBytesRoundedUpToEven = numBytes + (numBytes&1);
+  start_tx(sizeof(net.frame) + sizeof(net.ip) + sizeof(net.udp) + numBytesRoundedUpToEven);
+
+  // Perform UDP broadcast
+  for(int i = 0; i < 6; ++i)
+    net.frame.dst_mac[i] = 0xFF;
+
+  // http://wiki.icomp.de/wiki/RRNet
+  net.frame.src_mac[0] = 0x28;
+  net.frame.src_mac[1] = 0xCD;
+  net.frame.src_mac[2] = 0x4C;
+  net.frame.src_mac[3] = 0xFF;
+  net.frame.src_mac[4] = *(volatile unsigned char *)0xDE0E;
+  net.frame.src_mac[5] = *(volatile unsigned char *)0xDE0F;
+
+  net.frame.etherType = 0x0008;
+  tx_bytes(&net.frame, sizeof(net.frame));
+
+  net.ip.versionAndHeaderLength = 0x45;
+  net.ip.typeOfService = 0;
+  net.ip.packetLength = ntohs(sizeof(net.ip) + sizeof(net.udp) + numBytesRoundedUpToEven);
+  net.ip.identification = 0;
+  net.ip.flagsAndFragmentOffset = 0;
+  net.ip.timeToLive = 128;
+  net.ip.protocol = 17; // udp
+  net.ip.headerChecksum = 0; // temporary, will be filled later
+
+  net.ip.src_ip[0] = 192;
+  net.ip.src_ip[1] = 168;
+  net.ip.src_ip[2] = 0;
+  net.ip.src_ip[3] = 255;
+
+  net.ip.dst_ip[0] = 255;
+  net.ip.dst_ip[1] = 255;
+  net.ip.dst_ip[2] = 255;
+  net.ip.dst_ip[3] = 255;
+  net.ip.headerChecksum = ntohs(calculate_one1c_checksum(&net.ip, sizeof(net.ip))); // Calculate the IP checksum (this is not optional)
+
+  tx_bytes(&net.ip, sizeof(net.ip));
+
+  net.udp.src_port = ntohs(49739);
+  net.udp.dst_port = ntohs(4009);
+  net.udp.length = ntohs(sizeof(net.udp) + numBytesRoundedUpToEven);
+  net.udp.checksum = 0; // Skip computing UDP checksum - that is optional. (tricky to compute since checksum extends over user payload)
+  tx_bytes(&net.udp, sizeof(net.udp));
+
+  // The only thing left now is to fill the actual UDP payload data,
+  // which is the caller's side to do.
+}
+
+#define FRAGMENT_RECEIVED_DATAGRAM_MAGIC 0xEE365F02
+struct fragment_received
+{
+  uint32_t magic;
+  uint16_t fragment_index;
+};
+
+void send_udp_fragment_received_msg(uint16_t fragment_index)
+{
+  fragment_received recv;
+  recv.magic = FRAGMENT_RECEIVED_DATAGRAM_MAGIC;
+  recv.fragment_index = fragment_index;
+  start_udp_send(sizeof(recv));
+  tx_bytes(&recv, sizeof(recv));
+}
+
+NFILE *nfopen(const char *filename, const char *mode)
+{
+  rrnet_init(/*promiscuous_mode=*/false);
+  if (!rrnet_initialized) return 0;
+  NFILE *f = (NFILE*)calloc(1, sizeof(NFILE));
+  if (!f) return 0;
+
+  uint16_t bytes_left = recv_udp_file_transfer_fragment(true);
+  f->fragment_index = 0xFF;
+  assert(bytes_left == sizeof(recv_file_datagram_header));
+  read_struct(&f->header, sizeof(recv_file_datagram_header));
+  return f;
+}
+
+int nfgetc(NFILE *f)
+{
+  if (f->have_next_byte)
+  {
+    f->have_next_byte = false;
+    return f->next_byte;
+  }
+
+  if (f->bytes_left > 0)
+  {
+read_byte:
+    --f->bytes_left;
+    uint16_t data = rx_data_lo_hi();
+    if (f->bytes_left)
+    {
+      --f->bytes_left;
+      f->have_next_byte = true;
+      f->next_byte = (uint8_t)(data >> 8);
+    }
+    return (uint8_t)data;
+  }
+
+  if (f->eof) return -1;
+
+  send_udp_fragment_received_msg(f->fragment_index++);
+  if (f->fragment_index == f->header.num_fragments)
+  {
+    f->eof = true;
+    return -1;
+  }
+  f->bytes_left = recv_udp_file_transfer_fragment(false);
+
+  recv_file_datagram_fragment_header frag;
+  read_struct(&frag, sizeof(frag));
+  f->bytes_left -= sizeof(frag);
+
+  goto read_byte;
+}
+
+size_t nfread(void *buffer, size_t size, size_t count, NFILE *f)
+{
+  uint8_t *ptr = (uint8_t*)buffer;
+  for(size_t i = 0; i < size; ++i)
+    for(size_t j = 0; j < count; ++j)
+    {
+      int ch = nfgetc(f);
+      if (ch < 0) break;
+      *ptr++ = (uint8_t)ch;
+    }
+  return (uintptr_t)ptr - (uintptr_t)buffer;
+}
+
+int nfclose(NFILE *f)
+{
+  if (f->bytes_left)
+    discard_rx_bytes(f->bytes_left);
+  free(f);
+  return 0;
+}
