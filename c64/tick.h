@@ -7,6 +7,7 @@ class tick_t
 public:
   uint8_t tod[4];
   void operator -=(const tick_t &rhs);
+  uint16_t decisecs() const;
   void print() const;
 };
 

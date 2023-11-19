@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
+#include "../c64/tick.h"
 #include "../c64/nfio.h"
 #include "../c64/c64_kernal.h"
 #include "../c64/c64_cursor.h"
@@ -874,7 +875,7 @@ int view_file(char *text, uint8_t view_type)
       int pos = SCREEN_WIDTH*(SCREEN_HEIGHT-1) + strlen("saving: [");
       int progress_incr = num_lines >> 4;
       int progress = 0;
-      _Jiffies elapsed = _RDTIM();
+      tick_t elapsed = tick();
       FILE *handle = fopen(filename, device);
       char *tmp = (view_type == VIEW_DESC) ? (char*)malloc(82) : 0;
       for(int line = l0; line < l1; ++line)
@@ -901,14 +902,14 @@ int view_file(char *text, uint8_t view_type)
       }
       free(tmp);
       fclose(handle);
-      elapsed = _RDTIM() - elapsed;
+      elapsed = tick() - elapsed;
       char str[44];
-      uint16_t bytes_per_sec = (uint16_t)((unsigned long)num_bytes*60/elapsed);
+      uint16_t decisecs = elapsed.decisecs();
+      uint16_t bytes_per_sec = (uint16_t)((unsigned long)num_bytes*10/decisecs);
       sprintf(str, "wrote %d lines/%u bytes", l1-l0, num_bytes);
+      put_string_on_screen(str, 0, SCREEN_HEIGHT-2, WHITE);
+      sprintf(str, "elapsed %um %us, %u b/sec.", decisecs/600, (decisecs%600)/10, bytes_per_sec);
       put_string_on_screen(str, 0, SCREEN_HEIGHT-1, WHITE);
-      uint16_t seconds = (uint16_t)(elapsed / 60);
-      //sprintf(str, "in %lu jiffies=%u sec, %u b/sec.", (unsigned long)elapsed, seconds, bytes_per_sec);
-      //put_string_on_screen(str, 0, SCREEN_HEIGHT-1, WHITE);
       get_key();
       line_select_mode = false;
       line_select_start = line_select_end = -1;

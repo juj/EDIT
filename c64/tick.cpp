@@ -51,6 +51,14 @@ seconds:
   _CHROUT('\r');
 }
 
+uint16_t tick_t::decisecs() const
+{
+  int h = (tod[3]>>4)*10+(tod[3]&15);
+  int m = (tod[2]>>4)*10+(tod[2]&15);
+  int s = (tod[1]>>4)*10+(tod[1]&15);
+  return ((h*60+m)*60+s)*10+tod[0];
+}
+
 tick_t operator -(const tick_t &a, const tick_t &b)
 {
   tick_t ret = a;
