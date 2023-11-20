@@ -1009,7 +1009,7 @@ int main()
   if (!success) printf("RR-NET NOT FOUND!\n");
 
   bool for_printing = false;
-  selected_year = 2020;
+  selected_year = 2023;
   for(;;)
   {
     send_ask_aoc_calendar(selected_year);
