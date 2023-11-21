@@ -2,55 +2,34 @@
 #include "c64_kernal.h"
 #include <stdio.h>
 
-//  char data[512];
-
 int main()
 {
   char str[80];
 
   printf("TEST WRITING TO TAPE, FILE EX1.TXT...\n");
   FILE *handle = fopen("EX1.TXT", "1w");
-  for(int i = 0; i < 10; ++i)
+  for(int i = 0; i < 23; ++i)
   {
     char str[80];
-    sprintf(str, "%d\n", i);
+    sprintf(str, "%d THIS IS A 40 COLUMN LINE ABCDEFGH %d\n", i, i);
     fputs(str, handle);
+    _SLEEP(240);
   }
   fclose(handle);
-  printf("WRITE DONE!\n");
-  printf("PLEASE REWIND AND PRESS ANY KEY.\n");
-  char key = 0;
-  while (!key) key = _GETIN();
+  printf("WRITE DONE. PLEASE STOP AND REWIND.\n");
+  while(_DATASSETTE_BUTTON_DOWN());
+
+  // Wait for the rewind
+  while(!_DATASSETTE_BUTTON_DOWN());
+  while(_DATASSETTE_BUTTON_DOWN());
 
   handle = fopen("", "1r");
-
   while(fgets(str, sizeof(str), handle))
-    printf("%s", str);
-  fclose(handle);
-
-
-/*
-  memset(data, 0, sizeof(data));
-  int dpos = 0;
-  for(;;)
   {
-    uint8_t val = _CHKIN(handle->handle);
-    if (val) break;
-    uint8_t err = _READST();
-    if (err) break;
-    bool e;
-    uint8_t ch = _CHRIN_GET_ERROR(&e);
-    if (e) break;
-    data[dpos++] = ch;
-    err = _READST();
-    if (err) break;
-    _CLRCHN();
-    _CHROUT(ch == '\n' ? 'Z' : ch);
+    _SLEEP(240);
+    printf("%s", str);
   }
-  _CLOSE(handle->handle);
-  _CLRCHN();
-  printf("%s\n", data);
-*/
+  fclose(handle);
   printf("TEST FINISHED!\n");
-  for(;;);
+  for(;;); // Don't return to BASIC, so that the test results text remain on screen
 }
