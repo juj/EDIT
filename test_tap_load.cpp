@@ -8,6 +8,7 @@ int main()
 
   printf("TEST WRITING TO TAPE, FILE EX1.TXT...\n");
   FILE *handle = fopen("EX1.TXT", "1w");
+#if 1
   for(int i = 0; i < 23; ++i)
   {
     char str[80];
@@ -15,6 +16,11 @@ int main()
     fputs(str, handle);
     _SLEEP(240);
   }
+#else
+  char test[] = "int main(){}";
+  fwrite8(test, 12, handle);
+  fputc('\n', handle);
+#endif
   fclose(handle);
   printf("WRITE DONE. PLEASE STOP AND REWIND.\n");
   while(_DATASSETTE_BUTTON_DOWN());
