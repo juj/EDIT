@@ -15,6 +15,7 @@
 #include "audio.h"
 #include "file.h"
 #include "viewport.h"
+#include "network.h"
 
 void open_file(const char *filename, uint8_t device)
 {
@@ -24,7 +25,11 @@ void open_file(const char *filename, uint8_t device)
     open_file_in_viewport(f, /*bringToMruFront:*/1);
 #ifdef __C64__
     if (device == 1 && filename[0] == 0)
+    {
       ask_string_prompt("NAME OPENED FILE: ", f->filename, MAX_C64_FILENAME_LEN, ASK_ALLOW_EMPTY_INPUT);
+      // Send the new file name to server.
+      send_new_document_to_network_server(f, /*clear_contents=*/false);
+    }
 #endif
   }
   else

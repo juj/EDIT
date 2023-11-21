@@ -9,6 +9,7 @@
 void save_file(File *file, char *device_and_mode)
 {
   bool error = false;
+  file->deviceNum = device_and_mode[0] ? atoi(device_and_mode) : 8;
   strcat(device_and_mode, "w");
   FILE *handle = fopen(file->filename, device_and_mode);
   if (!handle) error = true;

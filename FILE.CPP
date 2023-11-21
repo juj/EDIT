@@ -140,6 +140,7 @@ File *open_new_file()
   if (!f)
     return 0;
   memset(f, 0, sizeof(File));
+  f->deviceNum = 8;
 
 #if defined(__C64__) || defined(__MSDOS__) // files are all uppercase, and on C64 chars too
   const char *filename = "<UNTITLED>";
@@ -222,6 +223,7 @@ File *load_file(const char *filename, uint8_t device_id)
     return 0;
   }
   memset(f, 0, sizeof(File));
+  f->deviceNum = device_id;
   strcpy(f->filename, filename);
 
   char *tmp_line = (char*)Malloc(MAX_CHARS_PER_LINE+1);

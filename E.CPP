@@ -1288,7 +1288,8 @@ void main_loop()
 #endif
       {
         bool userCancelled = false;
-        char device[8] = {};
+        char device[3];
+        sprintf(device, "%d", (int)currentFile->deviceNum);
         if (is_file_unnamed(currentFile) || is_shift_key_held(key))
         {
 #ifdef __C64__
