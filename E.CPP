@@ -26,6 +26,7 @@
 #include "editor.h"
 #include "c64/c64_kernal.h"
 #include "c64/c64_char_rom.h"
+#include "c64/nfio.h"
 
 #ifdef __C64__
 #define COLOR_UNSAVED_CURRENT LTRED
@@ -1369,13 +1370,36 @@ void main_loop()
       case ACTION_SAVE_COMPILED_PRG_TO_DISK_ALT2:
 #endif
         {
-        send_ask_compiled_document_msg(currentFile->document_id, /*for_loading_to_memory=*/false);
-        char filename[20];
-        wait_to_receive_file(filename);
-        repaint_screen();
-        char text[40];
-        sprintf(text, "program %s saved to disk", filename);
-        write_status_text(text, LTGREEN);
+          char device[3] = {};
+          char filename[MAX_C64_FILENAME_LEN+1];
+          const char *end = find_last_char_or_end(currentFile->filename, '.');
+          uint8_t len = end - currentFile->filename;
+          memcpy8(filename, currentFile->filename, len);
+          filename[len] = 0;
+
+          ask_string_prompt("SAVE TO DEVICE #: ", device, 2);
+          uint8_t device_num = atoi(device);
+
+          if (device_num == 1)
+          {
+            printf("\n"); // Add a newline so that the next question appears on a new line
+            ask_string_prompt("ENTER FILENAME: ", filename, MAX_C64_FILENAME_LEN);
+            printf("\n");
+            _SETNAM(filename, len);
+            _SETLFS(1, 1, 1);
+            send_ask_compiled_document_msg(currentFile->document_id, /*for_loading_to_memory=*/true);
+            receive_and_run_prg(/*run_prg=*/false);
+            put_string_on_screen("WRITE COMPLETE.", 0, SCREEN_HEIGHT-1, WHITE);
+          }
+          else
+          {
+            send_ask_compiled_document_msg(currentFile->document_id, /*for_loading_to_memory=*/false);
+            wait_to_receive_file(filename);
+          }
+          repaint_screen();
+          char text[40];
+          sprintf(text, "program %s saved to disk", filename);
+          write_status_text(text, LTGREEN);
         }
         break;
 #endif

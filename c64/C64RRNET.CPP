@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdint.h>
 #include "c64_kernal.h"
+#include "nfio.h"
 #include "../NETWORK.h"
 #include "../SCREEN.h"
 
@@ -89,25 +90,12 @@ struct udp_header
   uint16_t checksum;
 };
 
-#define MAX_C64_FILENAME_LEN 16
-
 struct message_magic_header
 {
   uint32_t magic_header; // 0x25291423
 };
 
 #define RECV_FILE_DATAGRAM_MAGIC 0x25291423
-struct recv_file_datagram_header
-{
-//  uint32_t magic_header;
-  char filename[20];
-  uint16_t file_id;
-  uint16_t num_fragments;
-  uint16_t file_start_address;
-  uint16_t file_size;
-  uint8_t filetype;
-  uint8_t dummy0;
-};
 
 #define RECV_FILE_DATAGRAM_FRAGMENT_MAGIC 0x25291424
 struct recv_file_datagram_fragment_header

@@ -25,6 +25,7 @@ prev_sp                  = $CBFF ; uint8
 choose_run_prg           = $CBFE ; bool, if true, we will run the downloaded PRG, otherwise we are saving it to datassette
 prg_entry_func_address   = $CBFC ; uint16
 prev_cpu_processor_port  = $CBFB ; uint8 ; Save the value of the CPU processor port register (Memory address $0001). REU is unable to reload this
+used_by_chrout_u32_in_stdio = $CBF7; uint32 ; chrout_u32() uses this as scratch space
 
 ; # Clobbers A
 .macro REU_SNAPSHOT value

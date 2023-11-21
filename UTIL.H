@@ -16,4 +16,8 @@ uint8_t ADD_U8_SAT(uint8_t a, uint8_t b);
 // Returns max(a-b, 0)
 uint8_t SUB_U8_SAT(uint8_t a, uint8_t b);
 
+// Find last occurrence of character ch in s, or zero
+// if not found.
+const char *find_last_char_or_end(const char *s, char ch);
+
 #endif

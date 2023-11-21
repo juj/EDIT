@@ -5,6 +5,7 @@
 #include "audio.h"
 #include "screen.h"
 #include "input.h"
+#include <string.h>
 
 void repaint_screen();
 
@@ -55,4 +56,12 @@ uint8_t SUB_U8_SAT(uint8_t a, uint8_t b)
   if (a < b) return 0;
   return a - b;
 #endif
+}
+
+const char *find_last_char_or_end(const char *s, char ch)
+{
+  const char *end = s + strlen(s);
+  const char *ptr = end;
+  while(ptr-- > s) if (*ptr == ch) return ptr;
+  return end;
 }
