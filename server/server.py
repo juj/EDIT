@@ -274,7 +274,7 @@ def handle_new_document_msg(data):
   clear_contents, document_id, filename_len, dummy = struct.unpack('BBBB', data[:4])
   petscii_file = remove_trailing_null_byte(data[4:4+filename_len])
   filename = petscii_to_ascii(petscii_file)
-  if filename[0] == '<': filename = f'untitled_filename_{document_id}.cpp'
+  if len(filename) == 0 or filename[0] == '<': filename = f'untitled_filename_{document_id}.cpp'
 
   print(f'New document: id: {document_id} -> clear: {clear_contents}. Filename: {filename}')
 
