@@ -167,6 +167,22 @@ static uint8_t read_next_char(FILE *f, bool *error)
   */
   uint8_t ch = _CHRIN_GET_ERROR(error);
   SET_SCREEN_BORDER(ch);
+  // TODO/Bug workaround? In my editor test code, if I first save a cpp file
+  // to tape, then attempting to load it does not register an EOF condition
+  // correctly, but the tape reads a 0 after the EOF, and then reads an
+  // indefinite number of 0x20 bytes. EOF does not seem to be received
+  // in all cases properly. So to work around this, treat read 0 byte
+  // to mean EOF. This means that we can only write SEQ text files to cassette
+  // via this function, and those can't have the null byte in them.
+  // TODO: IS this condition a bug in my code, or some limitation/issue in
+  // the C64 KERNAL?
+  if (ch == 0 && f->deviceNum == 1)
+  {
+    // Treat received null byte from the Datassette an EOF condition.
+    *error = f->error = 0x40; // EOF
+    return 0;
+  }
+
   if (*error) _STDIO_DEBUG2("FREAD ERR");
 /////  if (ch == 199)
   {
@@ -254,6 +270,7 @@ extern "C" FILE *fopen(const char *filename, const char *mode)
   f->nextCharAvailable = false;
   f->handle = fileHandleCounter++; // TODO multiple handles
   f->error = 0;
+  f->deviceNum = device_number;
   if (fileHandleCounter >= 127) fileHandleCounter = 1;
 
   _CLRCHN();

@@ -40,6 +40,7 @@ struct FILE
   bool nextCharAvailable; // If true, nextChar is present. If false, must read first.
   uint8_t handle;
   uint8_t error;
+  uint8_t deviceNum;
 };
 
 #define MAX_FILENAME_LEN 16
