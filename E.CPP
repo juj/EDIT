@@ -1292,7 +1292,7 @@ void main_loop()
         if (is_file_unnamed(currentFile) || is_shift_key_held(key))
         {
 #ifdef __C64__
-          userCancelled = ask_string_prompt("SAVE TO DEVICE #: ", device, 2) <= 0;
+          userCancelled = ask_string_prompt("SAVE TO DEVICE #: ", device, 2, ASK_ONLY_NUMBERS | ASK_ALLOW_CANCEL) <= 0;
 #endif
           if (!userCancelled) userCancelled = ask_name_for_file(currentFile);
           if (!userCancelled) currentFile->hasUnsavedChanges = 1;
@@ -1377,13 +1377,13 @@ void main_loop()
           memcpy8(filename, currentFile->filename, len);
           filename[len] = 0;
 
-          ask_string_prompt("SAVE TO DEVICE #: ", device, 2);
+          ask_string_prompt("SAVE TO DEVICE #: ", device, 2, ASK_ONLY_NUMBERS | ASK_ALLOW_CANCEL);
           uint8_t device_num = atoi(device);
 
           if (device_num == 1)
           {
             printf("\n"); // Add a newline so that the next question appears on a new line
-            ask_string_prompt("ENTER FILENAME: ", filename, MAX_C64_FILENAME_LEN);
+            ask_string_prompt("ENTER FILENAME: ", filename, MAX_C64_FILENAME_LEN, ASK_ALLOW_CANCEL);
             printf("\n");
             _SETNAM(filename, len);
             _SETLFS(1, 1, 1);
@@ -1514,7 +1514,7 @@ int main(int argc, char **argv)
 #ifdef __C64__
   File *f = open_new_file();
 #else
-  File *f = (argc > 1) ? load_file(argv[1]) : open_new_file();
+  File *f = (argc > 1) ? load_file(argv[1], /*unused:*/0) : open_new_file();
 #endif
 
   open_file_in_viewport(f, /*bringToMruFront*/1);

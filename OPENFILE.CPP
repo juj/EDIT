@@ -2,6 +2,9 @@
 #include <conio.h>
 #include <dos.h>
 #endif
+#ifdef __C64__
+#include "c64/nfio.h"
+#endif
 #include <stdio.h>
 #include "iassert.h"
 #include "openfile.h"
@@ -13,11 +16,17 @@
 #include "file.h"
 #include "viewport.h"
 
-void open_file(const char *filename)
+void open_file(const char *filename, uint8_t device)
 {
-  File *f = load_file(filename);
+  File *f = load_file(filename, device);
   if (f)
+  {
     open_file_in_viewport(f, /*bringToMruFront:*/1);
+#ifdef __C64__
+    if (device == 1 && filename[0] == 0)
+      ask_string_prompt("NAME OPENED FILE: ", f->filename, MAX_C64_FILENAME_LEN, ASK_ALLOW_EMPTY_INPUT);
+#endif
+  }
   else
     ERROR_BEEP();
 }
@@ -78,12 +87,17 @@ void run_open_file_menu()
 
 void run_open_file_menu()
 {
+  char device[3] = {};
   char filename[MAX_FILENAME_LEN+1] = {};
-  int len = ask_string_prompt("OPEN FILE: ", filename, MAX_FILENAME_LEN);
+
+  ask_string_prompt("LOAD FROM DEVICE #: ", device, 2, ASK_ONLY_NUMBERS | ASK_ALLOW_CANCEL);
+  uint8_t device_num = atoi(device);
+
+  int len = ask_string_prompt("OPEN FILE: ", filename, MAX_FILENAME_LEN, ASK_ALLOW_CANCEL | (device_num==1?ASK_ALLOW_EMPTY_INPUT:0));
   if (len < 0) return; // user cancelled?
   File *maybeDummyFile = currentFile;
   bool isOnlyEmptyFile = (maybeDummyFile->nextFile == 0 && maybeDummyFile->prevFile == 0 && calculate_file_byte_size(maybeDummyFile) <= 1);
-  open_file(filename);
+  open_file(filename, device_num);
   if (isOnlyEmptyFile) // Close dummy initial "<untitled>" file if user opens a new file to replace that
   {
     maybeDummyFile->hasUnsavedChanges = false; // Make close_file() not ask about unsaved modifications before closing.

@@ -18,7 +18,7 @@ bool ask_name_for_file(File *file)
   fn[MAX_FILENAME_LEN] = 0;
   strcpy(fn, file->filename);
   if (fn[0] == '<') fn[0] = 0;
-  int ret = ask_string_prompt("SAVE TO FILE: ", fn, MAX_FILENAME_LEN);
+  int ret = ask_string_prompt("SAVE TO FILE: ", fn, MAX_FILENAME_LEN, ASK_ALLOW_CANCEL);
   if (ret < 0) return true; // user cancelled
   strcpy(file->filename, fn);
   printf("\n"); // Print a newline so that when saving on tape, the text "press play & record on tape" will appear on a new line

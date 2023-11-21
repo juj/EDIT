@@ -200,9 +200,14 @@ void close_file(File *file)
 
 void write_status_text(const char *text, unsigned char color);
 
-File *load_file(const char *filename)
+File *load_file(const char *filename, uint8_t device_id)
 {
+#ifdef __C64__
+  char mode[3] = { (char)('0' + device_id), 'r' };
+  FILE *handle = fopen(filename, mode);
+#else
   FILE *handle = fopen(filename, "r");
+#endif
   if (!handle)
   {
     write_status_text("FILE OPEN FAILED", LTRED);

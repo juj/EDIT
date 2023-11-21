@@ -183,7 +183,7 @@ void deinit_keyboard()
 #endif
 }
 
-int ask_string_prompt(const char *prompt, char *dst, int maxLen)
+int ask_string_prompt(const char *prompt, char *dst, int maxLen, uint8_t flags)
 {
   clear_line((uint16_t)(SCREEN_HEIGHT-1)*SCREEN_WIDTH, ' ', LTGRAY); // Clear last line to start with
 
@@ -199,8 +199,8 @@ int ask_string_prompt(const char *prompt, char *dst, int maxLen)
     int key = get_key();
     switch(key)
     {
-    case ACTION_ESC: result = -1; break;
-    case ACTION_ENTER: if (x > 0) result = 1; break;
+    case ACTION_ESC: if ((flags & ASK_ALLOW_CANCEL)) result = -1; break;
+    case ACTION_ENTER: if ((flags & ASK_ALLOW_EMPTY_INPUT) || x > 0) result = 1; break;
     case ACTION_DELETE_LEFT:
       if (x > 0)
       {
@@ -211,7 +211,9 @@ int ask_string_prompt(const char *prompt, char *dst, int maxLen)
     default:
       if (x < maxLen /*&& prompt_len + x + 1 < SCREEN_WIDTH*/ && key >= 0x20 && key < 127)
       {
-        if (maxLen > 1 || key == 'y' || key == 'Y' || key == 'n' || key == 'N')
+        if (((flags & ASK_ONLY_YES_NO) && (key == 'y' || key == 'Y' || key == 'n' || key == 'N'))
+          || ((flags & ASK_ONLY_NUMBERS) && (key >= '0' && key <= '9'))
+          || (!(flags & ASK_ONLY_YES_NO) && !(flags & ASK_ONLY_NUMBERS)))
         {
           put_screen(pos+x, key, LTGRAY);
           dst[x++] = key;
@@ -228,7 +230,7 @@ int ask_string_prompt(const char *prompt, char *dst, int maxLen)
 int ask_yes_no_prompt(const char *prompt)
 {
   char dst[2] = {0};
-  int ret = ask_string_prompt(prompt, dst, 1);
+  int ret = ask_string_prompt(prompt, dst, 1, ASK_ONLY_YES_NO | ASK_ALLOW_CANCEL);
   return ret > 0 && (dst[0] == 'y' || dst[0] == 'Y');
 }
 
