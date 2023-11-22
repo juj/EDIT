@@ -64,8 +64,8 @@ void repaint_open_files_list(File *highlightFilename)
 
     put_string_on_screen(fname, x, 0, color);
     f = f->nextFile;
-    if (f && x > 0)
-      put_string_on_screen(STR_PIPE, --x, 0, LTGRAY);
+    if (x > 0)
+      put_string_on_screen(f ? STR_PIPE : " ", --x, 0, LTGRAY);
   }
 }
 
@@ -374,7 +374,7 @@ void backspace_character()
 
     cursorX = virtualX = currentLine->length;
     delete_character();
-    scroll_viewport_horizontally_to_display_cursor();
+    scroll_viewport_horizontally_to_display_cursor(/*repaint=*/true);
   }
   assert(cursorY >= 0);
 }
@@ -383,20 +383,20 @@ void backspace_character()
 // it is outside the display, we must scroll the viewport by
 // adjusting viewportXOffset and repaint the screen.
 // Return true if repainted screen
-bool scroll_viewport_horizontally_to_display_cursor()
+bool scroll_viewport_horizontally_to_display_cursor(bool repaint)
 {
   if (currentLine->length < viewportXOffset)
   {
     viewportXOffset = currentLine->length;
     cursorX = 0;
-    repaint_screen();
+    if (repaint) repaint_screen();
     return true;
   }
   if (cursorX >= SCREEN_WIDTH)
   {
     viewportXOffset += cursorX - (SCREEN_WIDTH-1);
     cursorX = SCREEN_WIDTH - 1;
-    repaint_screen();
+    if (repaint) repaint_screen();
     return true;
   }
   return false;
@@ -404,10 +404,10 @@ bool scroll_viewport_horizontally_to_display_cursor()
 
 // Adjust real cursor X based on the virtual cursor X of where it
 // would want to be. Return true if screen was repainted.
-bool restrict_cursor_on_line()
+bool restrict_cursor_on_line(bool repaint)
 {
   cursorX = MIN(virtualX, currentLine->length - viewportXOffset);
-  return scroll_viewport_horizontally_to_display_cursor();
+  return scroll_viewport_horizontally_to_display_cursor(repaint);
 }
 
 void move_viewport_vertically(cursor_pos lines, bool cursor_moves_along)
@@ -465,12 +465,12 @@ void move_viewport_vertically(cursor_pos lines, bool cursor_moves_along)
         break;
     }
   }
-  bool repainted = restrict_cursor_on_line();
-  if (!repainted) repaint_screen();
+  restrict_cursor_on_line(/*repaint=*/false);
+  repaint_screen();
   assert(cursorY >= 0);
 }
 
-void move_cursor_vertically(cursor_pos lines)
+void move_cursor_vertically(cursor_pos lines, bool repaint = true)
 {
   assert(currentLine);
   bool scrolled = false; // Detect if we want to play a beep sound
@@ -495,8 +495,11 @@ void move_cursor_vertically(cursor_pos lines)
       while(lines && currentLine->prevLine) { firstDisplayedLine = currentLine = currentLine->prevLine; ++lines; --firstDisplayedLineNumber; ++lines_scrolled; }
       if (lines_scrolled)
       {
-        scroll_screen_up(lines_scrolled);
-        repaint_screen_lines(0, lines_scrolled+1, /*startX=*/0, SCREEN_WIDTH); // Draw +1 line to clear the open files list at top right
+        if (repaint)
+        {
+          scroll_screen_up(lines_scrolled);
+          repaint_screen_lines(0, lines_scrolled+1, /*startX=*/0, SCREEN_WIDTH); // Draw +1 line to clear the open files list at top right
+        }
         scrolled = true;
       }
     }
@@ -520,18 +523,18 @@ void move_cursor_vertically(cursor_pos lines)
     }
     --lines;
   }
-  if (viewport_lines_scrolled_down)
+  if (viewport_lines_scrolled_down && repaint)
   {
     scroll_screen_down(viewport_lines_scrolled_down);
     repaint_screen_lines(0, 1, /*startX=*/0, SCREEN_WIDTH); // Redraw first line to repaint the open files list
     repaint_screen_lines(SCREEN_HEIGHT-2, SCREEN_HEIGHT, /*startX=*/0, SCREEN_WIDTH); // Redraw last line to repaint the line:column info
   }
 
-  restrict_cursor_on_line();
+  restrict_cursor_on_line(repaint);
   if (!scrolled) beep(170, 50);
 }
 
-void move_cursor_horizontally(cursor_pos chars)
+void move_cursor_horizontally(cursor_pos chars, bool repaint = true)
 {
   cursor_pos oldViewportXOffset = viewportXOffset;
 
@@ -551,14 +554,15 @@ void move_cursor_horizontally(cursor_pos chars)
     {
       if (currentLine->prevLine)
       {
-        move_cursor_vertically(-1);
+        move_cursor_vertically(-1, /*repaint=*/false);
         cursorX = virtualX = currentLine->length;
         left = MAX(0, cursorX - (SCREEN_WIDTH-1));
         assert(cursorX >= left);
         cursorX -= left;
         viewportXOffset += left;
-
-        move_cursor_horizontally(chars+1);
+        move_cursor_horizontally(chars+1, /*repaint=*/false);
+        if (repaint) repaint_screen();
+        return;
       }
       else
         ERROR_BEEP();
@@ -579,26 +583,31 @@ void move_cursor_horizontally(cursor_pos chars)
     {
       if (currentLine->nextLine)
       {
-        move_cursor_vertically(1);
+        move_cursor_vertically(1, /*repaint=*/false);
         cursorX = virtualX = 0;
         viewportXOffset = 0;
-        move_cursor_horizontally(chars-1);
+        move_cursor_horizontally(chars-1, /*repaint=*/false);
+        if (repaint) repaint_screen();
+        return;
       }
       else
         ERROR_BEEP();
     }
   }
-  if (viewportXOffset > oldViewportXOffset)
+  if (repaint)
   {
-    int8_t viewportXIncrement = viewportXOffset - oldViewportXOffset;
-    scroll_screen_right(viewportXIncrement);
-    repaint_screen_lines(0, SCREEN_HEIGHT, SCREEN_WIDTH - viewportXIncrement, SCREEN_WIDTH);
-  }
-  else if (viewportXOffset < oldViewportXOffset)
-  {
-    int8_t viewportXDecrement = oldViewportXOffset - viewportXOffset;
-    scroll_screen_left(viewportXDecrement);
-    repaint_screen_lines(0, SCREEN_HEIGHT, 0, viewportXDecrement);
+    if (viewportXOffset > oldViewportXOffset)
+    {
+      int8_t viewportXIncrement = viewportXOffset - oldViewportXOffset;
+      scroll_screen_right(viewportXIncrement);
+      repaint_screen_lines(0, SCREEN_HEIGHT, SCREEN_WIDTH - viewportXIncrement, SCREEN_WIDTH);
+    }
+    else if (viewportXOffset < oldViewportXOffset)
+    {
+      int8_t viewportXDecrement = oldViewportXOffset - viewportXOffset;
+      scroll_screen_left(viewportXDecrement);
+      repaint_screen_lines(0, SCREEN_HEIGHT, 0, viewportXDecrement);
+    }
   }
 }
 

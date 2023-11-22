@@ -200,7 +200,7 @@ void scroll_screen_left(int8_t chars_scrolled)
   char *col_dst = col_src + offset;
   _DISABLE_INTR();
   temp_hide_cursor();
-  for(int y = 0; y < SCREEN_HEIGHT; ++y)
+  for(int8_t y = 0; y < SCREEN_HEIGHT; ++y)
   {
     memmove(ram_dst, ram_src, SCREEN_WIDTH - chars_scrolled);
     ram_dst += SCREEN_WIDTH;

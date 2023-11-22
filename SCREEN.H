@@ -31,7 +31,7 @@
 //#define LTCYAN   
 //#define LTMAGENTA
 
-#define STR_PIPE "\xa7"
+#define STR_PIPE "\xDD"
 
 #else
 #define ATTR_BLINK 0x80
