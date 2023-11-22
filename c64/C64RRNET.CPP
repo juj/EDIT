@@ -146,14 +146,15 @@ void start_tx(uint16_t numBytes)
     ; // Wait until we are ready to transmit
 }
 
-void tx_bytes(const void *msg, uint16_t numBytes)
+void tx_bytes(const char *msg, uint16_t numBytes)
 {
-  bool odd_data = (numBytes&1);
-  numBytes >>= 1;
-  const uint16_t *m16 = (const uint16_t*)msg;
+  numBytes = (numBytes+1)>>1;
   while(numBytes--)
-    write_u16_lo_hi(cs_rxtx_data, *m16++);
-  if (odd_data) write_u16_lo_hi(cs_rxtx_data, *(uint8_t*)m16);
+  {
+    cs_rxtx_data[0] = msg[0];
+    cs_rxtx_data[1] = msg[1];
+    msg += 2;
+  }
 }
 
 //static volatile unsigned char * const screen_mem = (unsigned char*)0x0400;

@@ -182,12 +182,15 @@ static void start_tx(uint16_t numBytes)
     ; // Wait until we are ready to transmit
 }
 
-static void tx_bytes(const void *msg, uint16_t numBytes)
+static void tx_bytes(const char *msg, uint16_t numBytes)
 {
   numBytes = (numBytes+1)>>1;
-  const uint16_t *m16 = (const uint16_t*)msg;
   while(numBytes--)
-    write_u16_lo_hi(cs_rxtx_data, *m16++);
+  {
+    cs_rxtx_data[0] = msg[0];
+    cs_rxtx_data[1] = msg[1];
+    msg += 2;
+  }
 }
 
 uint16_t recv_udp_file_transfer_fragment(bool first_fragment)
@@ -275,7 +278,7 @@ void start_udp_send(uint16_t numBytes)
   net.frame.src_mac[5] = *(volatile unsigned char *)0xDE0F;
 
   net.frame.etherType = 0x0008;
-  tx_bytes(&net.frame, sizeof(net.frame));
+  tx_bytes((const char *)&net.frame, sizeof(net.frame));
 
   net.ip.versionAndHeaderLength = 0x45;
   net.ip.typeOfService = 0;
@@ -297,13 +300,13 @@ void start_udp_send(uint16_t numBytes)
   net.ip.dst_ip[3] = 255;
   net.ip.headerChecksum = ntohs(calculate_one1c_checksum(&net.ip, sizeof(net.ip))); // Calculate the IP checksum (this is not optional)
 
-  tx_bytes(&net.ip, sizeof(net.ip));
+  tx_bytes((const char *)&net.ip, sizeof(net.ip));
 
   net.udp.src_port = ntohs(49739);
   net.udp.dst_port = ntohs(4009);
   net.udp.length = ntohs(sizeof(net.udp) + numBytesRoundedUpToEven);
   net.udp.checksum = 0; // Skip computing UDP checksum - that is optional. (tricky to compute since checksum extends over user payload)
-  tx_bytes(&net.udp, sizeof(net.udp));
+  tx_bytes((const char *)&net.udp, sizeof(net.udp));
 
   // The only thing left now is to fill the actual UDP payload data,
   // which is the caller's side to do.
@@ -322,7 +325,7 @@ void send_udp_fragment_received_msg(uint16_t fragment_index)
   recv.magic = FRAGMENT_RECEIVED_DATAGRAM_MAGIC;
   recv.fragment_index = fragment_index;
   start_udp_send(sizeof(recv));
-  tx_bytes(&recv, sizeof(recv));
+  tx_bytes((const char *)&recv, sizeof(recv));
 }
 
 NFILE *nfopen(const char *filename, const char *mode)

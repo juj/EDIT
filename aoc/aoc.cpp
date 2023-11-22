@@ -179,12 +179,15 @@ static void start_tx(uint16_t numBytes)
     ; // Wait until we are ready to transmit
 }
 
-static void tx_bytes(const void *msg, uint16_t numBytes)
+static void tx_bytes(const char *msg, uint16_t numBytes)
 {
   numBytes = (numBytes+1)>>1;
-  const uint16_t *m16 = (const uint16_t*)msg;
   while(numBytes--)
-    write_u16_lo_hi(cs_rxtx_data, *m16++);
+  {
+    cs_rxtx_data[0] = msg[0];
+    cs_rxtx_data[1] = msg[1];
+    msg += 2;
+  }
 }
 
 static volatile unsigned char * const screen_mem = (unsigned char*)0x0400;
@@ -351,7 +354,7 @@ void send_ask_aoc_calendar(int year)
     .year = year
   };
   start_udp_send(sizeof(msg));
-  tx_bytes(&msg, sizeof(msg));
+  tx_bytes((const char *)&msg, sizeof(msg));
 }
 
 #define MAGIC_ASK_AOC_DAY 0x910532EF
@@ -372,7 +375,7 @@ void send_ask_aoc_day(int year, int day, int line_width)
     .line_width = (unsigned char)line_width
   };
   start_udp_send(sizeof(msg));
-  tx_bytes(&msg, sizeof(msg));
+  tx_bytes((const char *)&msg, sizeof(msg));
 }
 
 #define MAGIC_ASK_AOC_INPUT 0x12985331
@@ -393,7 +396,7 @@ void send_ask_aoc_input(int year, int day, int line_width)
     .line_width = (unsigned char)line_width
   };
   start_udp_send(sizeof(msg));
-  tx_bytes(&msg, sizeof(msg));
+  tx_bytes((const char *)&msg, sizeof(msg));
 }
 
 //char rrnet_recv_filename[MAX_FILENAME_LEN+1];
@@ -692,7 +695,7 @@ void send_submit_aoc_answer(int year, int day, char *answer)
   };
   strcpy(msg.answer, answer);
   start_udp_send(sizeof(msg));
-  tx_bytes(&msg, sizeof(msg));
+  tx_bytes((const char *)&msg, sizeof(msg));
 }
 
 int selected_year = 2023;
