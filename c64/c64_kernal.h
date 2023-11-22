@@ -320,15 +320,18 @@ _KERNAL void _ENABLE_INTR() { _ASM volatile("CLI"); }
 // Sets the screen border color (lowest 4 bits of color, 0-15)
 _KERNAL void _BORDER(uint8_t color) { *(volatile uint8_t*)0xD020 = color; }
 
+// Synchronously pauses for the given number of Jiffies.
 _KERNAL void _SLEEP(uint16_t jiffies)
 {
   _Jiffies target = _RDTIM() + jiffies;
   while(_RDTIM() < target) /*nop*/;
 }
 
-_KERNAL bool _DATASSETTE_BUTTON_DOWN()
-{
-  return ((*(volatile uint8_t*)0x01) & 0x10) == 0;
-}
+// Returns true if any of the Datassette buttons is down (Record/Play/FF/Rewind)
+_KERNAL bool _DATASSETTE_BUTTON_DOWN() { return ((*(volatile uint8_t*)0x01) & 0x10) == 0; }
+
+// Use this function to effectively halt execution in a fashion that the compiler
+// will not be able to understand to optimize away.
+_KERNAL void _HALT() { _ASM volatile("1: JMP 1b"); }
 
 #endif // ~__C64__
