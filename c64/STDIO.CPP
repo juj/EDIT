@@ -562,7 +562,7 @@ extern "C" void *memmove(void *dest, const void *src, size_t num)
 
   char *d = (char*)dest + (num-1);
   char *s = (char*)src + (num-1);
-  do *d-- = *s--; while(d != dest);
+  do *d-- = *s--; while(d >= dest);
   return dest;
 }
 
