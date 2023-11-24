@@ -27,6 +27,7 @@
 #include "c64/c64_kernal.h"
 #include "c64/c64_char_rom.h"
 #include "c64/nfio.h"
+#include "error_squiggles.h"
 
 #ifdef __C64__
 #define COLOR_UNSAVED_CURRENT LTRED
@@ -1069,6 +1070,7 @@ void main_loop()
   {
     print_line_column_info();
     set_cursor_pos(cursorX, cursorY);
+    update_error_squiggles_pos();
 
     assert(firstDisplayedLine);
     assert(get_line_number(firstDisplayedLine) == firstDisplayedLineNumber);

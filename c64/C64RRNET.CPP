@@ -5,6 +5,7 @@
 #include "nfio.h"
 #include "../NETWORK.h"
 #include "../SCREEN.h"
+#include "../error_squiggles.h"
 
 static volatile uint8_t * const rrnet_ctl      = (uint8_t *)0xDE01;
 static volatile uint8_t * const cs_packet_page = (uint8_t *)0xDE02;
@@ -43,6 +44,55 @@ static void cs_write_page_data(uint16_t page, uint16_t data)
   write_u16_lo_hi(cs_packet_data, data);
 }
 
+const uint8_t compiler_squiggles[63] __attribute__((aligned(64))) = // Each sprite is 24x21 bits and must be located in memory aligned to 64 bytes.
+{
+  0b01000100, 0b01000100, 0b01000100,
+  0b10101010, 0b10101010, 0b10101010,
+  0b00010001, 0b00010001, 0b00010001,
+  0b00000000, 0b00000000, 0b00000000,
+  0b00000000, 0b00000000, 0b00000000,
+  0b00000000, 0b00000000, 0b00000000,
+  0b00000000, 0b00000000, 0b00000000,
+  0b00000000, 0b00000000, 0b00000000,
+  0b00000000, 0b00000000, 0b00000000,
+  0b00000000, 0b00000000, 0b00000000,
+  0b00000000, 0b00000000, 0b00000000,
+  0b00000000, 0b00000000, 0b00000000,
+  0b00000000, 0b00000000, 0b00000000,
+  0b00000000, 0b00000000, 0b00000000,
+  0b00000000, 0b00000000, 0b00000000,
+  0b00000000, 0b00000000, 0b00000000,
+  0b00000000, 0b00000000, 0b00000000,
+  0b00000000, 0b00000000, 0b00000000,
+  0b00000000, 0b00000000, 0b00000000,
+  0b00000000, 0b00000000, 0b00000000,
+  0b00000000, 0b00000000, 0b00000000,
+};
+
+volatile uint8_t *sprite_addr = (uint8_t*)0xCBC0;
+
+// In the functions below, the sprite index i must be in range [0,7].
+void SET_SPRITE_PTR(uint8_t i, void *ptr)
+{
+  // C64 hardware places constraints on possible sprite mem locations
+  assert((uintptr_t)ptr < 16384 && (uintptr_t)ptr % 64 == 0);
+  // Sprite ptr address depends on the value of D018h.
+  // In production code however we don't want to dynamically compute the sprite ptr address based on
+  // D018h as that would be costly. So instead we hardcode the sprite_ptr_addr value here, and only
+  // assert that we got it right.
+  // VIC base = 0xC000
+  // offset = 0x0C00
+  uint16_t actual_sprite_ptr_addr = 0xCFF8;//(((*(uint16_t*)0xD018) & 0xF0) << 6) + 1016;
+  /*
+  const uint16_t hardcoded_sprite_ptr_addr = 2040; // If you change value in D018h, update this address accordingly.
+  assert(hardcoded_sprite_ptr_addr == actual_sprite_ptr_addr);
+  ((uint8_t*)hardcoded_sprite_ptr_addr)[i] = (uint8_t)((uintptr_t)ptr >> 6);
+  */
+
+
+  ((volatile uint8_t*)actual_sprite_ptr_addr)[i] = (uint8_t)(((uintptr_t)ptr - 0xC000) >> 6);
+}
+
 int rrnet_init()
 {
   *rrnet_ctl |= 1; // enable clock port
@@ -58,6 +108,10 @@ int rrnet_init()
   cs_write_page_data(0x015A/*pp_ia*/, 0xB310);
   cs_write_page_data(0x015C/*pp_ia*/, 0xB7EB);
   cs_write_page_data(0x0112/*pp_line_ctl*/, 0xD3); // Enable RX and TX
+
+  memcpy((void*)sprite_addr, (void*)compiler_squiggles, 64);
+  SET_SPRITE_PTR(0, (void*)sprite_addr);
+  
   return 1;
 }
 
@@ -520,6 +574,8 @@ bool process_udp_network_datagrams(char *filename)
       }
     }
     while(linearPos < SCREEN_HEIGHT*SCREEN_WIDTH-5) put_screen(linearPos++, ' ', LTBLUE);
+
+    set_error_squiggles(recv_msg.line_no, recv_msg.column, recv_msg.success);
   }
 end:
   discard_rx_bytes(bytes_left);
