@@ -47,11 +47,11 @@ void send_line_to_network_server(uint8_t editType, File *f, Line *l, line_num li
   m.edit_type = editType;
   m.document_id = f->document_id;
   m.line_len = l ? l->length : 0;
-  uint8_t orig_line_len = m.line_len;
-  if (m.line_len&1) ++m.line_len;
-  start_udp_send(sizeof(m) + m.line_len);
+  uint8_t send_line_len = m.line_len;
+  send_line_len += (send_line_len&1);
+  start_udp_send(sizeof(m) + send_line_len);
   tx_bytes((char*)&m, sizeof(m)); // send header
-  tx_bytes(l->text, orig_line_len); // send line data
+  tx_bytes(l->text, m.line_len); // send line data
 #endif
 }
 
