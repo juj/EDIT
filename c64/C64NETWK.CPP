@@ -31,7 +31,7 @@ void send_new_document_to_network_server(File *f, bool clear_contents)
   uint8_t orig_filename_len = m.filename_len;
   if (m.filename_len&1) ++m.filename_len;
   start_udp_send(sizeof(m) + m.filename_len);
-  tx_bytes(&m, sizeof(m)); // send header
+  tx_bytes((char*)&m, sizeof(m)); // send header
   tx_bytes(f->filename, orig_filename_len); // send filename
 #endif  
 }
@@ -50,7 +50,7 @@ void send_line_to_network_server(uint8_t editType, File *f, Line *l, line_num li
   uint8_t orig_line_len = m.line_len;
   if (m.line_len&1) ++m.line_len;
   start_udp_send(sizeof(m) + m.line_len);
-  tx_bytes(&m, sizeof(m)); // send header
+  tx_bytes((char*)&m, sizeof(m)); // send header
   tx_bytes(l->text, orig_line_len); // send line data
 #endif
 }
@@ -65,7 +65,7 @@ void send_ask_compiled_document_msg(uint8_t document_id, bool for_loading_to_mem
   m.document_id = document_id;
   m.for_loading_to_memory = for_loading_to_memory;
   start_udp_send(sizeof(m));
-  tx_bytes(&m, sizeof(m)); // send msg
+  tx_bytes((char*)&m, sizeof(m)); // send msg
 #endif
 }
 
