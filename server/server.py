@@ -58,10 +58,12 @@ def save_file(filename, file_lines):
     f.write(l + '\n')
   f.close()
 
-def parse_first_clang_error(stderr):
+def parse_first_clang_diagnostic(stderr, diag_kind):
+  diag_kind += ':'
+  print(str(stderr))
   lines = stderr.split('\n')
   for l in lines:
-    if 'error:' in l:
+    if diag_kind in l:
       print(l)
       if l.count(':') >= 4:
         parts = l.split(':')
@@ -74,7 +76,7 @@ def parse_first_clang_error(stderr):
         file = 0
         line = 0
         column = 0
-      error = l[l.find('error:')+len('error:'):]
+      error = l[l.find(diag_kind)+len(diag_kind):]
 
       error = error.replace('after top level declarator', '')
       error = error.replace('main cannot be declared as global variable', 'main cannot be a variable')
@@ -285,10 +287,11 @@ def handle_new_document_msg(data):
 
 def handle_update_line_msg(data):
   line_no, edit_type, document_id, line_len, dummy = struct.unpack('HBBBB', data[:6])
+  print(f'LINE LEN: {line_len}')
   petscii_line = remove_trailing_null_byte(data[6:6+line_len])
   line = petscii_to_ascii(petscii_line)
-#  print(f'PETSCII line: {petscii_line} -> ASCII line: "{line}"')
-#  print(f'Line: {line_no}, edit_type: {edit_type}, document_id: {document_id}, line: {line}')
+  print(f'PETSCII line: {petscii_line} -> ASCII line: "{line}"')
+  print(f'Line: {line_no}, edit_type: {edit_type}, document_id: {document_id}, line: {line}')
   file_lines = get_file_lines(document_id)
 
   if edit_type == 0: # Insert
@@ -439,10 +442,14 @@ def poll_compilation_finished():
     stdout = current_subprocess_build.stdout.read().decode('utf-8')
     stderr = current_subprocess_build.stderr.read().decode('utf-8')
     if current_subprocess_build.returncode == 0:
-      print('BUILD OK!')
-      send_build_error(0, 0, 1, f'OK. {build_output_file}: {os.path.getsize(build_output_file)} bytes.')
+      try:
+        line, column, first_error = parse_first_clang_diagnostic(stderr, 'warning')
+        send_build_error(line, column, 2, first_error)
+      except:
+        print('BUILD OK!')
+        send_build_error(0, 0, 1, f'OK. {build_output_file}: {os.path.getsize(build_output_file)} bytes.')
     else:
-      line, column, first_error = parse_first_clang_error(stderr)
+      line, column, first_error = parse_first_clang_diagnostic(stderr, 'error')
       print(first_error)
       send_build_error(line, column, 0, first_error)
 

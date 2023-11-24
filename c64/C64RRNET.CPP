@@ -502,7 +502,7 @@ bool process_udp_network_datagrams(char *filename)
     READ_STRUCT(recv_msg);
 
     uint16_t linearPos = (SCREEN_HEIGHT-1)*SCREEN_WIDTH;
-    uint8_t color = (recv_msg.success ? LTGREEN : LTRED) | 0x80;
+    uint8_t color = (recv_msg.success == 1 ? LTGREEN : (recv_msg.success == 2 ? YELLOW : LTRED)) | 0x80;
     if (recv_msg.msg_len > 34) recv_msg.msg_len = 34;
     if (recv_msg.msg_len > bytes_left) recv_msg.msg_len = bytes_left;
 
