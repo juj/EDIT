@@ -13,3 +13,9 @@
 *.idb
 *.pdb
 x64
+
+*.o
+*.d64
+*.elf
+*.exe
+*.prg
