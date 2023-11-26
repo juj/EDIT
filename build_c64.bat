@@ -1,10 +1,13 @@
-SET SOURCES=AUDIO.CPP COPYPAST.CPP CURSOR.CPP E.CPP FILE.CPP HIGHLITE.CPP INPUT.CPP LINE.CPP SMINDENT.CPP MEMORY.CPP OPENFILE.CPP SCREEN.CPP STATE.CPP UTIL.CPP VGA.CPP VIEWPORT.CPP SAVEFILE.CPP c64\C64NETWK.CPP c64\C64SAVE.CPP c64/c64.cpp c64/c64key.cpp c64/stdio.cpp c64/stdio.s c64/C64RRNET.CPP c64/c64_char_rom.cpp c64/c64_cursor.cpp c64/c64_malloc.cpp recvprg/recvprg.S error_squiggles.cpp -Wl,-Trestore_irq_overlay.ld -Ic64/
+@SET SOURCES=AUDIO.CPP COPYPAST.CPP CURSOR.CPP E.CPP FILE.CPP HIGHLITE.CPP INPUT.CPP LINE.CPP SMINDENT.CPP MEMORY.CPP OPENFILE.CPP SCREEN.CPP STATE.CPP UTIL.CPP VGA.CPP VIEWPORT.CPP SAVEFILE.CPP c64\C64NETWK.CPP c64\C64SAVE.CPP c64/c64.cpp c64/c64key.cpp c64/stdio.cpp c64/stdio.s c64/C64RRNET.CPP c64/c64_char_rom.cpp c64/c64_cursor.cpp c64/c64_malloc.cpp recvprg/recvprg.S error_squiggles.cpp -Wl,-Trestore_irq_overlay.ld -Ic64/
+
+@SET FLAGS=-DNDEBUG -Oz -Wno-nonportable-include-path -nolibc -nostdlib++
+
+:: -Wl,--reproduce=reproduce.tar
+
+:: -Wl,--lto-emit-asm,-mllvm,-stop-before=irtranslator
 
 :: 
-
-SET FLAGS=-DNDEBUG -Oz -Wno-nonportable-include-path -nolibc -nostdlib++ 
-
-:: 
+:: -LC:\llvm-mos\mos-platform\c64\lib -LC:\llvm-mos\mos-platform\common\lib -LC:\llvm-mos\mos-platform\commodore\lib -IC:\llvm-mos\mos-platform\common\include -D__mos__=1 -D__C64__=1
 
 ::C:\code\llvm-mos-sdk\mos-platform\common\c\new.cc
 ::SET FLAGS=-Oz -Wno-nonportable-include-path
@@ -22,3 +25,6 @@ call mos-c64-clang++ -o e.prg %FLAGS% %SOURCES%
 
 
 ::C:\code\llvm-mos-sdk\build\install\bin\mos-clang --config mos-c64.cfg -Wl,--lto-emit-asm -Oz -o test.s AUDIO.CPP COPYPAST.CPP CURSOR.CPP E.CPP FILE.CPP HIGHLITE.CPP INPUT.CPP LINE.CPP SMINDENT.CPP MEMORY.CPP OPENFILE.CPP SCREEN.CPP STATE.CPP UTIL.CPP VGA.CPP VIEWPORT.CPP SAVEFILE.CPP c64\C64NETWK.CPP c64\C64SAVE.CPP c64/c64.cpp c64/c64key.cpp -DNDEBUG -Oz -Wno-nonportable-include-path
+
+
+:: c:\code\edit\test_border.cpp -o c:\code\edit\test.prg -LC:\llvm-mos\mos-platform\c64\lib -LC:\llvm-mos\mos-platform\common\lib -LC:\llvm-mos\mos-platform\commodore\lib
