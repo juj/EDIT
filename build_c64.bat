@@ -12,7 +12,7 @@
 ::C:\code\llvm-mos-sdk\mos-platform\common\c\new.cc
 ::SET FLAGS=-Oz -Wno-nonportable-include-path
 
-call mos-c64-clang++ -o e.prg %FLAGS% %SOURCES%
+call mos-c64-clang++ -o e.prg %FLAGS% %SOURCES% %*
 
 ::C:\code\llvm-mos-sdk\build\install\bin\mos-clang --config mos-c64.cfg -c %FLAGS% %SOURCES%
 
