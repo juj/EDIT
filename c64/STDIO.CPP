@@ -566,11 +566,12 @@ extern "C" void *memmove(void *dest, const void *src, size_t num)
   return dest;
 }
 
-extern "C" void putchar(char c) // TODO: optimize
+extern "C" int putchar(int c) // TODO: optimize
 {
   if (__builtin_expect(c == '\n', 0))
     c = '\r';
   _CHROUT(c);
+  return c;
 }
 
 extern "C" char *strcat(char *s1, const char *s2) // TODO: optimize
