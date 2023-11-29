@@ -486,11 +486,12 @@ def handle_ask_aoc_calendar(data):
     stdout = stdout.replace(' **\n', '\x87**\x8F\n')
     stdout = stdout.replace(' * \n', '\x87* \x8F\n')
     stdout = stdout.replace(' *\n', '\x87*\x8F\n')
-
-
     stdout = (header + stdout).encode('iso8859-15')
-    print(str(stdout))
-    send_file_data_to_client('', stdout, False)
+  else:
+    stdout = 'ERROR'.encode('iso8859-15')
+
+  print(str(stdout))
+  send_file_data_to_client('', stdout, False)
 
 
 MAGIC_ASK_AOC_DAY = 0x910532EF
