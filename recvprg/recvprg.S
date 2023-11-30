@@ -242,7 +242,11 @@ save_prg_to_datassette:     ; Instead of running, we want to save the loaded PRG
   LDY mem_dst_address+1
   JSR $FFD8                    ; Call the 'SAVE' KERNAL ROM routine
 
-  JMP continue_after_datassette_save
+  ; XXXXXXX Hang execution after datassette save, because we cannot recover that the saved program
+  ; nuked our calling program (Turbo Chameleon 2 does not support REU, and I don't have another REU + RR-Net multicart)
+infinite_loop:
+  JMP infinite_loop
+  ;JMP continue_after_datassette_save
 
 run_prg:                   ; Instead of saving to datasette, run the PRG
   LDX #$FF ; Clear the stack pointer for the child program
