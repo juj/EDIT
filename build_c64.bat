@@ -14,6 +14,8 @@
 
 call mos-c64-clang++ -o e.prg %FLAGS% %SOURCES% %*
 
+call C:\Downloads\exomizer-3.1.2\win32\exomizer.exe sfx sys e.prg -o c++64.prg
+
 ::C:\code\llvm-mos-sdk\build\install\bin\mos-clang --config mos-c64.cfg -c %FLAGS% %SOURCES%
 
 ::C:\code\llvm-mos-sdk\build\install\bin\mos-clang --config mos-c64.cfg -Wl,--lto-emit-asm -g -o test.s %FLAGS% %SOURCES%
