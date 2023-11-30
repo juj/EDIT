@@ -313,6 +313,25 @@ end:
   return atoi(intstr);
 }
 
+static int32_t fscanf_read_int32(FILE *f)
+{
+  bool error;
+  uint8_t ch = read_next_char(f, &error);
+  char intstr[12] = { 0, 0, 0, 0, 0, 0 }; // max length –2147483648
+  uint8_t i = 0;
+  assert(isdigit(ch)); // Precondition to calling this function: next character in file must be an integer
+  while(isdigit(ch))
+  {
+    intstr[i++] = ch;
+    if (i >= 11) i = 0; // if i gets this large, read will overflow (will read garbage)
+    ch = read_next_char(f, &error);
+    if (error) goto end;
+  }
+  put_char_back(f, ch);
+end:
+  return atol(intstr);
+}
+
 static void fscanf_read_str(FILE *f, char *dst)
 {
   bool error;
@@ -366,18 +385,20 @@ extern "C" int fscanf(FILE *f, const char *format, ...)
       switch(*format)
       {
       case 'd':
+      case 'D':
       case 'u': // TODO test if this actually works?
+      case 'U': // TODO test if this actually works?
       {
         ch = read_next_char(f, &error);
         put_char_back(f, ch);
-        if (error) goto end;
-        if (!isdigit(ch)) goto end;
+        if (error || !isdigit(ch)) goto end;
         int *dst = va_arg(args, int*);
         *dst = fscanf_read_int(f);
         ++num_parsed;
       }
       break;
       case 's':
+      case 'S':
       {
         char *str = va_arg(args, char*);
         fscanf_read_str(f, str);
@@ -385,6 +406,7 @@ extern "C" int fscanf(FILE *f, const char *format, ...)
       }
       break;
       case 'c':
+      case 'C':
       {
         char *dst = va_arg(args, char*);
         *dst = read_next_char(f, &error);
@@ -392,6 +414,27 @@ extern "C" int fscanf(FILE *f, const char *format, ...)
         ++num_parsed;
       }
       break;
+      case 'l':
+      case 'L':
+        switch(*++format)
+        {
+        case 'd':
+        case 'D':
+        case 'u':
+        case 'U':
+        {
+          ch = read_next_char(f, &error);
+          put_char_back(f, ch);
+          if (error || !isdigit(ch)) goto end;
+          int32_t *dst = va_arg(args, int32_t*);
+          *dst = fscanf_read_int32(f);
+          ++num_parsed;
+        }
+        break;
+        default: assert(false); break;
+        }
+      break;
+
       default: assert(false);
       }
     }
@@ -1021,13 +1064,13 @@ extern "C" int printf(const char *format, ...)
     {
     // TODO: %x/%X/%04X/%lu/%ld
     case '%': _CHROUT('%'); break;
-    case 'c': _CHROUT(va_arg(args, int/*char*/)); break;
-    case 'd':
+    case 'c': case 'C': _CHROUT(va_arg(args, int/*char*/)); break;
+    case 'd': case 'D':
       dst = va_arg(args, int);
       if (dst < 0) { _CHROUT('-'); dst = -dst; }
       chrout_u16(dst);
     break;
-    case 'u':
+    case 'u': case 'U':
       dst = va_arg(args, unsigned int);
       chrout_u16(dst);
     break;
@@ -1037,12 +1080,12 @@ extern "C" int printf(const char *format, ...)
     case 'X':
       chrout_X16(va_arg(args, unsigned int));
       break;
-    case 's':
+    case 's': case 'S':
       str = va_arg(args, const char *);
       assert(str);
       while(*str) _CHROUT(*str++);
       break;
-    case 'l':
+    case 'l': case 'L':
       switch(*++format)
       {
       case 'd':
