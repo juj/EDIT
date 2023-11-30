@@ -116,13 +116,15 @@ def calc_output_prg_filename_from_input_cpp_filename(filename):
 current_subprocess_build = None
 pending_subprocess_build = None # filename to a pending build
 build_output_file = None
+last_successfully_compiled_filename = None
 
 def compile_file(filename):
-  global current_subprocess_build, pending_subprocess_build, build_output_file
+  global current_subprocess_build, pending_subprocess_build, build_output_file, last_successfully_compiled_filename
   if current_subprocess_build:
     pending_subprocess_build = filename
     return
   pending_subprocess_build = None
+  last_successfully_compiled_filename = None
 
   build_output_file = calc_output_prg_filename_from_input_cpp_filename(filename)
   # TODO PATH
@@ -256,7 +258,11 @@ def petscii_to_ascii(s):
     if not in_single_quotes and not in_double_quotes:
       asc += chr(petscii_to_ascii_ch(s[i]))
     else:
-      if i > 0 and (s[i-1] == 0xAE or s[i-1] == ord('%')): # HACK: If previous character was a backspace '\', then do convert next char so that \n works
+      # HACK: If previous character was a backspace '\' or '%', then do convert next char so that \n and %d works
+      if i > 0 and (s[i-1] == 0xAE or s[i-1] == ord('%')):
+        asc += chr(petscii_to_ascii_ch(s[i]))
+      # HACK2: If previous character was a %l, then do convert next char so that %ld and %lu work
+      elif i > 1 and s[i-1] == ord('l') and s[i-2] == ord('%'):
         asc += chr(petscii_to_ascii_ch(s[i]))
       else:
         asc += chr(petscii_to_ascii_ch_inside_quotes(s[i]))
@@ -427,14 +433,15 @@ def send_file_data_to_client(filename, file_data, crop_first_two_bytes):
   print('File sent!')
 
 def handle_ask_compiled_document_msg(data):
+  global last_successfully_compiled_filename
   print(f"handle_ask_compiled_document_msg({data})")
   document_id, crop_first_two_bytes = struct.unpack('BB', data)
   filename = filenames[document_id]
-  out_file = calc_output_prg_filename_from_input_cpp_filename(filename)
-  send_file_to_client(out_file, crop_first_two_bytes)
+  #out_file = calc_output_prg_filename_from_input_cpp_filename(filename)
+  send_file_to_client(last_successfully_compiled_filename, crop_first_two_bytes)
 
 def poll_compilation_finished():
-  global current_subprocess_build, pending_subprocess_build, build_output_file
+  global current_subprocess_build, pending_subprocess_build, build_output_file, last_successfully_compiled_filename
   if not current_subprocess_build: return
 
   current_subprocess_build.poll()
@@ -442,6 +449,7 @@ def poll_compilation_finished():
     stdout = current_subprocess_build.stdout.read().decode('utf-8')
     stderr = current_subprocess_build.stderr.read().decode('utf-8')
     if current_subprocess_build.returncode == 0:
+      last_successfully_compiled_filename = build_output_file
       try:
         line, column, first_error = parse_first_clang_diagnostic(stderr, 'warning')
         send_build_error(line, column, 2, first_error)
@@ -449,6 +457,7 @@ def poll_compilation_finished():
         print('BUILD OK!')
         send_build_error(0, 0, 1, f'OK. {build_output_file}: {os.path.getsize(build_output_file)} bytes.')
     else:
+      last_successfully_compiled_filename = None
       line, column, first_error = parse_first_clang_diagnostic(stderr, 'error')
       print(first_error)
       send_build_error(line, column, 0, first_error)
@@ -653,5 +662,8 @@ if 'send' in sys.argv:
   fn = sys.argv[-1]
   crop_first_two_bytes = fn.lower().endswith('.prg')
   send_file_to_client(fn, crop_first_two_bytes)
+elif 'start_addr' in sys.argv:
+  fn = sys.argv[-1]
+  print(f'Starting address of {fn} = {hex(extract_prg_entry_func_address(fn))}')
 else:
   server_main()
