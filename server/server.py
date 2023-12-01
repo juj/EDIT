@@ -654,6 +654,8 @@ def server_main():
         print(f'Unknown magic {hex(magic)}')
     except TimeoutError:
       pass
+    except socket.timeout:
+      pass
     poll_compilation_finished()
 
 
