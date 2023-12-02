@@ -1421,9 +1421,13 @@ void main_loop()
 #ifdef ACTION_RUN_COMPILED_PRG_ALT2
       case ACTION_RUN_COMPILED_PRG_ALT2:
 #endif
-        send_ask_compiled_document_msg(currentFile->document_id, /*for_loading_to_memory=*/true);
-        receive_and_run_prg(/*run_prg=*/true);
-        repaint_screen();
+        if (no_current_compilation_error())
+        {
+          set_error_squiggles(0, 0, /*build_ok=*/1); // Hide squiggles from the executing program
+          send_ask_compiled_document_msg(currentFile->document_id, /*for_loading_to_memory=*/true);
+          receive_and_run_prg(/*run_prg=*/true);
+          repaint_screen();
+        }
 #endif
         break;
 

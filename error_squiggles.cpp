@@ -20,6 +20,11 @@ static line_num squiggles_line_num;
 static line_xpos squiggles_column;
 static uint8_t squiggles_type; // 0 - red, 1 - build ok (squiggles not visible), 2 - yellow
 
+bool no_current_compilation_error()
+{
+  return squiggles_type != 0;
+}
+
 void set_error_squiggles(line_num line_num_, line_xpos column_, uint8_t type_)
 {
   squiggles_line_num = line_num_;
