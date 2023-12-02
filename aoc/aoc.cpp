@@ -472,6 +472,8 @@ end:
   return recv_data;
 }
 
+void convert_to_business_petscii(char *str);
+
 void stream_puzzle_input_file_to_disk(int year, int day)
 {
   send_ask_aoc_input(year, day, 250);
@@ -497,6 +499,13 @@ void stream_puzzle_input_file_to_disk(int year, int day)
     char s[64];
     size_t recv = nfread(s, 64, 1, f);
     if (recv <= 0) break;
+
+    // HACK: For some reason, received data ends in a 0x00 character (TODO: debug this)
+    if (s[recv-1] == 0x00) --recv;
+    if (recv <= 0) break;
+
+    convert_to_business_petscii(s);
+
     fwrite(s, recv, 1, dst);
     *screen_border = s[0];
     printf("%c", (unsigned char)s[0]);
@@ -897,11 +906,18 @@ int view_file(char *text, uint8_t view_type)
           uint8_t out_len = remove_control_codes(tmp, s, len);
           assert(out_len <= 81);
           fwrite8(tmp, out_len, handle);
+          num_bytes += out_len;
         }
         else
+        {
           fwrite8(s, (uint8_t)len, handle);
-        fputc('\n',handle);
-        num_bytes += len + 1;
+          num_bytes += len;
+        }
+        if (line+1 < l1 || len > 0)
+        {
+          fputc('\n',handle);
+          ++num_bytes;
+        }
       }
       free(tmp);
       fclose(handle);
