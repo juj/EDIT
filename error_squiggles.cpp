@@ -41,6 +41,11 @@ void set_error_squiggles(line_num line_num_, line_xpos column_, uint8_t type_)
   }
 }
 
+void hide_error_squiggles()
+{
+  DISABLE_SPRITE(0);
+}
+
 void update_error_squiggles_pos()
 {
   if (squiggles_type != 1)

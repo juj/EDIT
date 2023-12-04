@@ -1056,6 +1056,29 @@ void clear_currently_selected_text()
 
 void highlight_scroll_to_right(bool scrolled);
 
+void download_and_run_aoc()
+{
+  hide_error_squiggles();
+  send_ask_compiled_document_msg(-1, /*for_loading_to_memory=*/true);
+  // Reset VIC memory addressing to its default values for running the
+  // Advent of Code program
+  volatile uint8_t *mem_setup = (uint8_t *)0xD018;
+  volatile uint8_t *vic_bank = (uint8_t *)0xDD00;
+  volatile uint8_t *screen_ram_starting_address = (uint8_t *)0x0288; // high byte part (*256)
+  uint8_t prev_mem = *mem_setup;
+  uint8_t prev_vic = *vic_bank;
+  uint8_t prev_sram = *screen_ram_starting_address;
+  *mem_setup |= 0x03; // default 0x15
+  *vic_bank = 0xC7; // default 0xC7
+  *screen_ram_starting_address = 0x04; // default 0x04
+  receive_and_run_prg(/*run_prg=*/true);
+  // Now assign them back to the values that C++64 needs
+  *mem_setup &= 0xFC; // Set VIC base to 0xC000
+  *vic_bank = prev_vic;
+  *screen_ram_starting_address = prev_sram;
+  repaint_screen();
+}
+
 void main_loop()
 {
   clear_screen(' ', editorTextColor);
@@ -1423,13 +1446,19 @@ void main_loop()
 #endif
         if (no_current_compilation_error())
         {
-          set_error_squiggles(0, 0, /*build_ok=*/1); // Hide squiggles from the executing program
+          hide_error_squiggles();
           send_ask_compiled_document_msg(currentFile->document_id, /*for_loading_to_memory=*/true);
           receive_and_run_prg(/*run_prg=*/true);
           repaint_screen();
         }
 #endif
         break;
+
+#ifdef ACTION_RUN_AOC_PRG
+      case ACTION_RUN_AOC_PRG:
+        download_and_run_aoc();
+        break;
+#endif
 
       default:
         if (is_printable_key(key))

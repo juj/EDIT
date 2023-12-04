@@ -85,4 +85,7 @@
 #define ACTION_RUN_COMPILED_PRG (KEY_RUN_STOP | KEY_SHIFT_MODIFIER)
 #define ACTION_RUN_COMPILED_PRG_ALT2 (KEY_R | KEY_CMDR_MODIFIER)
 
+// Advent of Code integration: run AOC program directly from the editor
+#define ACTION_RUN_AOC_PRG (KEY_A | KEY_CMDR_MODIFIER)
+
 #endif // ~__C64__

@@ -436,9 +436,12 @@ def handle_ask_compiled_document_msg(data):
   global last_successfully_compiled_filename
   print(f"handle_ask_compiled_document_msg({data})")
   document_id, crop_first_two_bytes = struct.unpack('BB', data)
-  filename = filenames[document_id]
-  #out_file = calc_output_prg_filename_from_input_cpp_filename(filename)
-  send_file_to_client(last_successfully_compiled_filename, crop_first_two_bytes)
+  if document_id == 255:
+    send_file_to_client('aoc.prg', crop_first_two_bytes=True)
+  else:
+    filename = filenames[document_id]
+    #out_file = calc_output_prg_filename_from_input_cpp_filename(filename)
+    send_file_to_client(last_successfully_compiled_filename, crop_first_two_bytes)
 
 def poll_compilation_finished():
   global current_subprocess_build, pending_subprocess_build, build_output_file, last_successfully_compiled_filename
