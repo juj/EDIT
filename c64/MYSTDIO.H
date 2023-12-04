@@ -92,6 +92,9 @@ void malloc_dump_heap(void);
 size_t malloc_usable_size(void *ptr);
 void malloc_verify_heap_consistency(void);
 
+bool kbhit();
+uint8_t getch();
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

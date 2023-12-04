@@ -1366,6 +1366,18 @@ extern "C" int memcmp(const void *ptr1, const void *ptr2, size_t num)
   return 0;
 }
 
+extern "C" bool kbhit()
+{
+  return _KBHIT();
+}
+
+extern "C" uint8_t getch()
+{
+  _CLRCHN();
+  while(!kbhit());
+  return _GETIN();
+}
+
 #include "reucpy.h"
 
 static volatile uint8_t *const reu_status = (uint8_t*)0xDF00;
