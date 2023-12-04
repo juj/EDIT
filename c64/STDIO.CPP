@@ -445,6 +445,87 @@ end:
   return num_parsed;
 }
 
+extern "C" int sscanf(const char *str, const char *format, ...)
+{
+  va_list args;
+  va_start(args, format);
+  int8_t num_parsed = 0;
+  uint8_t ch;
+  // consume any initial whitespace in input
+  while(isspace(*str)) ++str;
+
+  for(; *format; ++format)
+  {
+    if (*format != '%')
+    {
+      if (*str++ != *format) goto end;
+      // A single space character in format should
+      // consume as many whitespaces from input as possible
+      if (isspace(*format)) while(isspace(*str)) ++str;
+    }
+    else
+    {
+      ++format;
+      switch(*format)
+      {
+      case 'd':
+      case 'D':
+      case 'u': // TODO test if this actually works?
+      case 'U': // TODO test if this actually works?
+      {
+        if (!isdigit(*str)) goto end;
+        int *dst = va_arg(args, int*);
+        *dst = atoi(str);
+        while(isdigit(*str)) ++str;
+        ++num_parsed;
+      }
+      break;
+      case 's':
+      case 'S':
+      {
+        char *dst = va_arg(args, char*);
+        while(*str && !isspace(*str)) *dst++ = *str++;
+        *dst = 0;
+        ++num_parsed;
+      }
+      break;
+      case 'c':
+      case 'C':
+      {
+        char *dst = va_arg(args, char*);
+        *dst = *str++;
+        ++num_parsed;
+      }
+      break;
+      case 'l':
+      case 'L':
+        switch(*++format)
+        {
+        case 'd':
+        case 'D':
+        case 'u':
+        case 'U':
+        {
+          if (!isdigit(*str)) goto end;
+          int32_t *dst = va_arg(args, int32_t*);
+          *dst = atol(str);
+          while(isdigit(*str)) ++str;
+          ++num_parsed;
+        }
+        break;
+        default: assert(false); break;
+        }
+      break;
+
+      default: assert(false);
+      }
+    }
+  }
+end:
+  va_end(args);
+  return num_parsed;
+}
+
 extern "C" char *fgets(char *str, int count, FILE *f)
 {
   assert(str);
@@ -463,7 +544,7 @@ extern "C" char *fgets(char *str, int count, FILE *f)
     uint8_t ch = read_next_char(f, &error);
     if (error) break;
     *str++ = ch;
-    if (ch == '\n') break;
+    if (ch == '\n' || ch == '\r') break;
   }
   *str = 0;
   _CLRCHN();
