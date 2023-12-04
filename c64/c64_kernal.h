@@ -275,7 +275,8 @@ _KERNAL uint8_t _FRAMES_PER_SEC()
 // Query Stop key indicator. If pressed, call CLRCHN and clear keyboard buffer.
 _KERNAL uint8_t _STOP()  { uint8_t stop; _ASM volatile("JSR $FFE1\nTSX\nTXA\nAND #2":"=a"(stop)::"x"); return stop; }
 
-// Wait to get a character from current Input Channel (compare to _CHRIN, which does not pause to wait, but returns EOF if buffer is empty)
+// Get a character from current Input Channel (compare to _CHRIN, which does not pause to wait, but returns EOF if buffer is empty)
+// TODO: Hmmno, _GETIN() won't block to wait either
 // Returns PETSCII code of character.
 _KERNAL uint8_t _GETIN() { NEED_STACK(7/*todo:max unknown*/); uint8_t byte; _ASM volatile("JSR $FFE4":"=a"(byte)::"x","y","c"); return byte; }
 
