@@ -262,7 +262,7 @@ def petscii_to_ascii(s):
       if i > 0 and (s[i-1] == 0xAE or s[i-1] == ord('%')):
         asc += chr(petscii_to_ascii_ch(s[i]))
       # HACK2: If previous character was a %l, then do convert next char so that %ld and %lu work
-      elif i > 1 and s[i-1] == ord('l') and s[i-2] == ord('%'):
+      elif i > 1 and s[i-1] == ord('L') and s[i-2] == ord('%'):
         asc += chr(petscii_to_ascii_ch(s[i]))
       else:
         asc += chr(petscii_to_ascii_ch_inside_quotes(s[i]))
