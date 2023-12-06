@@ -37,9 +37,17 @@ def receive_datagram(timeout=None):
   print("received message: %s, len: %d from %s" % (s, len(data), str(addr)))
   return (data, addr)
 
+last_sent_datagram = None
 def send_datagram(data):
+  global last_sent_datagram
 #  print(f'Sending datagram of length {len(data)}: {data}')
+  last_sent_datagram = data
   send_sock.sendto(data, ("255.255.255.255", CLIENT_PORT))
+
+def resend_last_datagram():
+  global last_sent_datagram
+  print('Did not get an ACK in time, maybe lost? Resending last datagram')
+  send_datagram(last_sent_datagram)
 
 def get_file_lines(document_id):
   if document_id not in files:
@@ -131,7 +139,7 @@ def compile_file(filename):
   compiler = 'C:/llvm-mos/bin/mos-c64-clang.bat'
 # compiler = 'mos-c64-clang'
   include_dir = os.path.abspath(os.path.join(script_directory, '..', 'C64'))
-  additional_libs = [os.path.join(include_dir, 'stdio.cpp'), os.path.join(include_dir, 'stdio.s'), os.path.join(include_dir, 'c64_malloc.cpp')]
+  additional_libs = [os.path.join(include_dir, 'stdio.cpp'), os.path.join(include_dir, 'tick.cpp'), os.path.join(include_dir, 'stdio.s'), os.path.join(include_dir, 'c64_malloc.cpp')]
 #  print(include_dir)
 ############### XXXXXXXXXXXX DEBUG
 #  open(filename, 'w').write('''
@@ -142,7 +150,7 @@ def compile_file(filename):
 #  printf("HELLO, WORLD!\\n");
 #}
 #''')
-  cmd = [compiler, filename, f'-I{include_dir}', '-D_STDIO_DEBUG_LEVEL=0', '-DNDEBUG', '-Oz', '-o', build_output_file, '-nolibc', '-nostdlib++'] + additional_libs
+  cmd = [compiler, filename, f'-I{include_dir}', '-D_STDIO_DEBUG_LEVEL=0', '-Wno-nonportable-include-path', '-DNDEBUG', '-Oz', '-o', build_output_file, '-nolibc', '-nostdlib++'] + additional_libs
   print(str(cmd))
   current_subprocess_build = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
@@ -366,7 +374,11 @@ def extract_prg_entry_func_address(prg_file):
 def wait_to_ack_datagram_received(datagram_number):
   print(f'wait_to_ack_datagram_received({datagram_number})')
   while True:
-    data, addr = receive_datagram()
+    try:
+      data, addr = receive_datagram(60)
+    except TimeoutError:
+      resend_last_datagram()
+      continue
     print(f'Received {data} from {addr}')
     magic = struct.unpack('I', data[:4])[0]
     data = data[4:]
