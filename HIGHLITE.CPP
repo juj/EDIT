@@ -7,8 +7,21 @@
 #include "highlite.h"
 #include "screen.h"
 #include "state.h"
+#include "file.h"
 
 #ifdef ENABLE_SYNTAX_HIGHLIGHTING
+
+static bool syntax_highlight_disabled = false;
+
+void disable_syntax_highlighting()
+{
+  if (syntax_highlight_disabled) return;
+  syntax_highlight_disabled = true;
+  // Free all memory used by color highlighting
+  for(File *f = currentFile; f; f = f->nextFile)
+    for(Line *l = f->firstLine; l; l = l->nextLine)
+      clear_highlight(l);
+}
 
 /* Keywords recognized by Borland Turbo C++ 3.0:
 auto break case catch char class const continue default delete do double else
@@ -149,6 +162,7 @@ unsigned char scan_octal_number(const char huge *s, size_t len)
 
 void syntax_highlight(Line far *line)
 {
+  if (syntax_highlight_disabled) return;
   assert(line);
   int prevLineFlags = line->prevLine ? line->prevLine->colorFlags : 0;
   if (!line->colors)

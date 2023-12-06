@@ -20,8 +20,7 @@ struct Line
 #ifdef ENABLE_SYNTAX_HIGHLIGHTING
   unsigned char huge *colors;
 #endif
-  Line far *prevLine;
-  Line far *nextLine;
+  Line far *prevLine, *nextLine;
 };
 
 Line far *advance_n_lines(Line far *line, line_num numLinesForward);

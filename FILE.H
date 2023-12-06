@@ -19,8 +19,11 @@ struct File
   Line far *firstLine;
   Line far *lastLine;
 
-  File *prevFile;
-  File *nextFile;
+  // A doubly linked list that stores all open files.
+  // currentFile should always be the first in the list
+  // (with prevFile == 0), and other files are in MRU
+  // order from there.
+  File *prevFile, *nextFile;
 };
 
 File *open_new_file();

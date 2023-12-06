@@ -225,7 +225,8 @@ void paste_selection()
   line_xpos pastePosition = current_column();
   if (i < copyBufferLength)// && pastePosition < currentLine->length) // if true, we will be pasting multiple lines
   {
-    insert_new_line(0); // TODO: Disable indent generation here?
+    if (!insert_new_line(0)) // TODO: Disable indent generation here?
+      return;
     cursorX = virtualX = find_line_indent_position(currentLine);
     viewportXOffset = 0;
   }

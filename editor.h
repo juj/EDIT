@@ -2,7 +2,7 @@
 
 void repaint_screen_lines(cursor_pos yStart, cursor_pos yEnd, cursor_pos xStart, cursor_pos xEnd); // TODO proper declaration location
 void repaint_screen();
-void insert_new_line(bool cursorMovesToNewline);
+bool insert_new_line(bool cursorMovesToNewline);
 bool scroll_viewport_horizontally_to_display_cursor(bool repaint);
 Line far *find_last_viewport_start_line(cursor_pos *linesInView);
 void scroll_to_beginning();

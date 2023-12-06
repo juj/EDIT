@@ -756,7 +756,7 @@ void move_cursor_to_next_word()
 }
 
 // Inserts a new line after the current one, e.g. when enter is pressed (maybe in the middle of a line)
-void insert_new_line(bool cursorMovesToNewline)
+bool insert_new_line(bool cursorMovesToNewline)
 {
   assert(currentLine);
   erase_selected_text();
@@ -771,7 +771,7 @@ void insert_new_line(bool cursorMovesToNewline)
   line_xpos curLineIndent = MIN(currentCharOffset, find_line_indent_position(currentLine));
 
   Line far *newLine = (Line far *)Farmalloc(sizeof(Line));
-  if (!newLine) return; // OOM!
+  if (!newLine) return false; // OOM!
 
   // move all chars from current line cursor position onwards to new line
 
@@ -787,7 +787,7 @@ void insert_new_line(bool cursorMovesToNewline)
   if (!newLine->text && newLine->length > 0)
   {
     delete_line(newLine);
-    return;
+    return false;
   }
   // Copy indent
   memcpy(newLine->text, currentLine->text, curLineIndent);
@@ -845,6 +845,7 @@ void insert_new_line(bool cursorMovesToNewline)
     assert(endY <= SCREEN_HEIGHT);
     repaint_screen_lines(repaintStartY, endY, /*startX=*/0, SCREEN_WIDTH);
   }
+  return true;
 }
 
 void erase_line(Line *line)

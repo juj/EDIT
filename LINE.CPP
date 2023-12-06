@@ -74,11 +74,8 @@ line_num get_current_line_number()
 void delete_line(Line far *line)
 {
   assert(line);
+  clear_highlight(line);
   Farfree(line->text, line->capacity);
-#ifdef ENABLE_SYNTAX_HIGHLIGHTING
-  if (line->colors)
-    Farfree(line->colors, line->capacity);
-#endif
   Farfree(line, sizeof(Line));
 }
 
@@ -93,13 +90,7 @@ bool increase_capacity(Line far *line, line_xpos newCapacity)
     return 0;
   for(line_xpos i = 0; i < line->length; ++i)
     newText[i] = line->text[i];
-#ifdef ENABLE_SYNTAX_HIGHLIGHTING
-  if (line->colors)
-  {
-    Farfree(line->colors, line->capacity);
-    line->colors = 0;
-  }
-#endif
+  clear_highlight(line);
   Farfree(line->text, line->capacity);
   line->text = newText;
   line->capacity = newCapacity;

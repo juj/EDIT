@@ -6,6 +6,7 @@
 #include "audio.h"
 #include "screen.h"
 #include "input.h"
+#include "highlite.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -29,6 +30,10 @@ void out_of_memory(int isFarMemory, size_t bytes)
     YELLOW | BGCOLOR(RED));
   ERROR_BEEP();
   get_key();
+  // Try to get more free memory by
+  // disabling nonessential syntax
+  // highlighting
+  disable_syntax_highlighting();
   repaint_status_line();
 }
 

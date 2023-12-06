@@ -189,9 +189,7 @@ void close_file(File *file)
   for(Line far *l = file->firstLine; l; l = l->nextLine)
   {
     Farfree(l->text, l->capacity);
-#ifdef ENABLE_SYNTAX_HIGHLIGHTING
-    if (l->colors) Farfree(l->colors, l->capacity);
-#endif
+    clear_highlight(l);
   }
 
   send_new_document_to_network_server(file, /*clear_contents=*/true);
