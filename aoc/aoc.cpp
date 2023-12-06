@@ -729,6 +729,23 @@ uint8_t remove_control_codes(char *dst, const char *s, uint8_t srcLen)
   return d - dst;
 }
 
+uint8_t remove_control_codes_for_printing(char *dst, const char *s, uint8_t srcLen)
+{
+  char *d = dst;
+  while(*s && *s != '\n' && *s != '\r' && srcLen--)
+  {
+    if ((uint8_t)*s < 0x80 || (uint8_t)*s > 0x91)
+      *d++ = *s;
+    else if (*s == 0x90) // reverse on
+      *d++ = 18;
+    else if (*s == 0x91) // reverse off
+      *d++ = 146;
+    ++s;
+  }
+  *d = 0;
+  return d - dst;
+}
+
 void ask_answer()
 {
   char answer[31] = {};
@@ -964,6 +981,31 @@ int view_file(char *text, uint8_t view_type)
         free(text);
         free(starts);
         return -1; // toggle for printing
+      }
+      else if (key == 0xD0) // Shift-P: print
+      {
+        int l0 = line_select_mode?line_select_start:0;
+        int l1 = line_select_mode?line_select_end+1:num_lines;
+        uint16_t num_bytes = 0;
+        int line_num = 0;
+        _SETLFS(4,4,7);
+        _OPEN();
+        _CHKOUT(4);
+        char *tmp = (char*)malloc(82);
+        for(int line = l0; line < l1; ++line)
+        {
+          char *s = text+starts[line];
+          int len = starts[line+1] - starts[line] - 1;
+          uint8_t out_len = remove_control_codes_for_printing(tmp, s, len);
+          assert(out_len <= 81);
+          for(int i = 0; i < out_len; ++i)
+            _CHROUT(tmp[i]);
+          _CHROUT('\r');
+        }
+        free(tmp);
+        _CHROUT('\r');
+        _CLRCHN();
+        _CLOSE(4);
       }
       else if (view_type == VIEW_DESC)
       {
