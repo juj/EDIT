@@ -105,6 +105,9 @@ _KERNAL uint8_t _READST() { NEED_STACK(2); uint8_t status; _ASM volatile("JSR $F
 // If secondary address is 0: default file type is PRG, and file is opened for reading. "Relocating" load is performed.
 // If secondary address is 1: default file type is PRG, and file is opened for writing. Nonrelocating load is performed.
 // If secondary address >= 2: use the information present in SETNAM in format ",S,R" or ",P,W" etc. to determine file type and read/write
+// When opening a MPS-803 printer:
+// - if secondary address is 7: print business PETSCII
+// - if secondary address is 0: print graphics PETSCII
 _KERNAL void _SETLFS(uint8_t file_no, uint8_t device_address, uint8_t secondary_address) { NEED_STACK(2); _ASM volatile("JSR $FFBA"::"a"(file_no),"x"(device_address),"y"(secondary_address):); }
 
 // Sets filename for OPEN command
