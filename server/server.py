@@ -130,6 +130,7 @@ def compile_file(filename):
   global current_subprocess_build, pending_subprocess_build, build_output_file, last_successfully_compiled_filename
   if current_subprocess_build:
     pending_subprocess_build = filename
+    print(f'Existing build process pending, status {current_subprocess_build}, returncode: {current_subprocess_build.returncode}')
     return
   pending_subprocess_build = None
   last_successfully_compiled_filename = None
@@ -461,6 +462,7 @@ def poll_compilation_finished():
 
   current_subprocess_build.poll()
   if current_subprocess_build.returncode is not None:
+    print(f'Build finished, returncode {current_subprocess_build.returncode}')
     stdout = current_subprocess_build.stdout.read().decode('utf-8')
     stderr = current_subprocess_build.stderr.read().decode('utf-8')
     if current_subprocess_build.returncode == 0:
@@ -479,6 +481,7 @@ def poll_compilation_finished():
 
     current_subprocess_build = None
     if pending_subprocess_build:
+      print('Running pending build')
       compile_file(pending_subprocess_build)
 
 
