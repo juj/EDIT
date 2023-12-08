@@ -1378,6 +1378,19 @@ extern "C" uint8_t getch()
   return _GETIN();
 }
 
+void print64(u64 x)
+{
+  char vals[21]; // Max U64: 18446744073709551615 (a 20 digit number);
+  u8 n = 0;
+  while(x)
+  {
+    vals[n++] = x % 10;
+    x = x / 10;
+  }
+  while(n--)
+    printf("%c", vals[n] + '0');
+}
+
 #include "reucpy.h"
 
 static volatile uint8_t *const reu_status = (uint8_t*)0xDF00;
