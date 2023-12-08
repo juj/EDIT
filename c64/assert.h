@@ -4,6 +4,8 @@
 #define _STDIO_DEBUG_LEVEL 0
 #endif
 
+#ifdef __mos__
+
 void __assert(bool condition, const char *str, const char *file, int line, const char *func);
 
 #ifdef NDEBUG
@@ -14,4 +16,10 @@ void __assert(bool condition, const char *str, const char *file, int line, const
 #define assert(x) __assert((x), "", __FILE__, __LINE__, "");
 #else
 #define assert(x) __assert((x), "", "", __LINE__, "");
+#endif
+
+#else
+
+#include_next <assert.h>
+
 #endif

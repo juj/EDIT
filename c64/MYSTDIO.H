@@ -1,20 +1,5 @@
 #pragma once
 
-#ifdef __C64__
-
-// Before including this file, call
-// #define _STDIO_DEBUG_LEVEL 2 to add verbose debugging support, or
-// #define _STDIO_DEBUG_LEVEL 1 to add more lightweight debugging support.
-// #define NDEBUG to disable assert() macro.
-#include <stdint.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <string.h>
-#include <ctype.h>
-#include <assert.h>
-
-//#include_next <stdio.h>
-
 #ifdef __clang__
 typedef _BitInt(24) int24_t;
 typedef unsigned _BitInt(24) uint24_t;
@@ -22,6 +7,8 @@ typedef unsigned _BitInt(24) uint24_t;
 typedef int int24_t;
 typedef unsigned int uint24_t;
 #endif
+
+#include <stdint.h>
 
 typedef int8_t i8;
 typedef uint8_t u8;
@@ -33,6 +20,20 @@ typedef int32_t i32;
 typedef uint32_t u32;
 typedef int64_t i64;
 typedef uint64_t u64;
+
+#ifdef __C64__
+
+// Before including this file, call
+// #define _STDIO_DEBUG_LEVEL 2 to add verbose debugging support, or
+// #define _STDIO_DEBUG_LEVEL 1 to add more lightweight debugging support.
+// #define NDEBUG to disable assert() macro.
+#include <stdlib.h>
+#include <stdarg.h>
+#include <string.h>
+#include <ctype.h>
+#include <assert.h>
+
+//#include_next <stdio.h>
 
 struct FILE
 {
