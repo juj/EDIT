@@ -1,4 +1,4 @@
-import socket, struct, subprocess, os, random, sys
+import socket, struct, subprocess, os, random, sys, time
 
 script_directory = os.path.dirname(os.path.abspath(sys.argv[0]))
 
@@ -122,12 +122,13 @@ def calc_output_prg_filename_from_input_cpp_filename(filename):
 # contains the Popen object representing the current compilation, if
 # one is running on the background, or None if no active compilation.
 current_subprocess_build = None
+current_subprocess_start_time = None # time.time() stamp of current build start time
 pending_subprocess_build = None # filename to a pending build
 build_output_file = None
 last_successfully_compiled_filename = None
 
 def compile_file(filename):
-  global current_subprocess_build, pending_subprocess_build, build_output_file, last_successfully_compiled_filename
+  global current_subprocess_build, pending_subprocess_build, build_output_file, last_successfully_compiled_filename, current_subprocess_start_time
   if current_subprocess_build:
     pending_subprocess_build = filename
     print(f'Existing build process pending, status {current_subprocess_build}, returncode: {current_subprocess_build.returncode}')
@@ -154,6 +155,7 @@ def compile_file(filename):
   cmd = [compiler, filename, f'-I{include_dir}', '-D_STDIO_DEBUG_LEVEL=0', '-Wno-nonportable-include-path', '-DNDEBUG', '-Oz', '-o', build_output_file, '-nolibc', '-nostdlib++'] + additional_libs
   print(str(cmd))
   current_subprocess_build = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+  current_subprocess_start_time = time.time()
 
 a2p = [
 	0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x14,0x20,0x0d,0x11,0x93,0x0a,0x0e,0x0f,
@@ -457,7 +459,7 @@ def handle_ask_compiled_document_msg(data):
     send_file_to_client(last_successfully_compiled_filename, crop_first_two_bytes)
 
 def poll_compilation_finished():
-  global current_subprocess_build, pending_subprocess_build, build_output_file, last_successfully_compiled_filename
+  global current_subprocess_build, pending_subprocess_build, build_output_file, last_successfully_compiled_filename, current_subprocess_start_time
   if not current_subprocess_build: return
 
   current_subprocess_build.poll()
@@ -480,6 +482,13 @@ def poll_compilation_finished():
       send_build_error(line, column, 0, first_error)
 
     current_subprocess_build = None
+    if pending_subprocess_build:
+      print('Running pending build')
+      compile_file(pending_subprocess_build)
+  elif time.time() > current_subprocess_start_time + 6:
+    print('COMPILATION TIMEOUT! ABANDONING PREVIOUS COMPILATION')
+    current_subprocess_build = None
+    last_successfully_compiled_filename = None
     if pending_subprocess_build:
       print('Running pending build')
       compile_file(pending_subprocess_build)
