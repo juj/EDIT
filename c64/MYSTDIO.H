@@ -3,9 +3,21 @@
 #ifdef __clang__
 typedef _BitInt(24) int24_t;
 typedef unsigned _BitInt(24) uint24_t;
+typedef _BitInt(40) int40_t;
+typedef unsigned _BitInt(40) uint40_t;
+typedef _BitInt(48) int48_t;
+typedef unsigned _BitInt(48) uint48_t;
+typedef _BitInt(56) int56_t;
+typedef unsigned _BitInt(56) uint56_t;
 #else
 typedef int int24_t;
 typedef unsigned int uint24_t;
+typedef int64_t int40_t;
+typedef uint64_t uint40_t;
+typedef int64_t int48_t;
+typedef uint64_t uint48_t;
+typedef int64_t int56_t;
+typedef uint64_t uint56_t;
 #endif
 
 #include <stdint.h>
@@ -18,6 +30,12 @@ typedef int24_t i24;
 typedef uint24_t u24;
 typedef int32_t i32;
 typedef uint32_t u32;
+typedef int40_t i40;
+typedef uint40_t u40;
+typedef int48_t i48;
+typedef uint48_t u48;
+typedef int56_t i56;
+typedef uint56_t u56;
 typedef int64_t i64;
 typedef uint64_t u64;
 
