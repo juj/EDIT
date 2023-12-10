@@ -1391,7 +1391,12 @@ void print64(u64 x)
     printf("%c", vals[n] + '0');
 }
 
-#include "reucpy.h"
+extern "C" int __cxa_atexit(void (*f)(void *), void *p, void * /* dso_handle */)
+{
+  return 0;
+}
+
+#include "reu.h"
 
 static volatile uint8_t *const reu_status = (uint8_t*)0xDF00;
 static volatile uint8_t *const reu_command = (uint8_t*)0xDF01;
