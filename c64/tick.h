@@ -17,3 +17,15 @@ public:
 
 tick_t operator -(const tick_t &a, const tick_t &b);
 tick_t tick(void);
+
+class tick_bench
+{
+public:
+  tick_t val;
+  tick_bench():val(tick()) {}
+  ~tick_bench() {
+    (tick()-val).print();
+  }
+};
+
+#define BENCH() tick_bench _tickbench##__COUNTER__;

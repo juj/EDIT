@@ -353,6 +353,7 @@ static void fscanf_read_str(FILE *f, char *dst)
 
 extern "C" int fscanf(FILE *f, const char *format, ...)
 {
+  if (f->error) return 0;
   if (_CHKIN(f->handle)) return 0;
   SCOPE_SAVE_SCREEN_BORDER();
 
@@ -575,9 +576,10 @@ extern "C" size_t fread(void *buffer, size_t size, size_t count, FILE *f)
     {
       bool error;
       uint8_t ch = read_next_char(f, &error);
-      if (error) break;
+      if (error) goto end;
       *ptr++ = ch;
     }
+end:
   _CLRCHN();
   return (uintptr_t)ptr - (uintptr_t)buffer;
 }
@@ -1124,6 +1126,18 @@ one:   *dst++ = ch[num&15];
   return dst;
 }
 
+void chrout_u64(u64 x)
+{
+  char vals[21]; // Max U64: 18446744073709551615 (a 20 digit number);
+  u8 n = 0;
+  while(x)
+  {
+    vals[n++] = x % 10;
+    x = x / 10;
+  }
+  while(n--) _CHROUT(vals[n] + '0');
+}
+
 extern "C" int printf(const char *format, ...)
 {
   va_list args;
@@ -1143,51 +1157,76 @@ extern "C" int printf(const char *format, ...)
     ++format;
     switch(*format)
     {
-    // TODO: %x/%X/%04X/%lu/%ld
-    case '%': _CHROUT('%'); break;
-    case 'c': case 'C': _CHROUT(va_arg(args, int/*char*/)); break;
-    case 'd': case 'D':
-      dst = va_arg(args, int);
-      if (dst < 0) { _CHROUT('-'); dst = -dst; }
-      chrout_u16(dst);
-    break;
-    case 'u': case 'U':
-      dst = va_arg(args, unsigned int);
-      chrout_u16(dst);
-    break;
-    case 'x':
-      chrout_x16(va_arg(args, unsigned int));
+      // TODO: %x/%X/%04X/%lu/%ld
+      case '%': _CHROUT('%'); break;
+      case 'c': case 'C': _CHROUT(va_arg(args, int/*char*/)); break;
+      case 'd': case 'D':
+        dst = va_arg(args, int);
+        if (dst < 0) { _CHROUT('-'); dst = -dst; }
+        chrout_u16(dst);
       break;
-    case 'X':
-      chrout_X16(va_arg(args, unsigned int));
+      case 'u': case 'U':
+        dst = va_arg(args, unsigned int);
+        chrout_u16(dst);
       break;
-    case 's': case 'S':
-      str = va_arg(args, const char *);
-      assert(str);
-      while(*str) _CHROUT(*str++);
-      break;
-    case 'l': case 'L':
-      switch(*++format)
+      case 'x':
+        chrout_x16(va_arg(args, unsigned int));
+        break;
+      case 'X':
+        chrout_X16(va_arg(args, unsigned int));
+        break;
+      case 's': case 'S':
+        str = va_arg(args, const char *);
+        assert(str);
+        while(*str) _CHROUT(*str++);
+        break;
+      case 'l': case 'L':
       {
-      case 'd':
-      case 'D':
-      {
-        int32_t i32 = va_arg(args, int32_t);
-        if (i32 < 0) { _CHROUT('-'); i32 = -i32; }
-        chrout_u32(i32);
+        switch(*++format)
+        {
+          case 'd':
+          case 'D':
+          {
+            int32_t i32 = va_arg(args, int32_t);
+            if (i32 < 0) { _CHROUT('-'); i32 = -i32; }
+            chrout_u32(i32);
+          }
+          break;
+          case 'u':
+          case 'U':
+          {
+            uint32_t u32 = va_arg(args, uint32_t);
+            chrout_u32(u32);
+          }
+          break;
+          case 'l': case 'L':
+          {
+            switch(*++format)
+            {
+              case 'd':
+              case 'D':
+              {
+                int64_t i64 = va_arg(args, int64_t);
+                if (i64 < 0) { _CHROUT('-'); i64 = -i64; }
+                chrout_u64(i64);
+              }
+              break;
+              case 'u':
+              case 'U':
+              {
+                uint64_t u64 = va_arg(args, uint64_t);
+                chrout_u64(u64);
+              }
+              break;
+              default: assert(false); break;
+            }
+          }
+          break;
+          default: assert(false); break;
+        }
+        break;
+        default: assert(false); break;
       }
-      break;
-      case 'u':
-      case 'U':
-      {
-        uint32_t u32 = va_arg(args, uint32_t);
-        chrout_u32(u32);
-      }
-      break;
-      default: assert(false); break;
-      }
-    break;
-    default: assert(false); break;
     }
   }
   va_end(args);
@@ -1287,7 +1326,7 @@ extern "C" char *strstr(const char *str1, const char *str2)
   return 0;
 }
 
-static unsigned char petscii_to_screen_code(unsigned char petscii)
+unsigned char petscii_to_screen_code(unsigned char petscii)
 {
   if (petscii <= 31) return 32;//petscii + 128;
   if (petscii <= 63) return petscii;
@@ -1376,19 +1415,6 @@ extern "C" uint8_t getch()
   _CLRCHN();
   while(!kbhit());
   return _GETIN();
-}
-
-void print64(u64 x)
-{
-  char vals[21]; // Max U64: 18446744073709551615 (a 20 digit number);
-  u8 n = 0;
-  while(x)
-  {
-    vals[n++] = x % 10;
-    x = x / 10;
-  }
-  while(n--)
-    printf("%c", vals[n] + '0');
 }
 
 extern "C" int __cxa_atexit(void (*f)(void *), void *p, void * /* dso_handle */)

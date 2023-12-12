@@ -3,7 +3,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <limits.h>
 #include <assert.h>
+#include "tick.h"
+
+unsigned char petscii_to_screen_code(unsigned char petscii);
 
 template<typename T>
 T MIN(T a, T b)
@@ -31,7 +35,9 @@ void qsort(T *arr, u16 n)
   if (r < n-2) qsort(arr+r+1, n-(r+1));
 }
 
-void print64(u64 x);
+#ifdef __mos__
+#include "c64_kernal.h"
+#endif
 
 #ifndef __mos__
 
