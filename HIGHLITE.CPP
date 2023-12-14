@@ -41,6 +41,14 @@ static int strneq(const char huge *s, const char *s2, int n)
   return 1;
 }
 
+static int strneq_num(const char huge *s, const char *s2, int n)
+{
+  for(int i = 0; i < n; ++i)
+    if (s[i] != s2[i])
+      return 0;
+  return 1;
+}
+
 static int is_one_of(char ch, const char *s)
 {
   while(*s)
@@ -51,6 +59,7 @@ static int is_one_of(char ch, const char *s)
 
 #define E(str) (strneq(s, str, len))
 #define E1(str) (strneq(s1, str, len1))
+#define E1NUM(str) (strneq_num(s1, str, len1))
 
 #ifdef __C64__
 #define CH(x) ((x) ^ 0x20) // Convert string literal a-z from ASCII to business PETSCII
@@ -68,12 +77,12 @@ int is_cpp_reserved_word(const char huge *s, const char huge *end)
   switch(len)
   {
   case 2:
-    if (*s == CH('d')) return E1("o");
-    if (*s == CH('i')) return E1("8") || E1("f");
-    return E("u8");
+    if (*s == CH('u')) return E1NUM("8");
+    if (*s == CH('i')) return E1NUM("8") || E1("f");
+    return E("do");
   case 3:
-    if (*s == CH('i')) return E1("16") || E1("24") || E1("32") || E1("64") || E1("nt");
-    if (*s == CH('u')) return E1("16") || E1("24") || E1("32") || E1("64");
+    if (*s == CH('i')) return E1NUM("16") || E1NUM("24") || E1NUM("32") || E1NUM("64") || E1("nt");
+    if (*s == CH('u')) return E1NUM("16") || E1NUM("24") || E1NUM("32") || E1NUM("64");
 //disabled for code size////    if (*s == CH('n')) return E1("ew");
     if (*s == CH('t')) return E1("ry");
     return E("for");
@@ -136,8 +145,7 @@ unsigned char scan_hex_number(const char huge *s, size_t len)
   assert(s[0] == '0');
   assert(s[1] == CH('x')); // these are known from calling this function
   for(size_t i = 2; i < len; ++i)
-    if (!(s[i] >= '0' && s[i] <= '9')
-     && !((s[i] | 0x20) >= 'a' && (s[i] | 0x20) <= 'f'))
+    if (!(s[i] >= '0' && s[i] <= '9') && !((s[i] | 0x20) >= 'a' && (s[i] | 0x20) <= 'f'))
      return BLACK | BGCOLOR(RED);
   return BLACK | (editorTextColor & 0xF0);
 }
@@ -145,7 +153,6 @@ unsigned char scan_hex_number(const char huge *s, size_t len)
 unsigned char scan_decimal_number(const char huge *s, size_t len)
 {
   for(size_t i = 0; i < len; ++i)
-//  for(; s != e; ++s)
     if (s[i] < '0' || s[i] > '9')
      return BLACK | BGCOLOR(RED);
   return LTGRAY | (editorTextColor & 0xF0);
