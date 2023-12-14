@@ -1418,6 +1418,7 @@ void main_loop()
 #ifdef ACTION_REPAINT_SCREEN
       case ACTION_REPAINT_SCREEN:
         repaint_screen();
+        resynchronize_file_with_network_server(currentFile);
         break;
 #endif
 #ifdef ACTION_SAVE_COMPILED_PRG_TO_DISK

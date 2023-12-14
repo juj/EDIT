@@ -199,6 +199,16 @@ void close_file(File *file)
 
 void write_status_text(const char *text, unsigned char color);
 
+void resynchronize_file_with_network_server(File *f)
+{
+  send_new_document_to_network_server(f, /*clear_contents=*/true);
+
+  line_num lineno = 1;
+  for(Line *l = f->firstLine; l; l = l->nextLine, ++lineno)
+    send_line_to_network_server(EDIT_TYPE_REPLACE_LINE, f, l, lineno);
+}
+
+
 File *load_file(const char *filename, uint8_t device_id)
 {
 #ifdef __C64__
@@ -291,11 +301,7 @@ File *load_file(const char *filename, uint8_t device_id)
     syntax_highlight(l);
 
   f->document_id = allocate_new_document_id();
-  send_new_document_to_network_server(f, /*clear_contents=*/true);
-
-  line_num lineno = 1;
-  for(Line *l = f->firstLine; l; l = l->nextLine, ++lineno)
-    send_line_to_network_server(EDIT_TYPE_REPLACE_LINE, f, l, lineno);
+  resynchronize_file_with_network_server(f);
 
   return f;
 }
