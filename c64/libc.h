@@ -44,3 +44,11 @@ void qsort(T *arr, u16 n)
 inline void getch() {}
 
 #endif
+
+#ifdef __mos__
+#define LINE_SEP '\r'
+#define LINE_SEP_STR "\r"
+#else
+#define LINE_SEP '\n'
+#define LINE_SEP_STR "\n"
+#endif
