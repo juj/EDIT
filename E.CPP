@@ -304,7 +304,7 @@ void delete_character()
     }
     --currentLine->length;
     clear_highlight(currentLine);
-    repaint_current_line_from_offset(MAX(cursorX-1, 0), currentLine->length+1);
+    repaint_current_line_from_offset(MAX(cursorX-1, 0), MIN(SCREEN_WIDTH, currentLine->length+1));
     send_current_line_to_server();
   }
   else // join next line on this
