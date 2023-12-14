@@ -1,5 +1,8 @@
 #pragma once
 
+//#define SUPPORT_C64_DATASSETTE 1
+//#define SUPPORT_INSERT_MODE    1
+
 void repaint_screen_lines(cursor_pos yStart, cursor_pos yEnd, cursor_pos xStart, cursor_pos xEnd); // TODO proper declaration location
 void repaint_screen();
 bool insert_new_line(bool cursorMovesToNewline);

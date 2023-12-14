@@ -7,6 +7,8 @@
 #include "../SCREEN.h"
 #include "../error_squiggles.h"
 
+unsigned char petscii_to_screen_code(unsigned char petscii);
+
 static volatile uint8_t * const rrnet_ctl      = (uint8_t *)0xDE01;
 static volatile uint8_t * const cs_packet_page = (uint8_t *)0xDE02;
 static volatile uint8_t * const cs_packet_data = (uint8_t *)0xDE04;
@@ -231,18 +233,6 @@ unsigned char ascii_to_petscii(unsigned char ch)
   if (ch >= 0x7B && ch <= 0x7F) return ch + 0x60; // {, |, }, ~ and DEL
   if (ch <= 0xBF || ch >= 0xE0) return ch; // Various other characters that map directly through
   return ch - 0x60;
-}
-
-unsigned char petscii_to_screen_code(unsigned char petscii)
-{
-  if (petscii <= 31) return 32;//petscii + 128;
-  if (petscii <= 63) return petscii;
-  if (petscii <= 95) return petscii - 64;
-  if (petscii <= 127) return petscii - 32;
-  if (petscii <= 159) return 32;//petscii + 64;
-  if (petscii <= 191) return petscii - 64;
-  if (petscii <= 254) return petscii - 128;
-  return 0x5E;
 }
 
 uint16_t screen_pos = 0;

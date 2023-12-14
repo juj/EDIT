@@ -1,6 +1,7 @@
 #include "state.h"
 #include "screen.h"
 #include "editor.h"
+#include "cursor.h"
 #include <assert.h>
 
 allocated_mem_size_t allocatedMemory = 0;
@@ -19,7 +20,6 @@ line_xpos virtualX = 0;
 line_xpos cursorX = 0;
 cursor_pos cursorY = 0;
 
-bool insertMode = false;
 bool textSelectionModeActive = false;
 
 bool showWhitespace = false;
@@ -57,9 +57,9 @@ void repaint_status_line()
 
 void mark_insert_mode_inactive_and_repaint_status()
 {
-  if (insertMode)
+  if (insert_mode())
   {
-    insertMode = false;
+    set_insert_mode(false);
     repaint_status_line();
   }
 }

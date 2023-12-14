@@ -155,7 +155,7 @@ void write_status_text(const char *text, unsigned char color)
 
 void print_insert_status_text(bool print_on_clear = false)
 {
-  if (insertMode)
+  if (insert_mode())
     write_status_text("insert mode", LTGRAY);
   else if (print_on_clear)
     clear_line(SCREEN_WIDTH*(SCREEN_HEIGHT-1), ' ', LTGRAY);
@@ -195,7 +195,7 @@ void insert_character(char ch, uint8_t times, line_xpos insert_pos)
 {
   assert(currentLine);
 
-  if (insertMode && insert_pos < currentLine->length)
+  if (insert_mode() && insert_pos < currentLine->length)
   {
     assert(times == 1); // this path doesn't support multiple char inserts
     // in insert mode, the length of the text stays put, and we only replace existing
@@ -1163,8 +1163,12 @@ void main_loop()
       case ACTION_PAGE_DOWN: move_viewport_vertically(SCREEN_HEIGHT, 1); break;
       case ACTION_CURSOR_TO_LINE_START: toggle_cursor_home(); break;
       case ACTION_CURSOR_TO_LINE_END: move_cursor_to_line_end(); break;
+#ifdef ACTION_CURSOR_TO_PREV_WORD
       case ACTION_CURSOR_TO_PREV_WORD: move_cursor_to_prev_word(); break;
+#endif
+#ifdef ACTION_CURSOR_TO_NEXT_WORD
       case ACTION_CURSOR_TO_NEXT_WORD: move_cursor_to_next_word(); break;
+#endif
 #ifdef ACTION_VIEWPORT_UP_ONE_LINE
       case ACTION_VIEWPORT_UP_ONE_LINE: move_viewport_vertically(-1, 0); break;
 #endif
@@ -1183,6 +1187,7 @@ void main_loop()
         else scroll_to_beginning(); 
         break;
 #endif
+#ifdef ACTION_QUIT_PROGRAM
       case ACTION_QUIT_PROGRAM:
 #ifdef ACTION_QUIT_PROGRAM_ALT2
       case ACTION_QUIT_PROGRAM_ALT2:
@@ -1193,7 +1198,10 @@ void main_loop()
         if (ask_yes_no_prompt("QUIT? "))
           running = 0;
         break;
+#endif
+#ifdef ACTION_SELECT_ALL
       case ACTION_SELECT_ALL: select_all(); break;
+#endif
       case ACTION_DELETE_LEFT:
         if (selectionStartLine) erase_selected_text();
         else                    backspace_character();
@@ -1211,14 +1219,16 @@ void main_loop()
         else                    erase_current_line();
         break;
 #endif
+#ifdef ACTION_TOGGLE_INSERT_MODE
       case ACTION_TOGGLE_INSERT_MODE:
-        if (textSelectionModeActive && !insertMode)
+        if (textSelectionModeActive && !insert_mode())
         {
           clear_currently_selected_text();
           mark_text_selection_mode_inactive_and_repaint_status();
         }
         toggle_insert();
         break;
+#endif
       case ACTION_ESC:
         clear_currently_selected_text();
         break;
@@ -1254,7 +1264,9 @@ void main_loop()
         insert_indent(/*line_start=*/true);
         break;
 #endif
+#ifdef ACTION_UNINDENT_LINE_START
       case ACTION_UNINDENT_LINE_START: unindent(); break;
+#endif
       case ACTION_ALT_TAB_MENU_NEXT_DOCUMENT:
 #ifdef ACTION_ALT_TAB_MENU_NEXT_DOCUMENT_ALT2
       case ACTION_ALT_TAB_MENU_NEXT_DOCUMENT_ALT2:
@@ -1273,19 +1285,25 @@ void main_loop()
           open_file_in_viewport(f, /*bringToMruFront*/1);
       }
         break;
+#ifdef ACTION_CUT_TEXT
       case ACTION_CUT_TEXT:
+#endif
 #ifdef ACTION_CUT_TEXT_ALT2
       case ACTION_CUT_TEXT_ALT2:
 #endif
         copy_selection(/*cutSelection=*/true);
         break;
+#ifdef ACTION_COPY_TEXT
       case ACTION_COPY_TEXT:
+#endif
 #ifdef ACTION_COPY_TEXT_ALT2
       case ACTION_COPY_TEXT_ALT2:
 #endif
         copy_selection(/*cutSelection=*/false);
         break;
+#ifdef ACTION_PASTE_TEXT
       case ACTION_PASTE_TEXT:
+#endif
 #ifdef ACTION_PASTE_TEXT_ALT2
       case ACTION_PASTE_TEXT_ALT2:
 #endif
@@ -1343,7 +1361,9 @@ void main_loop()
         send_current_line_to_server(); // Resend the current line to server to cause a rebuild and reupdate of the status
         break;
       }
+#ifdef ACTION_OPEN_GOTO_LINE_MENU
       case ACTION_OPEN_GOTO_LINE_MENU: run_goto_line_menu(); break;
+#endif
       case ACTION_OPEN_FILE:
         run_open_file_menu();
         repaint_screen();
@@ -1416,6 +1436,7 @@ void main_loop()
           ask_string_prompt("SAVE TO DEVICE #: ", device, 2, ASK_ONLY_NUMBERS | ASK_ALLOW_CANCEL);
           uint8_t device_num = atoi(device);
 
+#if SUPPORT_C64_DATASSETTE
           if (device_num == 1)
           {
             printf("\n"); // Add a newline so that the next question appears on a new line
@@ -1428,6 +1449,7 @@ void main_loop()
             put_string_on_screen("WRITE COMPLETE.", 0, SCREEN_HEIGHT-1, WHITE);
           }
           else
+#endif
           {
             send_ask_compiled_document_msg(currentFile->document_id, /*for_loading_to_memory=*/false);
             wait_to_receive_file(filename);

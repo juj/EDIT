@@ -3,12 +3,32 @@
 
 void print_insert_status_text(bool print_on_clear);
 
+static bool insertMode = false;
+
 void toggle_insert()
 {
+#ifdef SUPPORT_INSERT_MODE
   insertMode = !insertMode;
   if (insertMode) set_cursor_style(CURSOR_INSERT);
   else set_cursor_style(CURSOR_NORMAL);
   print_insert_status_text(true);
+#endif
+}
+
+void set_insert_mode(bool new_insert_mode)
+{
+#ifdef SUPPORT_INSERT_MODE
+  insertMode = new_insert_mode;
+#endif
+}
+
+bool insert_mode()
+{
+#ifdef SUPPORT_INSERT_MODE
+  return insertMode;
+#else
+  return false;
+#endif
 }
 
 #if defined(__TURBOC__) && defined(__MSDOS__)
