@@ -196,6 +196,7 @@ p2a = [
 def ascii_to_petscii_ch(ch):
   if ch >= ord('a') and ch <= ord('z'): return 0x41 + (ch - ord('a'))
   if ch >= ord('A') and ch <= ord('Z'): return 0x61 + (ch - ord('A'))
+  if ch == ord('|'): return 0x7D
   if ch == ord('_'): return 0xA4
   if ch == ord('{'): return 0xAB
   if ch == ord('}'): return 0xB3
@@ -235,7 +236,7 @@ def petscii_to_ascii_ch(ch): # shifted PETSCII
   if ch == 0xA4: return ord('_')
   if ch == 0xAB: return ord('{')
   if ch == 0xB3: return ord('}')
-  if ch == 0xDD: return ord('|')
+  if ch == 0x7D: return ord('|')
   if ch == 0xAE: return ord('\\')
 #  if ch >= 0xC1 and ch <= 0xDA: return ord('a') +(ch-0xC1)
   return p2a[ch]
@@ -251,7 +252,7 @@ def petscii_to_ascii_ch_inside_quotes(ch):
   if ch == 0xA4: return ord('_')
   if ch == 0xAB: return ord('{')
   if ch == 0xB3: return ord('}')
-  if ch == 0xDD: return ord('|')
+  if ch == 0x7D: return ord('|')
   if ch == 0xAE: return ord('\\')
   if ch >= 0xC1 and ch <= 0xDA: return ord('a') +(ch-0xC1)
   return ch#p2a[ch]

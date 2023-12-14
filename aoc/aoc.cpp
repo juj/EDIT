@@ -205,6 +205,7 @@ static unsigned char ascii_to_business_petscii(unsigned char ch)
   if (ch == 0x14) return 0x08; // Device Control 4
   if (ch == 0x60) return 0xC0; // `
   if (ch == 0x93) return 0x0C; // "
+  if (ch == '|') return 0x7D;  // Manually map pipe to 0x7D, the PETSCII representation of a PIPE char (in ASCII, '|' is 0x7C, in both gfx and business PETSCII, it is 0x7D)
   if (ch >= 0x41 && ch <= 0x5A) return ch + 0x20; // A-Z
   if (ch >= 0x61 && ch <= 0x7A) return ch - 0x20; // a-z
   if (ch >= 0x7B && ch <= 0x7F) return ch + 0x60; // {, |, }, ~ and DEL
@@ -932,7 +933,7 @@ int view_file(char *text, uint8_t view_type)
         }
         if (line+1 < l1 || len > 0)
         {
-          fputc('\n',handle);
+          fputc('\r',handle); // Write native C64 newline
           ++num_bytes;
         }
       }
