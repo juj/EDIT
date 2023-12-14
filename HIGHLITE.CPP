@@ -72,50 +72,50 @@ int is_cpp_reserved_word(const char huge *s, const char huge *end)
     if (*s == CH('i')) return E1("8") || E1("f");
     return E("u8");
   case 3:
-    if (*s == CH('f')) return E1("or");
     if (*s == CH('i')) return E1("16") || E1("24") || E1("32") || E1("64") || E1("nt");
     if (*s == CH('u')) return E1("16") || E1("24") || E1("32") || E1("64");
-    if (*s == CH('n')) return E1("ew");
-    return E("try");
+//disabled for code size////    if (*s == CH('n')) return E1("ew");
+    if (*s == CH('t')) return E1("ry");
+    return E("for");
   case 4:
-    if (*s == CH('a')) return E1("uto");
+//disabled for code size////    if (*s == CH('a')) return E1("uto");
     if (*s == CH('b')) return E1("ool");
     if (*s == CH('c')) return E1("ase") || E1("har");
     if (*s == CH('e')) return E1("lse") || E1("num");
     if (*s == CH('g')) return E1("oto");
     if (*s == CH('l')) return E1("ong");
-    if (*s == CH('t')) return E1("this");
+//disabled for code size////    if (*s == CH('t')) return E1("this");
     return E("void");
   case 5:
     if (*s == CH('b')) return E1("reak");
-    if (*s == CH('c')) return E1("atch") || E1("lass") || E1("onst");
-    if (*s == CH('f')) return E1("loat");
+    if (*s == CH('c')) return E1("onst") || E1("lass");//disabled for code size//// || E1("atch");
+//disabled for code size////    if (*s == CH('f')) return E1("loat");
     if (*s == CH('s')) return E1("hort");
-    if (*s == CH('t')) return E1("hrow");
+//disabled for code size////    if (*s == CH('t')) return E1("hrow");
     if (*s == CH('u')) return E1("nion");
     return E("while");
   case 6:
-    if (*s == CH('d')) return E1("elete") || E1("ouble");
-    if (*s == CH('e')) return E1("xtern");
-    if (*s == CH('f')) return E1("riend");
-    if (*s == CH('i')) return E1("nline");
-    if (*s == CH('p')) return E1("ublic");
-    if (*s == CH('s')) return E1("igned") || E1("izeof") || E1("tatic") || E1("truct") || E1("witch");
+//disabled for code size////    if (*s == CH('d')) return E1("elete") || E1("ouble");
+//disabled for code size////    if (*s == CH('e')) return E1("xtern");
+    //disabled for code size////if (*s == CH('f')) return E1("riend");
+//disabled for code size////    if (*s == CH('i')) return E1("nline");
+//disabled for code size////    if (*s == CH('p')) return E1("ublic");
+    if (*s == CH('s')) return E1("witch") || E1("izeof") || E1("truct");//disabled for code size//// || E1("tatic") || E1("igned");
     return E("return");
   case 7:
     if (*s == CH('d')) return E1("efault");
-    if (*s == CH('p')) return E1("rivate");
-    if (*s == CH('t')) return E1("ypedef");
-    return E("virtual");
+//disabled for code size////    if (*s == CH('p')) return E1("rivate");
+//disabled for code size////    if (*s == CH('v')) return E1("irtual");
+    return E("typedef");
   case 8:
     if (*s == CH('c')) return E1("ontinue");
     if (*s == CH('o')) return E1("perator");
-    if (*s == CH('r')) return E1("egister");
+//disabled for code size////    if (*s == CH('r')) return E1("egister");
     if (*s == CH('t')) return E1("emplate");
     if (*s == CH('u')) return E1("nsigned");
     return E("volatile");
-  case 9:
-    return E("protected");
+//disabled for code size////  case 9:
+//disabled for code size////    return E("protected");
   default:
     return 0;
   }
