@@ -709,25 +709,21 @@ extern "C" char *strcat(char *s1, const char *s2) // TODO: optimize
 
 extern "C" int strcmp(const char *s1, const char *s2)
 {
-  for(;;)
+  for(;; ++s1, ++s2)
   {
-    if (!*s1) return -1;
+    if (!*s1) return *s2 ? -1 : 0;
     if (!*s2) return 1;
-    if (!*s1 != !*s2) return *s1 - *s2;
-    ++s1;
-    ++s2;
+    if (*s1 != *s2) return *s1 - *s2;
   }
 }
 
-extern "C" int strncmp(const char *s1, const char *s2, size_t num) // TODO: optimize
+extern "C" int strncmp(const char *s1, const char *s2, size_t num)
 {
-  for(const char *end = s1 + num; s1 < end;)
+  for(const char *end = s1 + num; s1 < end; ++s1, ++s2)
   {
-    if (!*s1) return -1;
+    if (!*s1) return *s2 ? -1 : 0;
     if (!*s2) return 1;
     if (*s1 != *s2) return *s1 - *s2;
-    ++s1;
-    ++s2;
   }
   return 0;
 }
@@ -1336,6 +1332,25 @@ unsigned char petscii_to_screen_code(unsigned char petscii)
   if (petscii <= 191) return petscii - 64;
   if (petscii <= 254) return petscii - 128;
   return 0x5E;
+}
+
+static unsigned char ascii_to_business_petscii(unsigned char ch)
+{
+  if (ch == 0x08) return 0x14; // Backspace character
+  if (ch == 0x0A) return 0x0D; // NL line feed, new line
+  if (ch == 0x0B) return 0x11; // Vertical tab
+  if (ch == 0x0C) return 0x93; // NP form feed, new page
+  if (ch == 0x0D) return 0x0A; // Carriage return
+  if (ch == 0x11) return 0x0B; // Device Control 1
+  if (ch == 0x14) return 0x08; // Device Control 4
+  if (ch == 0x60) return 0xC0; // `
+  if (ch == 0x93) return 0x0C; // "
+  if (ch == '|') return 0x7D;  // Manually map pipe to 0x7D, the PETSCII representation of a PIPE char (in ASCII, '|' is 0x7C, in both gfx and business PETSCII, it is 0x7D)
+  if (ch >= 0x41 && ch <= 0x5A) return ch + 0x20; // A-Z
+  if (ch >= 0x61 && ch <= 0x7A) return ch - 0x20; // a-z
+  if (ch >= 0x7B && ch <= 0x7F) return ch + 0x60; // {, |, }, ~ and DEL
+  if (ch <= 0xBF || ch >= 0xE0) return ch; // Various other characters that map directly through
+  return ch - 0x60;
 }
 
 extern "C" char *gets_s(char *str, rsize_t n)
