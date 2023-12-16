@@ -22,6 +22,15 @@ T MAX(T a, T b)
 }
 
 template<typename T>
+void SWAP(T &a, T &b)
+{
+  T tmp = a;
+  a = b;
+  b = tmp;
+}
+
+
+template<typename T>
 void qsort(T *arr, u16 n)
 {
   T pivot = arr[n/2];
