@@ -990,7 +990,7 @@ void erase_current_line()
     --firstDisplayedLineNumber;
     cursorY += line_delta;
   }
-  repaint_screen();
+  restrict_cursor_on_line(/*repaint=*/true);
 }
 
 void measure_and_print_available_memory()
