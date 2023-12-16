@@ -237,6 +237,7 @@ def petscii_to_ascii_ch(ch): # shifted PETSCII
   if ch == 0xAB: return ord('{')
   if ch == 0xB3: return ord('}')
   if ch == 0x7D: return ord('|')
+  if ch == 0xDD: return ord('|')
   if ch == 0xAE: return ord('\\')
 #  if ch >= 0xC1 and ch <= 0xDA: return ord('a') +(ch-0xC1)
   return p2a[ch]
@@ -253,6 +254,7 @@ def petscii_to_ascii_ch_inside_quotes(ch):
   if ch == 0xAB: return ord('{')
   if ch == 0xB3: return ord('}')
   if ch == 0x7D: return ord('|')
+  if ch == 0xDD: return ord('|')
   if ch == 0xAE: return ord('\\')
   if ch >= 0xC1 and ch <= 0xDA: return ord('a') +(ch-0xC1)
   return ch#p2a[ch]
