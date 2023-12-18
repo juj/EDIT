@@ -219,6 +219,13 @@ void put_char_back(FILE *f, uint8_t ch)
   f->nextChar = ch;
 }
 
+static uint8_t peek_next_char(FILE *f, bool *error)
+{
+  uint8_t ch = read_next_char(f, error);
+  put_char_back(f, ch);
+  return ch;
+}
+
 extern "C" FILE *fopen(const char *filename, const char *mode)
 {
   assert(filename);
@@ -332,6 +339,30 @@ end:
   return atol(intstr);
 }
 
+bool is_hex_digit(char ch) {
+  bool is_hex = (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F');
+  return is_hex || isdigit(ch);
+}
+
+static uint32_t fscanf_read_hex32(FILE *f)
+{
+  bool error;
+  uint8_t ch = read_next_char(f, &error);
+  uint32_t hex = 0;
+  while(is_hex_digit(ch))
+  {
+    u8 val;
+    if (isdigit(ch)) val = ch - '0';
+    else val = (ch & ~0x20) - 'A' + 10;
+    hex = (hex << 4) | val;
+    ch = read_next_char(f, &error);
+    if (error) goto end;
+  }
+  put_char_back(f, ch);
+end:
+  return hex;
+}
+
 static void fscanf_read_str(FILE *f, char *dst)
 {
   bool error;
@@ -369,16 +400,19 @@ extern "C" int fscanf(FILE *f, const char *format, ...)
   {
     if (*format != '%')
     {
-      ch = read_next_char(f, &error);
-      if (error) goto end;
-      if (ch != *format)
-      {
-        put_char_back(f, ch);
-        goto end;
-      }
       // A single space character in format should
       // consume as many whitespaces from input as possible
       if (isspace(*format)) fscanf_skip_whitespace(f);
+      else
+      {
+        ch = read_next_char(f, &error);
+        if (error) goto end;
+        if (ch != *format)
+        {
+          put_char_back(f, ch);
+          goto end;
+        }
+      }
     }
     else
     {
@@ -390,8 +424,7 @@ extern "C" int fscanf(FILE *f, const char *format, ...)
       case 'u': // TODO test if this actually works?
       case 'U': // TODO test if this actually works?
       {
-        ch = read_next_char(f, &error);
-        put_char_back(f, ch);
+        ch = peek_next_char(f, &error);
         if (error || !isdigit(ch)) goto end;
         int *dst = va_arg(args, int*);
         *dst = fscanf_read_int(f);
@@ -424,13 +457,22 @@ extern "C" int fscanf(FILE *f, const char *format, ...)
         case 'u':
         case 'U':
         {
-          ch = read_next_char(f, &error);
-          put_char_back(f, ch);
+          ch = peek_next_char(f, &error);
           if (error || !isdigit(ch)) goto end;
           int32_t *dst = va_arg(args, int32_t*);
           *dst = fscanf_read_int32(f);
           ++num_parsed;
         }
+        break;
+        case 'x':
+        case 'X':
+        {
+          ch = peek_next_char(f, &error);
+          if (error || !is_hex_digit(ch)) goto end;
+          int32_t *dst = va_arg(args, int32_t*);
+          *dst = fscanf_read_hex32(f);
+          ++num_parsed;
+        }          
         break;
         default: assert(false); break;
         }
@@ -1446,10 +1488,10 @@ static volatile reu_addr_t *const reu_cart_addr = (reu_addr_t*)0xDF04;
 static volatile uint16_t *const reu_xfer_length = (uint16_t*)0xDF07;
 static volatile uint8_t *const reu_address_ctl = (uint8_t*)0xDF0A;
 
-void reucpy(void *c64_addr, unsigned _BitInt(24) reu_addr, uint16_t size, uint8_t direction)
+void reucpy(void *c64_addr, reu_addr_t reu_addr, uint16_t size, uint8_t direction)
 {
   assert(direction == RAM2REU || direction == REU2RAM);
-  // Call reu_detect() first if this assert() triggers, or if manually
+  // Call reu_init() first if this assert() triggers, or if manually
   // having done REU accesses in between, be sure to reset bits 7 and 6
   // of REU address control register back to zero.
   assert((*reu_address_ctl & 0xC0) == 0);
@@ -1460,9 +1502,21 @@ void reucpy(void *c64_addr, unsigned _BitInt(24) reu_addr, uint16_t size, uint8_
   *reu_command = direction;
 }
 
-int reu_detect()
+void reuset(reu_addr_t reu_addr, uint8_t val, uint16_t size)
 {
-  *reu_address_ctl = *reu_address_ctl & ~0xC0; // Make both C64 and REU addresses advance per each transferred byte
+  *reu_address_ctl = (*reu_address_ctl & 0x3F) | 0x80; // Fix C64 address, advance REU address
+
+  *reu_c64_addr = (uintptr_t)&val;
+  *reu_cart_addr = reu_addr;
+  *reu_xfer_length = size;
+  *reu_command = RAM2REU;
+
+  *reu_address_ctl = *reu_address_ctl & 0x3F; // Restore both C64 and REU addresses to advance per each transferred byte
+}
+
+int reu_init()
+{
+  *reu_address_ctl = *reu_address_ctl & 0x3F; // Make both C64 and REU addresses advance per each transferred byte
 
   char data[5] = { 'a', 'r', 'e', 'u', 0 };
   for(int bank = 255; bank >= 0; --bank)

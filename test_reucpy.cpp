@@ -3,7 +3,7 @@
 
 int main()
 {
-  int num_banks = reu_detect();
+  int num_banks = reu_init();
   printf("DETECTED %lu BYTES OF REU MEMORY.\n", (unsigned long)num_banks*65536);
   printf("REU STATUS REGISTER: 0X%X.\n", (int)*(volatile uint8_t*)0xDF00);
   printf("REU VERSION: %d.\n", (int)(*(volatile uint8_t*)0xDF00 & 15));

@@ -51,6 +51,7 @@ void qsort(T *arr, u16 n)
 #ifndef __mos__
 
 inline void getch() {}
+inline void _HALT() { for(;;) ;}
 
 #endif
 
