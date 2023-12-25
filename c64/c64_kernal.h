@@ -338,4 +338,16 @@ _KERNAL bool _DATASSETTE_BUTTON_DOWN() { return ((*(volatile uint8_t*)0x01) & 0x
 // will not be able to understand to optimize away.
 _KERNAL void _HALT() { _ASM volatile("1: JMP 1b"); }
 
+// Writes the given character at bottom-right corner of the screen. You can use this
+// for quick debugging purposes.
+_KERNAL void _DEBUG_SCREEN_CHAR(char ch)
+{
+  uint8_t vic_idx = *(volatile uint8_t *)0xDD00 & 3;
+  uint16_t vic_bank = 0x4000*(3-vic_idx);
+  uint8_t screen_mem_idx = *(volatile uint8_t *)0xD018 >> 4;
+  uint16_t screen_mem = 0x0400*screen_mem_idx;
+  volatile uint8_t *screen_ram = (volatile uint8_t *)(vic_bank+screen_mem);
+  screen_ram[999] = ch;
+}
+
 #endif // ~__C64__

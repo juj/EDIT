@@ -95,6 +95,8 @@ int fputc(int ch, FILE *f);
 int fputs(const char *str, FILE *f);
 int fclose(FILE *f);
 
+long long atoll(const char *str);
+
 int printf(const char *format, ...);
 
 typedef uint8_t rsize_t;

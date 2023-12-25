@@ -305,13 +305,17 @@ static int fscanf_read_int(FILE *f)
 {
   bool error;
   uint8_t ch = read_next_char(f, &error);
-  char intstr[6] = { 0, 0, 0, 0, 0, 0 }; // max length 65536
+  char intstr[7] = { 0, 0, 0, 0, 0, 0 }; // max length -32768
   uint8_t i = 0;
-  assert(isdigit(ch)); // Precondition to calling this function: next character in file must be an integer
+  assert(isdigit(ch) || ch == '-'); // Precondition to calling this function: next character in file must be an integer
+  if (ch == '-') {
+    intstr[i++] = ch;
+    ch = read_next_char(f, &error);
+  }
   while(isdigit(ch))
   {
     intstr[i++] = ch;
-    if (i >= 5) i = 0; // if i gets this large, read will overflow (will read garbage)
+    if (i >= 6) i = 0; // if i gets this large, read will overflow (will read garbage)
     ch = read_next_char(f, &error);
     if (error) goto end;
   }
@@ -326,7 +330,11 @@ static int32_t fscanf_read_int32(FILE *f)
   uint8_t ch = read_next_char(f, &error);
   char intstr[12] = { 0, 0, 0, 0, 0, 0 }; // max length –2147483648
   uint8_t i = 0;
-  assert(isdigit(ch)); // Precondition to calling this function: next character in file must be an integer
+  assert(isdigit(ch) || ch == '-'); // Precondition to calling this function: next character in file must be an integer
+  if (ch == '-') {
+    intstr[i++] = ch;
+    ch = read_next_char(f, &error);
+  }
   while(isdigit(ch))
   {
     intstr[i++] = ch;
@@ -337,6 +345,25 @@ static int32_t fscanf_read_int32(FILE *f)
   put_char_back(f, ch);
 end:
   return atol(intstr);
+}
+
+static int64_t fscanf_read_int64(FILE *f)
+{
+  bool error;
+  uint8_t ch = read_next_char(f, &error);
+  char intstr[21] = { 0, 0, 0, 0, 0, 0 }; // max length 18446744073709551615 
+  uint8_t i = 0;
+  assert(isdigit(ch)); // Precondition to calling this function: next character in file must be an integer
+  while(isdigit(ch))
+  {
+    intstr[i++] = ch;
+    if (i >= 20) i = 0; // if i gets this large, read will overflow (will read garbage)
+    ch = read_next_char(f, &error);
+    if (error) goto end;
+  }
+  put_char_back(f, ch);
+end:
+  return atoll(intstr);
 }
 
 bool is_hex_digit(char ch) {
@@ -425,7 +452,8 @@ extern "C" int fscanf(FILE *f, const char *format, ...)
       case 'U': // TODO test if this actually works?
       {
         ch = peek_next_char(f, &error);
-        if (error || !isdigit(ch)) goto end;
+
+        if (error || (!isdigit(ch) && ch != '-')) goto end;
         int *dst = va_arg(args, int*);
         *dst = fscanf_read_int(f);
         ++num_parsed;
@@ -452,13 +480,31 @@ extern "C" int fscanf(FILE *f, const char *format, ...)
       case 'L':
         switch(*++format)
         {
+        case 'l':
+        case 'L':
+          switch(*++format)
+          {
+          case 'd':
+          case 'D':
+          case 'u':
+          case 'U':
+          {
+            ch = peek_next_char(f, &error);
+            if (error || (!isdigit(ch) && ch != '-')) goto end;
+            int64_t *dst = va_arg(args, int64_t*);
+            *dst = fscanf_read_int64(f);
+            ++num_parsed;
+          }
+          break;
+          }
+        break;
         case 'd':
         case 'D':
         case 'u':
         case 'U':
         {
           ch = peek_next_char(f, &error);
-          if (error || !isdigit(ch)) goto end;
+          if (error || (!isdigit(ch) && ch != '-')) goto end;
           int32_t *dst = va_arg(args, int32_t*);
           *dst = fscanf_read_int32(f);
           ++num_parsed;
@@ -646,30 +692,46 @@ extern "C" size_t fwrite(const void *buffer, size_t size, size_t count, FILE *f)
 
 extern "C" size_t fwrite8(const void *buffer, uint8_t count, FILE *f)
 {
+  _DEBUG_SCREEN_CHAR('A');
   assert(f);
+  _DEBUG_SCREEN_CHAR('B');
   if (_CHKOUT(f->handle)) return 0;
+  _DEBUG_SCREEN_CHAR('C');
   SCOPE_SAVE_SCREEN_BORDER();
-
+  _DEBUG_SCREEN_CHAR('D');
   const uint8_t *ptr = (const uint8_t*)buffer;
+  _DEBUG_SCREEN_CHAR('E');
   while(count--)
   {
+  _DEBUG_SCREEN_CHAR('F');
     if (DRIVE_STATUS_ERROR()) break;
+  _DEBUG_SCREEN_CHAR('G');
     SET_SCREEN_BORDER(*ptr);
+  _DEBUG_SCREEN_CHAR('H');
     _CHROUT(*ptr++);
   }
+  _DEBUG_SCREEN_CHAR('I');
   _CLRCHN();
+  _DEBUG_SCREEN_CHAR('J');
   return (uintptr_t)ptr - (uintptr_t)buffer;
 }
 
 extern "C" int fputc(int ch, FILE *f)
 {
+  _DEBUG_SCREEN_CHAR('K');
   assert(f);
+  _DEBUG_SCREEN_CHAR('L');
   if (_CHKOUT(f->handle) || DRIVE_STATUS_ERROR()) return EOF;
+  _DEBUG_SCREEN_CHAR('M');
   SCOPE_SAVE_SCREEN_BORDER();
+  _DEBUG_SCREEN_CHAR('N');
   SET_SCREEN_BORDER(ch);
+  _DEBUG_SCREEN_CHAR('O');
 
   bool error = _CHROUT_GET_ERROR((unsigned char)ch);
+  _DEBUG_SCREEN_CHAR('P');
   _CLRCHN();
+  _DEBUG_SCREEN_CHAR('Q');
   return error ? EOF : ch;
 }
 
@@ -822,6 +884,7 @@ template <typename T> static inline T _atoi(const char *str) {
 extern "C" {
 int atoi(const char *str) { return _atoi<int>(str); }
 long atol(const char *str) { return _atoi<long>(str); }
+long long atoll(const char *str) { return _atoi<long long>(str); }
 }
 
 extern "C" int isalpha(int c) { // TODO: optimize
